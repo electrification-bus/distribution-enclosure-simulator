@@ -65,6 +65,12 @@ from ebus_panel_sim.snapshot import (
 from ebus_panel_sim.tick_inputs import PanelEnvelopeTick, TickInputs
 from ebus_panel_sim.wire.set_router import SetterHandler, SetterRegistry
 
+# Single source of truth for the distribution version: pyproject reads it from here
+# via `[tool.hatch.version]`, and publish.yml refuses to release when the git tag
+# disagrees. Bump it in this one place. Note this is the PACKAGE version and is
+# distinct from the producer-contract version the docstrings above refer to.
+__version__ = "0.2.0"
+
 __all__ = [
     "BESSConfig",
     "BESSDevice",
@@ -108,5 +114,6 @@ __all__ = [
     "SetterHandler",
     "SetterRegistry",
     "TickInputs",
+    "__version__",
     "legs_for_tabs",
 ]

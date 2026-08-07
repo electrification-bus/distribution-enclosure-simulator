@@ -1,0 +1,105 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  # Re-run the full gate set against the tag. A tag can point anywhere, so a green
+  # CI run on the branch is not evidence about the commit being released.
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --group dev
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run mypy --strict src tests
+      - run: uv run pytest tests --tb=short
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    # Names the PyPI trusted publisher's environment. PyPI checks this claim on the
+    # OIDC token, so it must match the "Environment name" registered there.
+    environment: pypi
+    permissions:
+      # Mints the OIDC token trusted publishing exchanges for an upload token. No
+      # PyPI API token is stored anywhere.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v3
+
+      # The version lives in one place, but the tag is typed by hand. Refuse to
+      # publish an artifact whose version disagrees with the tag that triggered it,
+      # rather than burning a version number on PyPI (uploads are not replaceable).
+      - name: Verify the tag matches the package version
+        run: |
+          pkg="v$(uv run python -c 'import re,pathlib; print(re.search(r"__version__ = \"([^\"]+)\"", pathlib.Path("src/ebus_panel_sim/__init__.py").read_text()).group(1))')"
+          echo "tag=${GITHUB_REF_NAME} package=${pkg}"
+          test "${pkg}" = "${GITHUB_REF_NAME}"
+
+      - name: Build the sdist and wheel
+        run: uv build
+
+      # Guards the packaging fault that kept this package unbuildable until #8: the
+      # wheel must actually carry the YAML/JSON wire data, since every profile and
+      # mapping lookup resolves from it at runtime and the test suite reads the
+      # source tree instead.
+      - name: Verify the wheel carries its wire data
+        run: |
+          python - <<'PY'
+          import glob, zipfile, sys
+          names = zipfile.ZipFile(sorted(glob.glob("dist/*.whl"))[0]).namelist()
+          missing = [d for d in ("wire/profiles", "wire/mapping", "wire/catalogs")
+                     if not any(d in n for n in names)]
+          dupes = len(names) - len(set(names))
+          if missing or dupes:
+              sys.exit(f"missing={missing} duplicate_entries={dupes}")
+          print(f"ok: {len(names)} entries, no duplicates, all wire data present")
+          PY
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true
+
+  # Mirror the release to GitHub Releases, using the tag's CHANGELOG section as the
+  # notes. Idempotent (create, else edit).
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create the GitHub Release from the CHANGELOG section
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          python3 - "$version" > notes.md <<'PY'
+          import re, sys, pathlib
+          v = re.escape(sys.argv[1])
+          text = pathlib.Path("CHANGELOG.md").read_text()
+          m = re.search(rf"^## \[{v}\][^\n]*\n(.*?)(?=^## \[|\Z)", text, re.S | re.M)
+          body = (m.group(1).strip() if m else "") or "See CHANGELOG.md."
+          sys.stdout.write(body + "\n")
+          PY
+          gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" \
+            --notes-file notes.md --verify-tag \
+            || gh release edit "${GITHUB_REF_NAME}" --notes-file notes.md

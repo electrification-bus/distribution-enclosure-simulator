@@ -4,7 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ebus-panel-sim"
-version = "0.2.0"
+# Single source of truth: src/ebus_panel_sim/__init__.py's __version__ (read
+# dynamically below). Bump it in ONE place; publish.yml fails the release if the
+# git tag disagrees. Matches the convention across the eBus family.
+dynamic = ["version"]
 description = "Producer-side Homie publisher with embedded behaviour runtime for the eBus convention"
 authors = [
     {name = "Bill Flood"},
@@ -29,6 +32,9 @@ dev = [
 Homepage = "https://ebus.energy"
 Repository = "https://github.com/electrification-bus/distribution-enclosure-simulator"
 Issues = "https://github.com/electrification-bus/distribution-enclosure-simulator/issues"
+
+[tool.hatch.version]
+path = "src/ebus_panel_sim/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 # `packages` already carries everything under the package directory, including the
