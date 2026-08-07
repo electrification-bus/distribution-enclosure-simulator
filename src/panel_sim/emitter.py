@@ -49,6 +49,7 @@ from panel_sim.snapshot import (
     EbusPvSnapshot,
 )
 from panel_sim.tick_inputs import TickInputs
+from panel_sim.wire._sdk_seam import owned_client
 from panel_sim.wire.bag_builder import BagBuilder
 from panel_sim.wire.graph_builder import build_graph
 from panel_sim.wire.mapping_loader import load_mapping_table
@@ -257,8 +258,9 @@ class Emitter:
         every device's retained values + ``$description`` before disconnecting,
         for a clean-slate re-run."""
         if not graceful:
-            if self._root.mqttc is not None:
-                self._root.mqttc.stop()
+            client = owned_client(self._root.mqttc)
+            if client is not None:
+                client.stop()
             return
         if clear_retained:
             for device in self._graph.devices.values():
