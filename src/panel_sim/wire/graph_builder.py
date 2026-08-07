@@ -48,11 +48,27 @@ def build_graph(
     mapping: MappingTable,
     profiles: ProfileTable,
     *,
-    mqtt_cfg: dict[str, Any],
+    mqtt_cfg: dict[str, Any] | None = None,
+    mqttc: Any | None = None,
 ) -> BuiltGraph:
-    """Build the SDK device tree. ``mqtt_cfg`` is the broker config handed to the
-    root device (a plain dict: ``host``/``port``/TLS/auth keys per ebus-mqtt-client);
-    children share the root's connection. No socket opens here."""
+    """Build the SDK device tree. No socket opens here.
+
+    Exactly one of ``mqtt_cfg`` or ``mqttc`` names the root's connection, and
+    children share whichever it is:
+
+    - ``mqtt_cfg`` — a broker config dict (``host``/``port``/TLS/auth keys per
+      ebus-mqtt-client) from which the SDK builds and owns a client.
+    - ``mqttc`` — a client the caller already owns, per ebus-sdk's
+      bring-your-own-transport contract. The SDK uses it as-is and never starts
+      or stops it.
+    """
+    if (mqtt_cfg is None) == (mqttc is None):
+        raise ManifestValidationError(
+            "build_graph requires exactly one of mqtt_cfg= or mqttc=; "
+            f"got mqtt_cfg={'set' if mqtt_cfg is not None else 'None'}, "
+            f"mqttc={'set' if mqttc is not None else 'None'}"
+        )
+
     graph = BuiltGraph()
 
     root_descriptors = [m for m in mapping.values() if m.placement.kind == "root-device"]
@@ -69,11 +85,22 @@ def build_graph(
         )
     root_instance = root_instances[0]
 
-    root_device = ebus_sdk.Device(
-        root_instance.instance_id,
-        name=root_instance.display_name,
-        type=profiles[root_class].type,
-        mqtt_cfg=mqtt_cfg,
+    # The SDK takes one or the other, never both: mqtt_cfg has it build a client
+    # it owns; mqttc hands it one the caller owns.
+    root_device = (
+        ebus_sdk.Device(
+            root_instance.instance_id,
+            name=root_instance.display_name,
+            type=profiles[root_class].type,
+            mqttc=mqttc,
+        )
+        if mqttc is not None
+        else ebus_sdk.Device(
+            root_instance.instance_id,
+            name=root_instance.display_name,
+            type=profiles[root_class].type,
+            mqtt_cfg=mqtt_cfg,
+        )
     )
     graph.devices[root_instance.instance_id] = root_device
     graph.root_id = root_instance.instance_id

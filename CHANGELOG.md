@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Bring-your-own-transport.** `Emitter(..., mqttc=client)` publishes the tree through a client the caller already owns, instead of having one built from `mqtt_cfg`. The two are mutually exclusive and passing both raises. This mirrors ebus-sdk's `Device(mqttc=...)` contract, and the case it serves is a host that cannot afford a second connection — a Home Assistant add-on, whose MQTT integration is `single_config_entry` and which forbids background threads (`ebus-mqtt-client` 0.4.0's `asyncio_driver()` covers pumping the loop). (#5)
+
+### Fixed
+
+- `Emitter.start()` no longer blocks waiting for a connection it does not own. With an injected client it returned only after polling `is_connected()` for the full `connect_timeout_s`, which would stall the very event loop such a client is likely driven on; the caller owns that lifecycle and the SDK never starts an injected client, so there is nothing to wait for. Retained values still republish on connect. Unchanged for a client the emitter had built. (#5)
+- `Emitter.stop(graceful=False)` no longer calls `stop()` on an injected client, which would tear down a connection the caller owns and may be using for other things. ebus-sdk makes the same guarantee for the devices it holds; the emitter now matches it. (#5)
+
 ### Changed
 
 - `ebus-sdk` pin moved from `>=0.12,<0.13` to `>=0.18,<0.19`. The old range excluded the release carrying the [python-sdk#27](https://github.com/electrification-bus/python-sdk/issues/27) fixes — the `battery` capability key removed in favour of `soc`, and `energy` → `energy_storage` / `total_increasing` → `measurement` for `soe`, `total-energy-storage` and `loadup-headroom` — so a downstream needing those could not stay inside the pin. No source changes: the published tree is byte-identical on `0.12.0` and `0.18.0` (197 retained topics, identical topic sets, zero payload differences once the `$description` `version` timestamp is normalised), and the suite is `158 passed` under both. `uv.lock` also moves `ebus-mqtt-client` 0.1.8 → 0.4.0, which `ebus-sdk` 0.18.0 requires. (#4, closes #3)
