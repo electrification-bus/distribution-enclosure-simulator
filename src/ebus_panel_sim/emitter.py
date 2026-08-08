@@ -796,6 +796,11 @@ class Emitter:
         # Step 8b: MID snapshots — the grid-forming interconnect device that a
         # commissioned islanding BESS exposes. Identity is static; grid state is
         # derived from the grid-online signal this tick.
+        #
+        # Off grid, the grid catalog wants the Homie device id of the device
+        # forming the reference, not its class. Left absent when no single BESS
+        # answers to that, which the catalog permits for "unknown".
+        islanded_former = self._grid_forming_device_id()
         mid_snaps: dict[str, EbusMidSnapshot] = {}
         for mid_id, mphys in self._physics.all_mid().items():
             mid_snaps[mid_id] = EbusMidSnapshot(
@@ -807,7 +812,7 @@ class Emitter:
                 hardware_version=mphys.hardware_version,
                 islanding_state="ON_GRID" if tick.grid_online else "OFF_GRID",
                 grid_state="UP" if tick.grid_online else "DOWN",
-                grid_forming_entity="GRID" if tick.grid_online else "BESS",
+                grid_forming_entity="GRID" if tick.grid_online else islanded_former,
             )
 
         # Step 9: assemble the panel snapshot from capability sub-dataclasses.
@@ -917,3 +922,16 @@ class Emitter:
             lugs=lugs_snaps,
             mid=mid_snaps,
         )
+
+    def _grid_forming_device_id(self) -> str | None:
+        """Homie id of the device forming the AC reference while islanded.
+
+        The MID mapping places it ``child-of-parent`` under ``bess``, and the
+        graph builder refuses a manifest where that parent is ambiguous, so a
+        single BESS is the answer wherever a MID exists at all. Anything else is
+        reported as unknown rather than guessed at.
+        """
+        bess_ids = tuple(self._physics.all_bess())
+        if len(bess_ids) != 1:
+            return None
+        return bess_ids[0]

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`grid/grid-forming-entity` published the class name `"BESS"` while islanded, where the catalog asks for a device id.** The grid capability catalog defines the property as `"GRID"` when grid-tied "or the Homie device ID of the grid-forming device … when islanded", and a consumer's use for it is to point at the device now forming the AC reference — to badge it, link to it, attribute the island to it. `"BESS"` resolves to nothing on the wire and defeats all three; in a manifest with a second DER it is not even unambiguous about which battery. It now publishes the BESS instance id, resolved the way the graph builder already resolves a MID's parent, and reports unknown (property absent, which the catalog permits) rather than guessing if a single BESS ever stops answering. No conformance report flagged this: the property's datatype is `string`, so the wrong value was always legal. Three tests pin it, two failing against the previous commit.
+
 ## [0.4.0] - 2026-08-08
 
 Adds bring-your-own-transport: a producer that already owns its MQTT connection can publish an eBus tree through it. Additive, so nothing existing changes; the minor bump reflects new public API rather than a break.
