@@ -42,6 +42,14 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    # The upper bound is a convention, not a recorded incompatibility. ebus-sdk is
+    # 0.x, where a minor release is allowed to break API, so the cap defaults to the
+    # next minor. Raise it deliberately once the suite is verified against that
+    # minor, as 0.5.2 did for 0.21 (the suite passed unchanged). Do not read the cap
+    # as evidence that the next minor is known to break: the bound has moved in
+    # lockstep with every floor bump since 0.12 and has never recorded an actual
+    # incompatibility. It matters to consumers, not just here, because this cap is
+    # what pins anything depending on ebus-panel-sim.
     "ebus-sdk>=0.20.1,<0.22",
     "pyyaml>=6.0",
 ]
