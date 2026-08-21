@@ -43,3 +43,55 @@ jobs:
 
       - name: Pytest
         run: uv run pytest tests --tb=short
+
+  # Separate job, and separate from the pytest run above, because it needs a second
+  # repository checked out and because it answers a different question.
+  #
+  # INTEGRITY, not currency. This asserts the vendored catalogs are byte-identical to
+  # the spec AT THE COMMIT .ebus-spec.json pins, which is always true when this repo is
+  # honest and is a real failure when it is not. It deliberately does not ask whether
+  # the spec has moved past that pin: being behind the spec is an ordinary state, not a
+  # build failure, and conflating the two is what made this check unreliable before.
+  #
+  # Previously the byte comparison ran only against a developer's sibling checkout, so
+  # it never ran here and reported whatever that clone happened to be sitting on. A
+  # spec bump could therefore break it silently for anyone with both repos while CI
+  # stayed green, which is exactly what happened on 2026-08-20.
+  catalog-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: distribution-enclosure-simulator
+
+      - name: Read the pinned specification commit
+        id: pin
+        working-directory: distribution-enclosure-simulator
+        run: |
+          sha=$(python3 -c "import json; print(json.load(open('.ebus-spec.json'))['synced_commit'])")
+          echo "Pinned specification commit: $sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      # Checking out the exact pinned SHA rather than a branch is the point: it is what
+      # makes this reproducible and what lets the comparison mean something.
+      - uses: actions/checkout@v4
+        with:
+          repository: electrification-bus/specification
+          ref: ${{ steps.pin.outputs.sha }}
+          path: specification
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        working-directory: distribution-enclosure-simulator
+        run: uv sync
+
+      - name: Vendored catalogs match the pinned spec commit
+        working-directory: distribution-enclosure-simulator
+        env:
+          EBUS_SPEC_DIR: ${{ github.workspace }}/specification
+        run: uv run pytest tests/test_catalog_drift.py --tb=short -v
