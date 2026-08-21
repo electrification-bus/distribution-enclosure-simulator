@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.6.1] - 2026-08-21
+
+No behaviour change: nothing this package publishes moves. The reason to release is the dependency ceiling, which is what reaches consumers.
+
+### Changed
+
+- **`ebus-sdk` may now be 0.22.** Floor unchanged; the ceiling moves from `<0.22` to `<0.23`. Nothing here uses anything new, and the suite passes 223/223 against 0.22.0 unaltered. The release exists because the cap is what pins every *consumer* of this package: 0.6.0 declares `<0.22` on PyPI, so anything depending on `ebus-panel-sim` is held below the current SDK until a release carries the raise. That is the same situation 0.5.2 existed to end, and it recurs on every SDK minor.
+
+  0.22.0 carries `DeviceTreeBuilder.add_root_capabilities()` and `.extend()`, which the wire-layer rewrite needs, plus a fix for the builder replacing properties in a model it does not own and discarding live values, callbacks and setters.
+
+- **Vendored `power-flows` catalog re-vendored to 0.3, lockfile re-pinned to specification `7ee7ca9`.** The specification qualified the negation table shortly after 0.6.0 shipped: `power-flows/grid` is the negation of the service lugs' `meter/active-power` **only** where those lugs are the utility connection point, which is false for an upstream DER (a battery between the utility and the main lugs) and for an enclosure chain. In both, the lugs measure panel-side flow while `grid` measures utility-side flow. No value this package publishes changes, because it already computed grid from the lugs *and* the BESS rather than by negating the lugs.
+
+### Fixed
+
+- **The vendored-catalog check was measuring the wrong thing, and could not run in CI.** It compared the vendored catalogs against whatever `../specification` happened to be checked out at, so it failed when that clone moved ahead of the pin (ordinary currency drift, not a defect), would fail spuriously on an unrelated branch, and would pass falsely against a clone itself stale at the pinned commit. It also skipped without a sibling checkout, which is never present in CI, so the only check validating the vendored bytes never ran automatically.
+
+  Both follow from `.ebus-spec.json` recording `synced_commit` as an exact anchor that nothing read. The check now reads the source out of git at that commit, making it deterministic and making it an integrity question: are the bytes we vendored the bytes we claim they are? CI gains a `catalog-integrity` job that checks out the specification at the pinned SHA and runs it, so the invariant is enforced rather than aspirational. A clone lacking the pinned commit now fails with an instruction to fetch rather than skipping, since a silent skip reads as a pass. Mutation-verified: tampering with a catalog names the file, and pointing `synced_commit` at the previous commit reports all ten catalogs that moved.
+
+  Deliberately not a currency check. Whether the specification has moved past the pin is a separate question, normally answered "yes, a little", and must not fail a build.
+
+- **The `ebus-sdk` pin carries its reason.** The upper bound had no comment, so anyone hitting it had to re-derive whether it guarded a real incompatibility. Tracing every change to the dependency shows it never did: the bound has moved in lockstep with each floor bump since 0.12 and was never raised independently. It is a 0.x convention, since a minor release of a 0.x dependency may break API, and it is raised deliberately once the suite is verified against that minor.
+
 ## [0.6.0] - 2026-08-20
 
 **BREAKING (wire).** This release changes the sign of values already being published. A consumer that stored or integrated any of them has records in the old frame that this release does not migrate. The affected properties are `power-flows/pv`, `power-flows/grid`, `power-flows/battery`, the BESS child's `meter/active-power`, and the downstream lugs' `meter/imported-energy` / `meter/exported-energy`. `power-flows/site` and the hosted-circuit frame are unchanged. The convention published here is now the one `capabilities/power-flows.md` 0.2 describes, so a consumer that was negating these values to compensate should stop.
