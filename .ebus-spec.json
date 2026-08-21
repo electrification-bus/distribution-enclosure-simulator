@@ -1,7 +1,7 @@
 {
   "$schema": "https://ebus.energy/schemas/ebus-spec.json",
   "spec_repo": "https://github.com/electrification-bus/specification",
-  "synced_commit": "4085c684f9a79bb3c25086112ba08c1f967f63c8",
+  "synced_commit": "7ee7ca93b19c3de3d61be44f01887ba9557dd803",
   "synced_date": "2026-08-20",
   "role": "publisher",
   "framework": "0.9",
@@ -17,7 +17,7 @@
       "shed": "0.2",
       "shed-forecast": "0.1",
       "grid": "0.2",
-      "power-flows": "0.2",
+      "power-flows": "0.3",
       "door": "0.1",
       "status": "0.1",
       "soc": "0.2"
