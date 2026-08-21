@@ -50,7 +50,7 @@ dependencies = [
     # lockstep with every floor bump since 0.12 and has never recorded an actual
     # incompatibility. It matters to consumers, not just here, because this cap is
     # what pins anything depending on ebus-panel-sim.
-    "ebus-sdk>=0.20.1,<0.22",
+    "ebus-sdk>=0.20.1,<0.23",
     "pyyaml>=6.0",
 ]
 
