@@ -26,6 +26,7 @@ import ebus_sdk
 
 from ebus_panel_sim.exceptions import ManifestValidationError, ProfileValidationError
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
+from ebus_panel_sim.manifest_physics import relay_locked
 from ebus_panel_sim.wire._sdk_seam import MqttDeviceTransport, make_property
 from ebus_panel_sim.wire.mapping_loader import MappingDescriptor, MappingTable
 from ebus_panel_sim.wire.profile_loader import Profile, ProfileTable
@@ -315,11 +316,32 @@ def _attach_profile(
                     ),
                     unit=_to_sdk_unit(prop.unit),
                     format_str=prop.format,
-                    settable=prop.settable,
+                    settable=_settable_for(prop.settable, instance, cap_name, prop_key),
                 )
                 graph.properties[
                     (entity_class, instance.instance_id, f"{cap_name}/{prop_key}")
                 ] = sdk_prop
+
+
+def _settable_for(
+    declared: bool,
+    instance: DeviceInstance,
+    cap_name: str,
+    prop_key: str,
+) -> bool:
+    """Narrow a profile's class-level ``settable`` to this instance.
+
+    The profile answers "may this property be settable", which is a statement
+    about the capability. ``switch/relay`` is the one property whose answer also
+    depends on the individual circuit: ``capabilities/switch.md`` makes it
+    settable "when ``relay-controllable``", and controllability is commissioned
+    per circuit, so a panel publishes a mix. Nothing else here varies that way,
+    and a locked circuit still declares ``load-shed/priority`` settable -- that
+    is a separate commissioning flag.
+    """
+    if not declared or (cap_name, prop_key) != ("switch", "relay"):
+        return declared
+    return not relay_locked(instance.metadata)
 
 
 def _render_node_id(template: str, instance: DeviceInstance) -> str:

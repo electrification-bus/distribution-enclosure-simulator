@@ -53,10 +53,10 @@ When the grid is offline the policy returns the circuit instance-ids whose prior
 ### Relay state precedence
 
 ```text
-always-on > /set override > load-shed > default-CLOSED
+locked > /set override > load-shed > default-CLOSED
 ```
 
-- `always-on` circuits (`relay-behavior=always-on`) ignore both `/set` and load-shed; the relay is permanently CLOSED. `switch/relay-requester` reports `CONFIGURATION`.
+- **Locked** circuits (`relay-behavior` of `always-on` or `non-controllable`, or explicit `always-on: true`) ignore both `/set` and load-shed; the relay is permanently CLOSED and `switch/relay-requester` reports `CONFIGURATION`. One bit governs both paths, because `relay-controllable` is defined as the relay being openable "by command or automatic shed", and the enclosure model says the host never opens a circuit commissioned locked. The same bit suppresses `$settable` on `switch/relay` and sets `switch/relay-controllable`, so the description and the values cannot disagree.
 - A `/set` override takes effect on the next tick, with no debounce, and can override a safety-shed. `switch/relay-requester` reports `USER`.
 - Load-shed applies only when there is no `/set` override. `switch/relay-requester` reports `LOAD_SHED`.
 - Default-CLOSED is the resting state when no decision-maker has spoken. `switch/relay-requester` reports `NONE`.
@@ -82,7 +82,7 @@ Relay changes reach the wire on the next `publish_tick`, bounded by the producer
 | Homie wire mechanics (`$description`/`$state`, parent-child arrays, retained topics + value encoding, LWT) | ebus-sdk (emitter builds the `Device` tree + capability nodes and drives the start/stop lifecycle) |
 | Device profiles + property graph + diff publishing | emitter |
 | Settable-property routing (`/set` to internal state) | emitter |
-| Relay state machine (always-on > /set > shed > default-CLOSED) | emitter |
+| Relay state machine (locked > /set > shed > default-CLOSED) | emitter |
 | BESS dispatch + SOC/SOE integration | emitter |
 | Load-shedding policy (SOC threshold, off-grid priority) | emitter |
 | Energy integration + per-leg current + panel meter aggregation | emitter |

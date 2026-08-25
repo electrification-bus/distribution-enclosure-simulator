@@ -62,6 +62,9 @@ class CircuitPhysics:
     default_priority: str
     relay_behavior: str  # "controllable" | "always-on" | "non-controllable"
     placement: str  # "upstream-of-lugs" | "downstream-of-lugs"
+    # The locked bit, from `relay_locked`: true for either non-controllable
+    # spelling. Named for the hardware flag it mirrors (`relay-controllable =
+    # !always-on`), not for the one `relay-behavior` value that shares the name.
     always_on: bool
     initial_consumed_wh: float
     initial_produced_wh: float
@@ -265,6 +268,36 @@ class ManifestPhysicsView:
 # ---------------------------------------------------------------------------
 
 
+def relay_locked(md: dict[str, str]) -> bool:
+    """Whether this circuit's relay is locked, from its raw metadata.
+
+    Locked means no path opens it: not ``/set``, not the enclosure's load-shed.
+    ``capabilities/switch.md`` defines ``relay-controllable`` as true when the
+    relay "can be opened and closed by command or automatic shed", and
+    ``devices/distribution-enclosure.md`` says the enclosure "never opens a
+    circuit commissioned as permanently ``OFF_GRID`` / locked" -- so the two
+    paths share one bit rather than having a gate each.
+
+    Read from raw metadata rather than from ``CircuitPhysics`` because the wire
+    layer needs the same answer while building a device description, before any
+    physics view exists. One derivation, two callers.
+
+    Either spelling locks: ``non-controllable`` and ``always-on`` are one
+    commissioning flag on the hardware this models -- SPAN publishes
+    ``relay-controllable = !always-on`` -- and they differ here only in the
+    operator's intent. The explicit ``always-on`` key is OR'd rather than
+    consulted as a default because producers write it out: a clone of a real
+    panel emits ``always-on: "false"`` beside ``relay-behavior:
+    non-controllable``, and a default chain would let that unlock the circuit.
+
+    Absent metadata is controllable, which is what a manifest that declares no
+    relay behaviour at all means.
+    """
+    return md.get("relay-behavior", "controllable") != "controllable" or _opt_bool(
+        md, "always-on", default=False
+    )
+
+
 def _require(md: dict[str, str], key: str) -> str:
     if key not in md:
         raise ManifestValidationError(f"missing required metadata key {key!r}")
@@ -405,7 +438,7 @@ def _parse_circuit(inst: DeviceInstance) -> CircuitPhysics:
             f"key 'placement': must be one of {sorted(_VALID_PLACEMENTS)}, got {placement!r}"
         )
 
-    always_on = _opt_bool(md, "always-on", default=relay_behavior == "always-on")
+    always_on = relay_locked(md)
 
     return CircuitPhysics(
         tabs=tabs,
