@@ -83,11 +83,18 @@ A producer can build `DeviceInstance`s directly instead of using the YAML loader
 | --- | --- | --- |
 | `panel` | `vendor-name`, `serial-number`, `firmware-version` (or `software-version`), `hardware-version`, `panel-size`, `main-breaker-rating-a`, `panel-model`, `postal-code`, `time-zone` | `service-voltage-v` (240), `line-voltage-v` (120), `islandable` (false), `schema-topology` (`flat` \| `parent-child`) |
 | `lugs` | `direction` (`upstream` \| `downstream`) | |
-| `circuit` | `tab-numbers` (CSV ints), `breaker-rating-a`, `default-priority`, `relay-behavior`, `placement` (`upstream-of-lugs` \| `downstream-of-lugs`) | `always-on`, `dipole` (defaults to `len(tab-numbers) > 1`), `pcs-priority` (0), `initial-consumed-wh` (0), `initial-produced-wh` (0) |
+| `circuit` | `tab-numbers` (CSV ints), `breaker-rating-a`, `default-priority`, `relay-behavior` (`controllable` \| `non-controllable` \| `always-on`), `placement` (`upstream-of-lugs` \| `downstream-of-lugs`) | `always-on`, `dipole` (defaults to `len(tab-numbers) > 1`), `pcs-priority` (0), `initial-consumed-wh` (0), `initial-produced-wh` (0) |
 | `bess` | `vendor-name`, `nameplate-capacity-kwh` | `model`, `part-number`, `serial-number`, `firmware-version`/`software-version`, `relative-position` (`UPSTREAM`), `feed`, `initial-soe-kwh` |
 | `pv` | `vendor-name`, `nominal-power-w`, `inverter-type` (`hybrid` \| `ac-coupled`) | `model`, `serial-number`, `firmware-version`/`software-version`, `relative-position` (`IN_PANEL`), `feed` |
 | `evse` | `vendor-name`, `model`, `part-number`, `serial-number`, `firmware-version` (or `software-version`), `max-current-a` | `feed` |
 | `mid` | (none) | `vendor-name`, `serial-number`, `model`, `firmware-version`/`software-version`, `hardware-version` |
+
+A circuit whose `relay-behavior` is `non-controllable` or `always-on` — or which carries
+`always-on: true` — is **locked**: its relay refuses `/set`, is exempt from load-shed, reports
+`switch/relay-requester` as `CONFIGURATION`, and declares no `$settable` on `switch/relay`.
+The two spellings differ only in the operator's intent; the hardware this models carries one
+flag, publishing `switch/relay-controllable` as its inverse. Locking reaches the relay only —
+a locked circuit still declares `load-shed/priority` settable.
 
 ## Usage (as a producer library)
 

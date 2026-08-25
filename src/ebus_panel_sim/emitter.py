@@ -632,7 +632,7 @@ class Emitter:
             for cid in shed_ids:
                 self._relays.set_shed(cid, open_relay=True)
 
-        # Step 4: resolve final relay state per circuit (always-on > /set > shed
+        # Step 4: resolve final relay state per circuit (locked > /set > shed
         # > default-CLOSED) and gate producer-reported power.
         gated_powers: dict[str, float] = {}
         for cid in circuits_phys:
@@ -702,7 +702,7 @@ class Emitter:
                 consumed_energy_wh=estate.consumed_wh,
                 tabs=list(cphys.tabs),
                 priority=effective_priority,
-                is_user_controllable=cphys.relay_behavior == "controllable",
+                is_user_controllable=not cphys.always_on,
                 is_sheddable=effective_priority in ("OFF_GRID", "SOC_THRESHOLD"),
                 is_never_backup=effective_priority == "NEVER",
                 is_240v=cphys.dipole,
@@ -713,7 +713,7 @@ class Emitter:
                 ),
                 breaker_rating_a=cphys.breaker_rating_a,
                 always_on=cphys.always_on,
-                pcs_managed=cphys.relay_behavior == "controllable",
+                pcs_managed=not cphys.always_on,
                 pcs_priority=cphys.pcs_priority,
                 relay_requester=str(requester),
                 energy_accum_update_time_s=int(tick.current_time),

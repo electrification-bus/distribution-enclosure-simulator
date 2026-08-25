@@ -51,6 +51,8 @@ _NOT_KEYS = frozenset(
         "downstream",
         "upstream-of-lugs",
         "downstream-of-lugs",
+        "controllable",
+        "non-controllable",
         "hybrid",
         "ac-coupled",
         "UPSTREAM",

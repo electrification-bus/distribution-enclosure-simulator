@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.7.0] - 2026-08-25
+
+**BREAKING (wire).** `switch/relay` no longer carries `$settable` on a circuit whose relay is locked, and such a circuit no longer accepts `/set` or participates in load-shed. A consumer that offered a relay control for every circuit will now correctly find none offered for the locked ones — which is what real firmware has always published.
+
+### Fixed
+
+- **`switch/relay` was declared settable, honoured `/set`, and was load-shed on circuits whose own `relay-controllable` said the relay was locked.** Four surfaces derived controllability separately and disagreed: the `$settable` declaration came from the per-*class* profile resolution (`wire/graph_builder.py`), so it could not vary per circuit and was always `true`; `RelayResolver` gated only on `always_on`, which `manifest_physics` derived so that a `non-controllable` circuit was not locked, leaving `/set` obeyed and shed applied; and `switch/relay-requester` reported `NONE` at rest where a locked circuit reports `CONFIGURATION`. Only the published `relay-controllable` value was right, and nothing consulted it.
+
+  `capabilities/switch.md` makes `relay` settable "when `relay-controllable`" in its normative Settable column, and defines the flag as the relay being openable "by command **or automatic shed**". `devices/distribution-enclosure.md` states the same from the shed host's side — the enclosure "never opens a circuit commissioned as permanently `OFF_GRID` / locked" — so "sheddable but not settable" is not a state the specification permits, and one bit has to govern both paths. `capabilities/load-shed.md` and `devices/circuit.md` scope `load-shed` *and* `pcs` to a circuit "that also publishes a controllable `switch`".
+
+  The fix derives that bit once, in `manifest_physics.relay_locked`, and reads it from every surface: the `$settable` declaration, the published `relay-controllable`, `/set` acceptance, load-shed participation, `relay-requester`, and `pcs_managed`. `RelayResolver`'s public signature is unchanged — `always_on` is the hardware's own name for this flag, since SPAN commissions it as `alwaysOn` and publishes `relay-controllable = !always-on`.
+
+  Two details the shape depends on. The predicate ORs the explicit `always-on` metadata rather than using it as a default: producers write the key out, so a clone of a real panel emits `always-on: "false"` beside `relay-behavior: non-controllable`, and a default chain would leave it unlocked. And `$settable` is omitted rather than published as `false`, matching what firmware does on a locked relay and on its read-only `shed/policy` alike; Homie 5 defaults the attribute to false, so the two are the same claim.
+
+  Scoped to `switch/relay` alone. A locked circuit keeps `load-shed/priority` settable, because never-backup is a separate commissioning flag mapped to that property's own `$settable` — real panels publish exactly that combination.
+
+  Found by diffing two masked retained-topic captures from production enclosures against this emitter's published tree in both variants. Across 27 circuits the panels hold the invariant without exception: `$settable` is present on `switch/relay` exactly when `relay-controllable` is `true`, and the two locked circuits report requester `CONFIGURATION`. Seventeen regression tests in `tests/test_relay_controllability.py`, of which fourteen fail without the change — including `test_settable_is_declared_exactly_when_relay_controllable_is_published`, which asserts that invariant over a mixed panel, and `test_a_non_controllable_circuit_is_not_shed_off_grid`, which is the shed half in executable form.
+
+  Note for anyone reconciling against firmware: SPAN reports a bug where the `$settable` re-toggle on the runtime re-commissioning path is skipped until the service restarts, and notes that the panel rejects an out-of-policy write regardless of what `$settable` last advertised. That is deliberately not emulated here — the refusal is what this emitter now reproduces.
+
 ## [0.6.1] - 2026-08-21
 
 No behaviour change: nothing this package publishes moves. The reason to release is the dependency ceiling, which is what reaches consumers.

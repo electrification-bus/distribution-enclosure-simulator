@@ -2,21 +2,32 @@
 
 The emitter now owns relay state across ticks. Commands arrive from three sources:
 
-1. **Manifest declaration** — ``relay-behavior == "always-on"`` or ``always-on=true``
-   metadata. Absolute: the relay can never be opened, regardless of /set or
-   load-shedding decisions.
+1. **Manifest declaration** — the circuit is *locked*: ``relay-behavior`` is
+   ``always-on`` or ``non-controllable``, or ``always-on=true`` metadata says so.
+   Absolute: the relay can never be opened, regardless of /set or load-shedding
+   decisions. See :func:`manifest_physics.relay_locked`, which derives the bit,
+   and which the wire layer reads too so the published ``$settable`` cannot
+   disagree with what this resolver does.
 2. **/set commands** — operator-driven via Homie ``circuit/.../switch/relay/set``
-   topic. Authoritative for non-always-on circuits, no debounce.
+   topic. Authoritative for unlocked circuits, no debounce.
 3. **Load shedding** — emitter's ``LoadSheddingDevice`` decisions. Applies only
    when there's no /set override.
 
 Precedence (highest wins):
 
-    always-on > /set override > load-shed > default-CLOSED
+    locked > /set override > load-shed > default-CLOSED
+
+Locking gates *both* command paths rather than only /set, because that is what
+the capability defines: ``relay-controllable`` is true when the relay "can be
+opened and closed by command or automatic shed", and
+``devices/distribution-enclosure.md`` states from the shed host's side that the
+enclosure "never opens a circuit commissioned as permanently ``OFF_GRID`` /
+locked". A circuit that were sheddable but not settable is a state the
+specification does not permit.
 
 ``relay_requester`` reflects the source of the active decision, using the
 canonical eBus ``switch/relay-requester`` domain:
-- ``CONFIGURATION`` for always-on (commissioned; the relay cannot open)
+- ``CONFIGURATION`` for a locked circuit (commissioned; the relay cannot open)
 - ``USER`` for /set
 - ``LOAD_SHED`` for load-shed
 - ``NONE`` for the default-CLOSED state
@@ -38,7 +49,7 @@ class RelayState(StrEnum):
 
 class RelayRequester(StrEnum):
     # Canonical eBus ``switch/relay-requester`` domain.
-    CONFIGURATION = "CONFIGURATION"  # always-on circuit; commissioned, cannot open
+    CONFIGURATION = "CONFIGURATION"  # locked circuit; commissioned, cannot open
     USER = "USER"  # /set override active
     LOAD_SHED = "LOAD_SHED"  # load-shed in effect
     NONE = "NONE"  # default-CLOSED, no active requester
@@ -48,12 +59,12 @@ class RelayRequester(StrEnum):
 class RelayResolver:
     """Maintains relay state per circuit instance.
 
-    Construct empty, register each circuit with its always-on flag, then update
+    Construct empty, register each circuit with its locked flag, then update
     overrides and shed decisions; query ``state()`` for the resolved final
     state."""
 
     def __init__(self) -> None:
-        # always_on map: instance_id -> bool (manifest declaration; immutable post-register)
+        # locked map: instance_id -> bool (manifest declaration; immutable post-register)
         self._always_on: dict[str, bool] = {}
         # /set override map: instance_id -> RelayState | None (None = no override)
         self._user_overrides: dict[str, RelayState | None] = {}
@@ -61,8 +72,14 @@ class RelayResolver:
         self._shed: dict[str, bool] = {}
 
     def register(self, instance_id: str, *, always_on: bool) -> None:
-        """Idempotent — re-registering with a different always_on value updates
-        the manifest declaration (typical use: emitter restart with edited manifest)."""
+        """Idempotent — re-registering with a different value updates the manifest
+        declaration (typical use: emitter restart with edited manifest).
+
+        ``always_on`` is the locked bit: true for ``relay-behavior`` of
+        ``always-on`` *or* ``non-controllable``. The name is the hardware's own
+        — SPAN commissions this as ``alwaysOn`` and publishes
+        ``relay-controllable = !always-on`` — so it is the flag, not a subset of
+        it. Derive it with :func:`manifest_physics.relay_locked`."""
         self._always_on[instance_id] = always_on
         self._user_overrides.setdefault(instance_id, None)
         self._shed.setdefault(instance_id, False)
@@ -71,11 +88,11 @@ class RelayResolver:
         """Operator /set or explicit clear. ``state=None`` clears the override
         and lets load-shed (or default-CLOSED) take effect.
 
-        Always-on circuits silently drop the override — operator cannot open them."""
+        Locked circuits silently drop the override — operator cannot open them."""
         if instance_id not in self._always_on:
             raise KeyError(f"set_user_override for unregistered instance_id={instance_id!r}")
         if self._always_on[instance_id]:
-            return  # absolute: always-on ignores /set
+            return  # absolute: a locked relay ignores /set
         self._user_overrides[instance_id] = state
 
     def clear_user_override(self, instance_id: str) -> None:
@@ -85,7 +102,8 @@ class RelayResolver:
         """Load-shedding decision. ``open_relay=True`` means the load-shedding
         policy wants this circuit OPEN.
 
-        Always-on circuits silently drop the request."""
+        Locked circuits silently drop the request: the enclosure never opens a
+        circuit commissioned locked (``devices/distribution-enclosure.md``)."""
         if instance_id not in self._always_on:
             raise KeyError(f"set_shed for unregistered instance_id={instance_id!r}")
         if self._always_on[instance_id]:
