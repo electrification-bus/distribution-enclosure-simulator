@@ -18,8 +18,6 @@
 
   Found by diffing two masked retained-topic captures from production enclosures against this emitter's published tree in both variants. Across 27 circuits the panels hold the invariant without exception: `$settable` is present on `switch/relay` exactly when `relay-controllable` is `true`, and the two locked circuits report requester `CONFIGURATION`. Seventeen regression tests in `tests/test_relay_controllability.py`, of which fourteen fail without the change — including `test_settable_is_declared_exactly_when_relay_controllable_is_published`, which asserts that invariant over a mixed panel, and `test_a_non_controllable_circuit_is_not_shed_off_grid`, which is the shed half in executable form.
 
-  Note for anyone reconciling against firmware: SPAN reports a bug where the `$settable` re-toggle on the runtime re-commissioning path is skipped until the service restarts, and notes that the panel rejects an out-of-policy write regardless of what `$settable` last advertised. That is deliberately not emulated here — the refusal is what this emitter now reproduces.
-
 ## [0.6.1] - 2026-08-21
 
 No behaviour change: nothing this package publishes moves. The reason to release is the dependency ceiling, which is what reaches consumers.
