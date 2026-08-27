@@ -29,7 +29,10 @@ specification does not permit.
 canonical eBus ``switch/relay-requester`` domain:
 - ``CONFIGURATION`` for a locked circuit (commissioned; the relay cannot open)
 - ``USER`` for /set
-- ``LOAD_SHED`` for load-shed
+- ``LOAD_SHED`` for load-shed, including on a circuit commissioned never-backup:
+  ``devices/distribution-enclosure.md`` says the requester is ``LOAD_SHED``
+  whenever "the enclosure's auto-shed logic drives a circuit's relay", with no
+  carve-out for how the circuit came to be ``OFF_GRID``
 - ``NONE`` for the default-CLOSED state
 
 The producer never sees /set commands. ``Emitter`` registers internal handlers
@@ -117,7 +120,21 @@ class RelayResolver:
             self._shed[k] = False
 
     def state(self, instance_id: str) -> tuple[RelayState, RelayRequester]:
-        """Resolve the final state for ``instance_id``."""
+        """Resolve the final state for ``instance_id``.
+
+        A shed is attributed to ``LOAD_SHED`` whatever made the circuit
+        ``OFF_GRID``, a commissioned never-backup circuit included. The
+        specification states it without a carve-out — "when the enclosure's
+        auto-shed logic drives a circuit's relay, the circuit publishes
+        ``switch/relay-requester = LOAD_SHED``"
+        (``devices/distribution-enclosure.md``) — and a consumer depends on it:
+        restore is defined as "circuits opened by ``LOAD_SHED`` are re-closed"
+        (``integration-guides/bess-and-distribution-enclosure.md``), so any
+        other value on a shed circuit leaves it open on rejoin.
+
+        The lock is therefore invisible here. It removes the consumer's ability
+        to re-prioritise the circuit, which is a ``$settable`` question on
+        ``load-shed/priority``, not an attribution question on the relay."""
         if self._always_on.get(instance_id, False):
             return RelayState.CLOSED, RelayRequester.CONFIGURATION
         override = self._user_overrides.get(instance_id)

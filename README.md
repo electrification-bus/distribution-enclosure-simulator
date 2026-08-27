@@ -83,7 +83,7 @@ A producer can build `DeviceInstance`s directly instead of using the YAML loader
 | --- | --- | --- |
 | `panel` | `vendor-name`, `serial-number`, `firmware-version` (or `software-version`), `hardware-version`, `panel-size`, `main-breaker-rating-a`, `panel-model`, `postal-code`, `time-zone` | `service-voltage-v` (240), `line-voltage-v` (120), `islandable` (false), `schema-topology` (`flat` \| `parent-child`) |
 | `lugs` | `direction` (`upstream` \| `downstream`) | |
-| `circuit` | `tab-numbers` (CSV ints), `breaker-rating-a`, `default-priority`, `relay-behavior` (`controllable` \| `non-controllable` \| `always-on`), `placement` (`upstream-of-lugs` \| `downstream-of-lugs`) | `always-on`, `dipole` (defaults to `len(tab-numbers) > 1`), `pcs-priority` (0), `initial-consumed-wh` (0), `initial-produced-wh` (0) |
+| `circuit` | `tab-numbers` (CSV ints), `breaker-rating-a`, `default-priority`, `relay-behavior` (`controllable` \| `non-controllable` \| `always-on`), `placement` (`upstream-of-lugs` \| `downstream-of-lugs`) | `always-on`, `never-backup` (false), `dipole` (defaults to `len(tab-numbers) > 1`), `pcs-priority` (0), `initial-consumed-wh` (0), `initial-produced-wh` (0) |
 | `bess` | `vendor-name`, `nameplate-capacity-kwh` | `model`, `part-number`, `serial-number`, `firmware-version`/`software-version`, `relative-position` (`UPSTREAM`), `feed`, `initial-soe-kwh` |
 | `pv` | `vendor-name`, `nominal-power-w`, `inverter-type` (`hybrid` \| `ac-coupled`) | `model`, `serial-number`, `firmware-version`/`software-version`, `relative-position` (`IN_PANEL`), `feed` |
 | `evse` | `vendor-name`, `model`, `part-number`, `serial-number`, `firmware-version` (or `software-version`), `max-current-a` | `feed` |
@@ -95,6 +95,16 @@ A circuit whose `relay-behavior` is `non-controllable` or `always-on` — or whi
 The two spellings differ only in the operator's intent; the hardware this models carries one
 flag, publishing `switch/relay-controllable` as its inverse. Locking reaches the relay only —
 a locked circuit still declares `load-shed/priority` settable.
+
+A circuit carrying `never-backup: true` is commissioned to receive no backup power: it is
+permanently `OFF_GRID`, so its `default-priority` must be `OFF_GRID` (any other value is
+rejected as contradictory), it declares no `$settable` on `load-shed/priority`, and a `/set`
+on that priority is refused. It still sheds when the panel islands — that is what being
+`OFF_GRID` means; what the lock removes is the consumer's ability to re-prioritise it. That
+shed publishes `switch/relay-requester` as `LOAD_SHED`, like any other shed — the lock is not a
+requester value — and at rest the circuit reports `NONE` like any other.
+This is a **separate commissioning input from the priority value**: `default-priority: NEVER`
+means "never shed" and stays fully settable, which is what real panels publish.
 
 ## Usage (as a producer library)
 

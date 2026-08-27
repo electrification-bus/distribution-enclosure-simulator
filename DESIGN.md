@@ -46,7 +46,7 @@ When the grid is offline the policy returns the circuit instance-ids whose prior
 | Entity class | Property | Effect |
 |---|---|---|
 | circuit | `switch/relay` | Updates the `RelayResolver` user override |
-| circuit | `load-shed/priority` | Updates the emitter's per-circuit priority override |
+| circuit | `load-shed/priority` | Updates the emitter's per-circuit priority override (refused on a never-backup circuit) |
 | panel | `shed/asserted-islanding-state` | Updates the consumer-asserted islanding override |
 | evse | `config/user-max-charge-current` | Updates the per-EVSE user charge-current ceiling |
 
@@ -57,8 +57,9 @@ locked > /set override > load-shed > default-CLOSED
 ```
 
 - **Locked** circuits (`relay-behavior` of `always-on` or `non-controllable`, or explicit `always-on: true`) ignore both `/set` and load-shed; the relay is permanently CLOSED and `switch/relay-requester` reports `CONFIGURATION`. One bit governs both paths, because `relay-controllable` is defined as the relay being openable "by command or automatic shed", and the enclosure model says the host never opens a circuit commissioned locked. The same bit suppresses `$settable` on `switch/relay` and sets `switch/relay-controllable`, so the description and the values cannot disagree.
+- **Never-backup** circuits (`never-backup: true`) are the *other* commissioning lock, and it is on a different property: the circuit is commissioned permanently `OFF_GRID`, so its `load-shed/priority` carries no `$settable` and a `/set` on it is refused. The relay itself is not locked — a never-backup circuit is shed like any other `OFF_GRID` circuit when the panel islands, and that open is attributed to `LOAD_SHED` like any other shed. The lock is not a second requester value: `switch/relay-requester` answers who drove the relay, and the auto-shed logic did. At rest, closed, the circuit reports `NONE`. The two locks are independent: either, both or neither may be commissioned on a circuit. Note that the priority *value* `NEVER` is not a lock at all — it means "never shed" and stays settable.
 - A `/set` override takes effect on the next tick, with no debounce, and can override a safety-shed. `switch/relay-requester` reports `USER`.
-- Load-shed applies only when there is no `/set` override. `switch/relay-requester` reports `LOAD_SHED`.
+- Load-shed applies only when there is no `/set` override. `switch/relay-requester` reports `LOAD_SHED`, for every circuit the auto-shed logic opens.
 - Default-CLOSED is the resting state when no decision-maker has spoken. `switch/relay-requester` reports `NONE`.
 
 Relay changes reach the wire on the next `publish_tick`, bounded by the producer's tick cadence (typically 1.0 s).

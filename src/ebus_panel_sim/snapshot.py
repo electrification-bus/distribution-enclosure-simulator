@@ -37,7 +37,15 @@ class EbusCircuitSnapshot:
     tabs: list[int]
     priority: str  # MUST_HAVE | NICE_TO_HAVE | NON_ESSENTIAL | NEVER | SOC_THRESHOLD | OFF_GRID
     is_user_controllable: bool
+    # `priority` is shed-eligible AND the relay is controllable -- both conjuncts
+    # of the retired flat `sheddable`. A relay-locked circuit never opens, so it
+    # is not sheddable whatever its priority says.
     is_sheddable: bool
+    # The installer commissioning lock, not a priority value: this circuit is
+    # permanently `OFF_GRID` and its `load-shed/priority` is not settable
+    # (published as the absence of `$settable`). `priority == "NEVER"` is the
+    # unrelated, ordinary, settable value meaning "never shed" -- deriving this
+    # flag from it is inverted in both directions.
     is_never_backup: bool
 
     device_type: str = "circuit"
