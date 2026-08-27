@@ -27,11 +27,14 @@ These tests pin the four surfaces of the one bit -- the `$settable`
 declaration, the `/set` path it removes, the published priority value, and the
 snapshot flag -- to the commissioning input, and pin the priority *value* to
 having no say in any of them.
+
+The reproduction itself lives next door in `test_never_backup_reproduction.py`,
+written against the pre-fix API alone so it can be lifted onto an unfixed
+checkout and fail on its assertion rather than at import. This module is free to
+use the new commissioning key, and does.
 """
 
 from __future__ import annotations
-
-import json
 
 import pytest
 
@@ -48,7 +51,7 @@ from ebus_panel_sim import (
 from ebus_panel_sim.manifest_physics import ManifestPhysicsView
 from ebus_panel_sim.wire.graph_builder import BuiltGraph, build_graph
 from ebus_panel_sim.wire.mapping_loader import load_mapping_table
-from ebus_panel_sim.wire.profile_loader import Variant, load_profiles
+from ebus_panel_sim.wire.profile_loader import load_profiles
 
 from .conftest import PahoRecorder
 
@@ -125,54 +128,6 @@ def _emitter(*circuits: DeviceInstance) -> Emitter:
 
 
 # --- The priority value has no say ----------------------------------------
-
-
-@pytest.mark.parametrize("variant", ["span", "reference"])
-def test_a_never_priority_circuit_is_settable_and_not_never_backup(
-    variant: Variant, rec: PahoRecorder
-) -> None:
-    """The reproduction case, end to end, on a manifest nobody had to change.
-
-    One ordinary circuit at `default-priority: NEVER` and no commissioning key
-    anywhere -- the manifest every producer already writes -- carried through
-    the emitter to what a consumer actually reads: the snapshot flag, and the
-    `$description` this emitter puts on the broker.
-
-    Both halves are the same claim, which is why they belong in one test: the
-    published `$settable = true` says this circuit's priority is the consumer's
-    to change, and `is_never_backup = true` says it is not. Only one of them can
-    be right, and the capture settles it -- both of its `NEVER` circuits publish
-    `$settable = true`.
-
-    Run in both variants because neither publishes a `never-backup` property at
-    all: the flat flag is retired, expressed structurally through `$settable`,
-    so the snapshot field is the only surface still carrying the name and the
-    only place the defect can hide.
-    """
-    manifest = DeviceManifest(instances=(_panel(), _circuit("kitchen", priority="NEVER")))
-    em = Emitter(manifest, SetterRegistry(), variant=variant)
-    em.start()
-    snap = em.publish_tick(
-        TickInputs(current_time=0.0, grid_online=True, circuits={"kitchen": 500.0})
-    )
-
-    assert snap.circuits["kitchen"].is_never_backup is False, (
-        "a NEVER-priority circuit is not commissioned never-backup: NEVER is an "
-        "ordinary settable value meaning 'never shed'"
-    )
-
-    retained = rec.retained
-    description = json.loads(retained["ebus/5/kitchen/$description"])
-    priority = description["nodes"]["load-shed"]["properties"]["priority"]
-    assert priority.get("settable") is True, (
-        "a NEVER-priority circuit publishes $settable=true on load-shed/priority; "
-        f"got {priority.get('settable')!r}"
-    )
-    assert retained["ebus/5/kitchen/load-shed/priority"] == "NEVER"
-    # The flat `never-backup` property is retired in v1.0, so no variant may
-    # resurrect it: the lock is published as the absence of `$settable`, and
-    # this circuit does not carry the lock in the first place.
-    assert not any(t.endswith("/never-backup") for t in retained)
 
 
 def test_a_never_priority_circuit_is_not_never_backup() -> None:
