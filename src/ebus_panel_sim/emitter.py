@@ -145,6 +145,13 @@ class Emitter:
         self._relays = RelayResolver()
         self._energy = EnergyIntegrator()
         self._priority_overrides: dict[str, str] = {}
+        # The circuits commissioned never-backup, resolved once from the manifest
+        # the way `RelayResolver` registers the relay lock once. Their priority is
+        # not settable, so an override never enters the map above and the
+        # published value stays the commissioned `OFF_GRID`.
+        self._priority_locked: frozenset[str] = frozenset(
+            cid for cid, cphys in self._physics.all_circuits().items() if cphys.never_backup
+        )
         self._name_overrides: dict[str, str] = {}
         self._dominant_power_source_override: str | None = None
         self._asserted_islanding_override: str | None = None
@@ -522,6 +529,13 @@ class Emitter:
             value: object,
         ) -> None:
             del entity_class, prop_path
+            if instance_id in self._priority_locked:
+                # Absolute, exactly as `RelayResolver` drops a `/set` on a locked
+                # relay. The declaration already removes the `/set` subscription,
+                # so this covers the paths that do not go through it: a producer
+                # routing commands into the registry itself, or a broker
+                # delivering to a topic nothing subscribed.
+                return
             self._priority_overrides[instance_id] = str(value).upper()
 
         def on_asserted_islanding(
@@ -703,8 +717,23 @@ class Emitter:
                 tabs=list(cphys.tabs),
                 priority=effective_priority,
                 is_user_controllable=not cphys.always_on,
-                is_sheddable=effective_priority in ("OFF_GRID", "SOC_THRESHOLD"),
-                is_never_backup=effective_priority == "NEVER",
+                # Both conjuncts of the retired flat `sheddable`, which the
+                # migration guide defines as "`load-shed/priority != NEVER` &&
+                # `switch/relay-controllable`". The relay half was missing, so a
+                # circuit `RelayResolver` refuses to shed -- the enclosure "never
+                # opens a circuit commissioned as permanently OFF_GRID / locked"
+                # -- reported itself sheddable. The priority half is narrowed to
+                # the values this emitter's own policy acts on
+                # (`native_devices/load_shedding.py`), which are the shed-eligible
+                # members of the v1.0 enum.
+                is_sheddable=(
+                    effective_priority in ("OFF_GRID", "SOC_THRESHOLD") and not cphys.always_on
+                ),
+                # The commissioning lock, not the priority value: `NEVER` means
+                # "never shed" and is an ordinary settable value, while
+                # never-backup is an installer input that pins the circuit to
+                # OFF_GRID and removes `$settable` from its priority.
+                is_never_backup=cphys.never_backup,
                 is_240v=cphys.dipole,
                 current_a=circuit_current_a(
                     gated_p,

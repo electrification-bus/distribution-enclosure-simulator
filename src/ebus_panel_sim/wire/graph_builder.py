@@ -19,6 +19,7 @@ elsewhere; this module owns topology + schema only.
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -26,7 +27,7 @@ import ebus_sdk
 
 from ebus_panel_sim.exceptions import ManifestValidationError, ProfileValidationError
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
-from ebus_panel_sim.manifest_physics import relay_locked
+from ebus_panel_sim.manifest_physics import never_backup, relay_locked
 from ebus_panel_sim.wire._sdk_seam import MqttDeviceTransport, make_property
 from ebus_panel_sim.wire.mapping_loader import MappingDescriptor, MappingTable
 from ebus_panel_sim.wire.profile_loader import Profile, ProfileTable
@@ -323,6 +324,21 @@ def _attach_profile(
                 ] = sdk_prop
 
 
+# The properties whose settability is commissioned per circuit rather than
+# fixed per capability. Each maps to the commissioning flag that locks it, and
+# the two are independent: a circuit may carry either, both or neither.
+#
+# ``switch/relay`` is settable "when ``relay-controllable``"
+# (``capabilities/switch.md``); ``load-shed/priority`` is published with
+# ``$settable = !never-backup`` (the eBus schema migration guide), which is a
+# lock on the *property*, unrelated to the priority's own value -- ``NEVER`` is
+# an ordinary settable value meaning "never shed".
+_INSTANCE_LOCKS: dict[tuple[str, str], Callable[[dict[str, str]], bool]] = {
+    ("switch", "relay"): relay_locked,
+    ("load-shed", "priority"): never_backup,
+}
+
+
 def _settable_for(
     declared: bool,
     instance: DeviceInstance,
@@ -332,16 +348,15 @@ def _settable_for(
     """Narrow a profile's class-level ``settable`` to this instance.
 
     The profile answers "may this property be settable", which is a statement
-    about the capability. ``switch/relay`` is the one property whose answer also
-    depends on the individual circuit: ``capabilities/switch.md`` makes it
-    settable "when ``relay-controllable``", and controllability is commissioned
-    per circuit, so a panel publishes a mix. Nothing else here varies that way,
-    and a locked circuit still declares ``load-shed/priority`` settable -- that
-    is a separate commissioning flag.
+    about the capability. Two circuit properties have a second answer that
+    depends on the individual circuit, because each is locked by its own
+    installer commissioning flag, so a panel publishes a mix of both: see
+    ``_INSTANCE_LOCKS``. Nothing else here varies that way.
     """
-    if not declared or (cap_name, prop_key) != ("switch", "relay"):
+    locked_by = _INSTANCE_LOCKS.get((cap_name, prop_key))
+    if not declared or locked_by is None:
         return declared
-    return not relay_locked(instance.metadata)
+    return not locked_by(instance.metadata)
 
 
 def _render_node_id(template: str, instance: DeviceInstance) -> str:

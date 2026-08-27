@@ -66,6 +66,10 @@ class CircuitPhysics:
     # spelling. Named for the hardware flag it mirrors (`relay-controllable =
     # !always-on`), not for the one `relay-behavior` value that shares the name.
     always_on: bool
+    # The *other* commissioning lock, from `never_backup`: this circuit is
+    # commissioned permanently `OFF_GRID` and its priority is not settable.
+    # Independent of `default_priority`'s value, and of `always_on`.
+    never_backup: bool
     initial_consumed_wh: float
     initial_produced_wh: float
     pcs_priority: int = 0
@@ -298,6 +302,38 @@ def relay_locked(md: dict[str, str]) -> bool:
     )
 
 
+def never_backup(md: dict[str, str]) -> bool:
+    """Whether this circuit's load-shed priority is locked, from its raw metadata.
+
+    Locked means the circuit was commissioned to receive no backup power: it is
+    permanently ``OFF_GRID`` and no consumer may re-prioritise it. The eBus
+    schema migration guide maps the retired flat ``never-backup`` boolean onto
+    exactly one thing, the Homie ``$settable`` attribute of
+    ``load-shed/priority`` -- "published with ``$settable = !never-backup``" --
+    and describes the result as "locked-priority circuits (commissioned
+    permanently ``OFF_GRID``) appear as ``priority = OFF_GRID, $settable =
+    false``; user-configurable circuits appear as ``$settable = true``".
+
+    It is a commissioning *input*, never derived from the priority value. The
+    guide is explicit that "the three flat booleans are independent
+    commissioning inputs stored as separate fields in each circuit's
+    commissioning state, so the derivation is a simple per-input rule".
+    ``NEVER`` in particular is an ordinary settable value meaning "never shed",
+    and a captured production enclosure publishes two circuits at ``NEVER``
+    with ``$settable = true`` on the same property -- a combination no
+    value-derived flag can produce.
+
+    Read from raw metadata rather than from ``CircuitPhysics`` for the same
+    reason as :func:`relay_locked`: the wire layer needs the same answer while
+    building a device description, before any physics view exists. One
+    derivation, two callers.
+
+    Absent metadata is user-configurable, which is what a manifest that declares
+    no commissioning lock at all means.
+    """
+    return _opt_bool(md, "never-backup", default=False)
+
+
 def _require(md: dict[str, str], key: str) -> str:
     if key not in md:
         raise ManifestValidationError(f"missing required metadata key {key!r}")
@@ -439,6 +475,20 @@ def _parse_circuit(inst: DeviceInstance) -> CircuitPhysics:
         )
 
     always_on = relay_locked(md)
+    priority_locked = never_backup(md)
+    # Contradictory physics, rejected rather than silently rewritten. A
+    # never-backup circuit *is* commissioned permanently ``OFF_GRID``, so a
+    # manifest that locks one at another priority states two incompatible things
+    # about one commissioning state, and there is no way to publish both. Having
+    # the lock quietly override the declared value would be the same class of
+    # defect this key exists to fix -- a published priority nobody wrote -- and
+    # would hide the producer's mistake instead of naming it. This way the
+    # published value is always the one the manifest declares.
+    if priority_locked and priority != "OFF_GRID":
+        raise ManifestValidationError(
+            "key 'never-backup': a never-backup circuit is commissioned permanently "
+            f"OFF_GRID, so 'default-priority' must be 'OFF_GRID', got {priority!r}"
+        )
 
     return CircuitPhysics(
         tabs=tabs,
@@ -449,6 +499,7 @@ def _parse_circuit(inst: DeviceInstance) -> CircuitPhysics:
         relay_behavior=relay_behavior,
         placement=placement,
         always_on=always_on,
+        never_backup=priority_locked,
         pcs_priority=_opt_int(md, "pcs-priority", 0),
         initial_consumed_wh=_opt_float(md, "initial-consumed-wh", 0.0),
         initial_produced_wh=_opt_float(md, "initial-produced-wh", 0.0),
