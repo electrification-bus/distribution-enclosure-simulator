@@ -101,8 +101,8 @@ permanently `OFF_GRID`, so its `default-priority` must be `OFF_GRID` (any other 
 rejected as contradictory), it declares no `$settable` on `load-shed/priority`, and a `/set`
 on that priority is refused. It still sheds when the panel islands — that is what being
 `OFF_GRID` means; what the lock removes is the consumer's ability to re-prioritise it. That
-shed publishes `switch/relay-requester` as `CONFIGURATION` rather than `LOAD_SHED`, since the
-decision was made at commissioning; at rest the circuit reports `NONE` like any other.
+shed publishes `switch/relay-requester` as `LOAD_SHED`, like any other shed — the lock is not a
+requester value — and at rest the circuit reports `NONE` like any other.
 This is a **separate commissioning input from the priority value**: `default-priority: NEVER`
 means "never shed" and stays fully settable, which is what real panels publish.
 

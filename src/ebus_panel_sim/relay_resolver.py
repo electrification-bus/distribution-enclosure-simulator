@@ -27,11 +27,12 @@ specification does not permit.
 
 ``relay_requester`` reflects the source of the active decision, using the
 canonical eBus ``switch/relay-requester`` domain:
-- ``CONFIGURATION`` for a locked circuit (commissioned; the relay cannot open),
-  and for a never-backup circuit the enclosure opens at islanding — the same
-  attribution, because both states were decided at commissioning
+- ``CONFIGURATION`` for a locked circuit (commissioned; the relay cannot open)
 - ``USER`` for /set
-- ``LOAD_SHED`` for load-shed
+- ``LOAD_SHED`` for load-shed, including on a circuit commissioned never-backup:
+  ``devices/distribution-enclosure.md`` says the requester is ``LOAD_SHED``
+  whenever "the enclosure's auto-shed logic drives a circuit's relay", with no
+  carve-out for how the circuit came to be ``OFF_GRID``
 - ``NONE`` for the default-CLOSED state
 
 The producer never sees /set commands. ``Emitter`` registers internal handlers
@@ -68,16 +69,12 @@ class RelayResolver:
     def __init__(self) -> None:
         # locked map: instance_id -> bool (manifest declaration; immutable post-register)
         self._always_on: dict[str, bool] = {}
-        # never-backup map: instance_id -> bool. Attribution only; see register().
-        self._priority_locked: dict[str, bool] = {}
         # /set override map: instance_id -> RelayState | None (None = no override)
         self._user_overrides: dict[str, RelayState | None] = {}
         # load-shed decision map: instance_id -> bool (True = wants OPEN)
         self._shed: dict[str, bool] = {}
 
-    def register(
-        self, instance_id: str, *, always_on: bool, priority_locked: bool = False
-    ) -> None:
+    def register(self, instance_id: str, *, always_on: bool) -> None:
         """Idempotent — re-registering with a different value updates the manifest
         declaration (typical use: emitter restart with edited manifest).
 
@@ -85,17 +82,8 @@ class RelayResolver:
         ``always-on`` *or* ``non-controllable``. The name is the hardware's own
         — SPAN commissions this as ``alwaysOn`` and publishes
         ``relay-controllable = !always-on`` — so it is the flag, not a subset of
-        it. Derive it with :func:`manifest_physics.relay_locked`.
-
-        ``priority_locked`` is the circuit's *other* commissioning lock,
-        never-backup, derived with :func:`manifest_physics.never_backup`. It
-        does not gate anything here — a never-backup circuit is commissioned
-        permanently ``OFF_GRID``, so the enclosure opens it at islanding like
-        any other ``OFF_GRID`` circuit — it changes only who that open is
-        attributed to. Defaulted so a caller that knows nothing of the flag
-        keeps the previous behaviour."""
+        it. Derive it with :func:`manifest_physics.relay_locked`."""
         self._always_on[instance_id] = always_on
-        self._priority_locked[instance_id] = priority_locked
         self._user_overrides.setdefault(instance_id, None)
         self._shed.setdefault(instance_id, False)
 
@@ -134,32 +122,26 @@ class RelayResolver:
     def state(self, instance_id: str) -> tuple[RelayState, RelayRequester]:
         """Resolve the final state for ``instance_id``.
 
-        A shed on a never-backup circuit is attributed to ``CONFIGURATION``
-        rather than ``LOAD_SHED``. Both open the relay; they differ in who
-        decided, and for this circuit the decision was made at commissioning,
-        not by the policy running now. The migration guide maps the flat
-        ``NEVER_BACKUP`` requester onto ``CONFIGURATION`` -- "the commissioning
-        lock is now expressed structurally via ``load-shed/priority = OFF_GRID``
-        with ``$settable = false``; ``CONFIGURATION`` captures the source
-        attribution" -- while flat ``BACKUP`` (an ordinary shed) maps to
-        ``LOAD_SHED``. Firmware distinguished the two, so collapsing them here
-        would lose a distinction the wire vocabulary still carries, and it is
-        the same attribution a relay-locked circuit already reports.
+        A shed is attributed to ``LOAD_SHED`` whatever made the circuit
+        ``OFF_GRID``, a commissioned never-backup circuit included. The
+        specification states it without a carve-out — "when the enclosure's
+        auto-shed logic drives a circuit's relay, the circuit publishes
+        ``switch/relay-requester = LOAD_SHED``"
+        (``devices/distribution-enclosure.md``) — and a consumer depends on it:
+        restore is defined as "circuits opened by ``LOAD_SHED`` are re-closed"
+        (``integration-guides/bess-and-distribution-enclosure.md``), so any
+        other value on a shed circuit leaves it open on rejoin.
 
-        At rest the lock says nothing: it does not hold the relay closed, so a
-        closed never-backup circuit reports ``NONE`` like any other."""
+        The lock is therefore invisible here. It removes the consumer's ability
+        to re-prioritise the circuit, which is a ``$settable`` question on
+        ``load-shed/priority``, not an attribution question on the relay."""
         if self._always_on.get(instance_id, False):
             return RelayState.CLOSED, RelayRequester.CONFIGURATION
         override = self._user_overrides.get(instance_id)
         if override is not None:
             return override, RelayRequester.USER
         if self._shed.get(instance_id, False):
-            requester = (
-                RelayRequester.CONFIGURATION
-                if self._priority_locked.get(instance_id, False)
-                else RelayRequester.LOAD_SHED
-            )
-            return RelayState.OPEN, requester
+            return RelayState.OPEN, RelayRequester.LOAD_SHED
         return RelayState.CLOSED, RelayRequester.NONE
 
     def known(self, instance_id: str) -> bool:

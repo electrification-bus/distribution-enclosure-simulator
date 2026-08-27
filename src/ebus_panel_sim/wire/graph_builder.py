@@ -333,6 +333,14 @@ def _attach_profile(
 # ``$settable = !never-backup`` (the eBus schema migration guide), which is a
 # lock on the *property*, unrelated to the priority's own value -- ``NEVER`` is
 # an ordinary settable value meaning "never shed".
+#
+# The two warrants differ in strength. ``capabilities/switch.md`` ties
+# ``relay``'s settability to ``relay-controllable`` per circuit. The public
+# catalog for ``load-shed`` does not go that far: it declares ``priority``
+# settable and allows a publisher to advertise it read-only as
+# publisher-level conformance latitude, without saying a publisher may vary
+# that per circuit. Only the migration guide makes it per-circuit, so this
+# entry rests on the guide, not on ``capabilities/load-shed.md``.
 _INSTANCE_LOCKS: dict[tuple[str, str], Callable[[dict[str, str]], bool]] = {
     ("switch", "relay"): relay_locked,
     ("load-shed", "priority"): never_backup,

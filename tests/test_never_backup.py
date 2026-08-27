@@ -260,8 +260,8 @@ def test_a_never_backup_circuit_still_sheds() -> None:
     commissioned `OFF_GRID`, so islanding is when it opens. The lock removes
     the consumer's ability to change that, not the shed itself.
 
-    The open is attributed to `CONFIGURATION`: it is the commissioning decision
-    taking effect, not a policy call made now."""
+    The open is attributed to `LOAD_SHED` like any other shed. The lock is not
+    a second requester value; it lives on `load-shed/priority`'s `$settable`."""
     em = Emitter(
         DeviceManifest(
             instances=(
@@ -293,7 +293,7 @@ def test_a_never_backup_circuit_still_sheds() -> None:
     )
     assert snap.circuits["well_pump"].relay_state == "OPEN"
     assert snap.circuits["well_pump"].is_sheddable is True
-    assert snap.circuits["well_pump"].relay_requester == "CONFIGURATION"
+    assert snap.circuits["well_pump"].relay_requester == "LOAD_SHED"
 
 
 def test_a_relay_locked_circuit_is_not_sheddable() -> None:
@@ -310,18 +310,19 @@ def test_a_relay_locked_circuit_is_not_sheddable() -> None:
     assert snap.circuits["solar"].is_sheddable is False
 
 
-def test_islanding_separates_a_commissioned_shed_from_a_policy_shed(rec: PahoRecorder) -> None:
-    """Two circuits, both `OFF_GRID`, both opened by the same islanding tick,
-    attributed to different actors -- which is the whole point of the property.
+def test_islanding_attributes_a_commissioned_shed_to_load_shed(rec: PahoRecorder) -> None:
+    """Two circuits, both `OFF_GRID`, one by commissioning and one by an
+    ordinary settable priority, both opened by the same islanding tick: the
+    requester is `LOAD_SHED` for both. The commissioning lock does not change
+    who the open is attributed to.
 
-    The migration guide maps the flat `NEVER_BACKUP` requester to
-    `CONFIGURATION`: "the commissioning lock is now expressed structurally via
-    `load-shed/priority = OFF_GRID` with `$settable = false`; `CONFIGURATION`
-    captures the source attribution". Flat `BACKUP` -- an ordinary shed -- maps
-    to `LOAD_SHED` instead. Firmware distinguished the two, so a publisher that
-    reported `LOAD_SHED` for both would erase a distinction the canonical
-    vocabulary still carries: for the locked circuit the decision was made once,
-    at commissioning, and the policy running now is only carrying it out.
+    `devices/distribution-enclosure.md` states it without a carve-out --
+    "when the enclosure's auto-shed logic drives a circuit's relay, the circuit
+    publishes `switch/relay-requester = LOAD_SHED`" -- and a consumer depends
+    on that being exhaustive: restore is defined as "circuits opened by
+    `LOAD_SHED` are re-closed"
+    (`integration-guides/bess-and-distribution-enclosure.md`), so a circuit
+    shed under any other value never comes back on rejoin.
 
     Asserted on the wire, because the requester is a published property and its
     consumer reads it there."""
@@ -364,16 +365,15 @@ def test_islanding_separates_a_commissioned_shed_from_a_policy_shed(rec: PahoRec
     assert snap.circuits["hot_tub"].relay_state == "OPEN"
 
     retained = rec.retained
-    assert retained["ebus/5/well_pump/switch/relay-requester"] == "CONFIGURATION"
+    assert retained["ebus/5/well_pump/switch/relay-requester"] == "LOAD_SHED"
     assert retained["ebus/5/hot_tub/switch/relay-requester"] == "LOAD_SHED"
 
 
 def test_a_never_backup_circuit_reports_no_requester_at_rest() -> None:
-    """The lock speaks only when it acts. It does not hold the relay closed --
-    that is what `relay-controllable = false` does, a different flag on a
-    different property -- so on-grid, closed, this circuit reports `NONE` like
-    any other, and reports `CONFIGURATION` only in the tick where the
-    commissioning decision actually opens it."""
+    """The lock does not hold the relay closed -- that is what
+    `relay-controllable = false` does, a different flag on a different property
+    -- so on-grid, closed, this circuit reports `NONE` like any other, and
+    reports `LOAD_SHED` only in the tick where the shed actually opens it."""
     em = _emitter(_locked("well_pump"))
     em.start()
     snap = em.publish_tick(
@@ -439,3 +439,60 @@ def test_relay_lock_and_priority_lock_are_independent() -> None:
     )
     assert _priority_declaration(graph, "solar")["settable"] is True
     assert _property_declaration(graph, "well_pump", "switch", "relay")["settable"] is True
+
+
+def test_a_circuit_carrying_both_locks() -> None:
+    """Neither lock is a special case of the other, so a circuit may carry both
+    and each keeps acting on its own property. The relay lock wins the relay --
+    the enclosure "never opens a circuit commissioned as permanently `OFF_GRID`
+    / locked" (`devices/distribution-enclosure.md`), so this circuit stays
+    CLOSED through an islanding tick and is not sheddable -- while the priority
+    lock does what it always does, removing `$settable` from the priority.
+
+    Both `$settable` attributes are therefore absent, and the requester is the
+    relay lock's `CONFIGURATION`, because the relay lock is what holds the relay
+    and no shed ever reaches it."""
+    both = _circuit(
+        "well_pump",
+        tabs="1",
+        priority="OFF_GRID",
+        relay_behavior="non-controllable",
+        never_backup="true",
+    )
+    graph = _graph(both)
+    assert "settable" not in _priority_declaration(graph, "well_pump")
+    assert "settable" not in _property_declaration(graph, "well_pump", "switch", "relay")
+
+    em = Emitter(
+        DeviceManifest(
+            instances=(
+                _panel(),
+                both,
+                DeviceInstance(
+                    "bess",
+                    "p1-bess",
+                    "Battery",
+                    metadata={"vendor-name": "Span", "nameplate-capacity-kwh": "13.5"},
+                ),
+            )
+        ),
+        SetterRegistry(),
+        bess_configs=(
+            BESSConfig(
+                instance_id="p1-bess",
+                nameplate_capacity_kwh=13.5,
+                max_charge_w=3500.0,
+                max_discharge_w=3500.0,
+                initial_soc_pct=80.0,
+            ),
+        ),
+        load_shedding_config=LoadSheddingConfig(soc_threshold_pct=20.0),
+    )
+    em.start()
+    snap = em.publish_tick(
+        TickInputs(current_time=0.0, grid_online=False, circuits={"well_pump": 1000.0})
+    )
+    assert snap.circuits["well_pump"].relay_state == "CLOSED"
+    assert snap.circuits["well_pump"].relay_requester == "CONFIGURATION"
+    assert snap.circuits["well_pump"].is_sheddable is False
+    assert snap.circuits["well_pump"].is_never_backup is True

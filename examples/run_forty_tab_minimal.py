@@ -179,6 +179,9 @@ def _circuit_instances(profile: Mapping[str, object]) -> list[DeviceInstance]:
                     "relay-behavior": relay_behavior,
                     "placement": str(circuit.get("placement", "downstream-of-lugs")),
                     "always-on": _bool_str(relay_behavior == "always-on"),
+                    "never-backup": _bool_str(
+                        bool(template.get("never_backup", circuit.get("never_backup", False)))
+                    ),
                     "pcs-priority": str(circuit.get("pcs_priority", idx)),
                 },
             ),
