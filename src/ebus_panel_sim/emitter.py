@@ -159,7 +159,9 @@ class Emitter:
         self._evse_user_max_override: dict[str, int] = {}
 
         for cid, cphys in self._physics.all_circuits().items():
-            self._relays.register(cid, always_on=cphys.always_on)
+            self._relays.register(
+                cid, always_on=cphys.always_on, priority_locked=cphys.never_backup
+            )
             self._energy.register(cid)
             if cphys.initial_consumed_wh or cphys.initial_produced_wh:
                 self._energy.seed(

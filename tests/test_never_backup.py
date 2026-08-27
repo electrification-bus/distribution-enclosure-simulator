@@ -258,7 +258,10 @@ def test_settable_is_declared_exactly_when_a_circuit_is_not_never_backup() -> No
 def test_a_never_backup_circuit_still_sheds() -> None:
     """`never-backup` means exactly "no backup power": the circuit is
     commissioned `OFF_GRID`, so islanding is when it opens. The lock removes
-    the consumer's ability to change that, not the shed itself."""
+    the consumer's ability to change that, not the shed itself.
+
+    The open is attributed to `CONFIGURATION`: it is the commissioning decision
+    taking effect, not a policy call made now."""
     em = Emitter(
         DeviceManifest(
             instances=(
@@ -290,6 +293,7 @@ def test_a_never_backup_circuit_still_sheds() -> None:
     )
     assert snap.circuits["well_pump"].relay_state == "OPEN"
     assert snap.circuits["well_pump"].is_sheddable is True
+    assert snap.circuits["well_pump"].relay_requester == "CONFIGURATION"
 
 
 def test_a_relay_locked_circuit_is_not_sheddable() -> None:
@@ -306,16 +310,70 @@ def test_a_relay_locked_circuit_is_not_sheddable() -> None:
     assert snap.circuits["solar"].is_sheddable is False
 
 
-def test_a_never_backup_circuit_attributes_its_state_to_the_actor_that_acted() -> None:
-    """The lock is on the priority, so it is not a relay requester: at rest the
-    relay is closed with no active requester, and when the panel islands the
-    load-shed policy is what opens it.
+def test_islanding_separates_a_commissioned_shed_from_a_policy_shed(rec: PahoRecorder) -> None:
+    """Two circuits, both `OFF_GRID`, both opened by the same islanding tick,
+    attributed to different actors -- which is the whole point of the property.
 
-    The guide's `NEVER_BACKUP -> CONFIGURATION` row is a translation rule for a
-    value a *flat* panel had already published; the canonical enum this emitter
-    publishes has no `NEVER_BACKUP`, and `CONFIGURATION` is reserved for the
-    relay's own commissioning lock (`relay-controllable = false`), which this
-    circuit does not carry."""
+    The migration guide maps the flat `NEVER_BACKUP` requester to
+    `CONFIGURATION`: "the commissioning lock is now expressed structurally via
+    `load-shed/priority = OFF_GRID` with `$settable = false`; `CONFIGURATION`
+    captures the source attribution". Flat `BACKUP` -- an ordinary shed -- maps
+    to `LOAD_SHED` instead. Firmware distinguished the two, so a publisher that
+    reported `LOAD_SHED` for both would erase a distinction the canonical
+    vocabulary still carries: for the locked circuit the decision was made once,
+    at commissioning, and the policy running now is only carrying it out.
+
+    Asserted on the wire, because the requester is a published property and its
+    consumer reads it there."""
+    manifest = DeviceManifest(
+        instances=(
+            _panel(),
+            _locked("well_pump", tabs="1"),
+            _circuit("hot_tub", tabs="3", priority="OFF_GRID"),
+            DeviceInstance(
+                "bess",
+                "p1-bess",
+                "Battery",
+                metadata={"vendor-name": "Span", "nameplate-capacity-kwh": "13.5"},
+            ),
+        )
+    )
+    em = Emitter(
+        manifest,
+        SetterRegistry(),
+        bess_configs=(
+            BESSConfig(
+                instance_id="p1-bess",
+                nameplate_capacity_kwh=13.5,
+                max_charge_w=3500.0,
+                max_discharge_w=3500.0,
+                initial_soc_pct=80.0,
+            ),
+        ),
+        load_shedding_config=LoadSheddingConfig(soc_threshold_pct=20.0),
+    )
+    em.start()
+    snap = em.publish_tick(
+        TickInputs(
+            current_time=0.0,
+            grid_online=False,
+            circuits={"well_pump": 1000.0, "hot_tub": 3000.0},
+        )
+    )
+    assert snap.circuits["well_pump"].relay_state == "OPEN"
+    assert snap.circuits["hot_tub"].relay_state == "OPEN"
+
+    retained = rec.retained
+    assert retained["ebus/5/well_pump/switch/relay-requester"] == "CONFIGURATION"
+    assert retained["ebus/5/hot_tub/switch/relay-requester"] == "LOAD_SHED"
+
+
+def test_a_never_backup_circuit_reports_no_requester_at_rest() -> None:
+    """The lock speaks only when it acts. It does not hold the relay closed --
+    that is what `relay-controllable = false` does, a different flag on a
+    different property -- so on-grid, closed, this circuit reports `NONE` like
+    any other, and reports `CONFIGURATION` only in the tick where the
+    commissioning decision actually opens it."""
     em = _emitter(_locked("well_pump"))
     em.start()
     snap = em.publish_tick(

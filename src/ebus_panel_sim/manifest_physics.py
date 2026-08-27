@@ -66,13 +66,19 @@ class CircuitPhysics:
     # spelling. Named for the hardware flag it mirrors (`relay-controllable =
     # !always-on`), not for the one `relay-behavior` value that shares the name.
     always_on: bool
-    # The *other* commissioning lock, from `never_backup`: this circuit is
-    # commissioned permanently `OFF_GRID` and its priority is not settable.
-    # Independent of `default_priority`'s value, and of `always_on`.
-    never_backup: bool
     initial_consumed_wh: float
     initial_produced_wh: float
     pcs_priority: int = 0
+    # The *other* commissioning lock, from `never_backup`: this circuit is
+    # commissioned permanently `OFF_GRID` and its priority is not settable.
+    # Independent of `default_priority`'s value, and of `always_on`.
+    #
+    # Defaulted, unlike `always_on`, because this dataclass is exported and a
+    # caller constructing one by hand predates the field. `False` is the
+    # parser's own absent-key answer, so a hand-built instance and a parsed
+    # manifest that omits the key agree. It sits last because a defaulted field
+    # cannot precede an undefaulted one, not because it belongs here.
+    never_backup: bool = False
 
 
 @dataclass(frozen=True, slots=True)
