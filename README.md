@@ -78,7 +78,7 @@ A producer can build `DeviceInstance`s directly instead of loading a definition 
 | --- | --- | --- |
 | `panel` | `vendor-name`, `serial-number`, `firmware-version` (or `software-version`), `hardware-version`, `panel-size`, `main-breaker-rating-a`, `panel-model`, `postal-code`, `time-zone` | `service-voltage-v` (240), `line-voltage-v` (120), `islandable` (false), `schema-topology` (`flat` \| `parent-child`) |
 | `lugs` | `direction` (`upstream` \| `downstream`) | |
-| `circuit` | `tab-numbers` (CSV ints), `breaker-rating-a`, `default-priority`, `relay-behavior` (`controllable` \| `non-controllable` \| `always-on`), `placement` (`upstream-of-lugs` \| `downstream-of-lugs`) | `always-on`, `never-backup` (false), `dipole` (defaults to `len(tab-numbers) > 1`), `pcs-priority` (0), `initial-consumed-wh` (0), `initial-produced-wh` (0) |
+| `circuit` | `tab-numbers` (CSV ints), `breaker-rating-a`, `default-priority`, `relay-behavior` (`controllable` \| `non-controllable` \| `always-on`), `placement` (`upstream-of-lugs` \| `downstream-of-lugs`) | `always-on`, `never-backup` (false), `commissioned-system` (`pv` \| `backup`), `dipole` (defaults to `len(tab-numbers) > 1`), `pcs-priority` (0), `initial-consumed-wh` (0), `initial-produced-wh` (0) |
 | `bess` | `vendor-name`, `nameplate-capacity-kwh` | `model`, `part-number`, `serial-number`, `firmware-version`/`software-version`, `relative-position` (`UPSTREAM`), `feed`, `initial-soe-kwh` |
 | `pv` | `vendor-name`, `nominal-power-w`, `inverter-type` (`hybrid` \| `ac-coupled`) | `model`, `serial-number`, `firmware-version`/`software-version`, `relative-position` (`IN_PANEL`), `feed` |
 | `evse` | `vendor-name`, `model`, `part-number`, `serial-number`, `firmware-version` (or `software-version`), `max-current-a` | `feed` |
@@ -100,6 +100,8 @@ shed publishes `switch/relay-requester` as `LOAD_SHED`, like any other shed — 
 requester value — and at rest the circuit reports `NONE` like any other.
 This is a **separate commissioning input from the priority value**: `default-priority: NEVER`
 means "never shed" and stays fully settable, which is what real panels publish.
+
+A circuit carrying `commissioned-system: pv` or `commissioned-system: backup` is the circuit a SPAN panel adds for a commissioned PV or battery system. It locks both: the relay as above, and `load-shed/priority`, which must be `NEVER` (any other `default-priority` is rejected).
 
 ### 3. Panel definition file
 

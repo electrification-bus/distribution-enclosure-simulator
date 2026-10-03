@@ -79,6 +79,14 @@ class CircuitPhysics:
     # manifest that omits the key agree. It sits last because a defaulted field
     # cannot precede an undefaulted one, not because it belongs here.
     never_backup: bool = False
+    # From `commissioned_system`: the circuit the panel adds for a commissioned
+    # PV (``"pv"``) or battery (``"backup"``) system, or None.
+    commissioned_system: str | None = None
+
+    @property
+    def priority_locked(self) -> bool:
+        """Whether ``load-shed/priority`` is not settable on this circuit."""
+        return self.never_backup or self.commissioned_system is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,6 +155,7 @@ _VALID_PRIORITIES = frozenset(
 )
 _VALID_RELAY_BEHAVIORS = frozenset({"controllable", "always-on", "non-controllable"})
 _VALID_PLACEMENTS = frozenset({"upstream-of-lugs", "downstream-of-lugs"})
+_VALID_COMMISSIONED_SYSTEMS = frozenset({"pv", "backup"})
 _VALID_LUGS_DIRECTIONS = frozenset({"upstream", "downstream"})
 _VALID_INVERTER_TYPES = frozenset({"hybrid", "ac-coupled"})
 _VALID_TOPOLOGIES = frozenset({"flat", "parent-child"})
@@ -303,8 +312,10 @@ def relay_locked(md: dict[str, str]) -> bool:
     Absent metadata is controllable, which is what a manifest that declares no
     relay behaviour at all means.
     """
-    return md.get("relay-behavior", "controllable") != "controllable" or _opt_bool(
-        md, "always-on", default=False
+    return (
+        md.get("relay-behavior", "controllable") != "controllable"
+        or _opt_bool(md, "always-on", default=False)
+        or commissioned_system(md) is not None
     )
 
 
@@ -338,6 +349,22 @@ def never_backup(md: dict[str, str]) -> bool:
     no commissioning lock at all means.
     """
     return _opt_bool(md, "never-backup", default=False)
+
+
+def commissioned_system(md: dict[str, str]) -> str | None:
+    """Which commissioned system this circuit is the panel's entry for, if any.
+
+    A SPAN panel adds a circuit for an in-panel commissioned PV system
+    (``"pv"``) or battery system (``"backup"``). Such a circuit locks both its
+    relay and its load-shed priority, which stays ``NEVER``. Read from raw
+    metadata for the same reason as :func:`relay_locked`."""
+    return _opt_str(md, "commissioned-system")
+
+
+def priority_locked(md: dict[str, str]) -> bool:
+    """Whether ``load-shed/priority`` is not settable, from raw metadata: the
+    circuit is commissioned never-backup or is a commissioned-system circuit."""
+    return never_backup(md) or commissioned_system(md) is not None
 
 
 def _require(md: dict[str, str], key: str) -> str:
@@ -481,7 +508,7 @@ def _parse_circuit(inst: DeviceInstance) -> CircuitPhysics:
         )
 
     always_on = relay_locked(md)
-    priority_locked = never_backup(md)
+    is_never_backup = never_backup(md)
     # Contradictory physics, rejected rather than silently rewritten. A
     # never-backup circuit *is* commissioned permanently ``OFF_GRID``, so a
     # manifest that locks one at another priority states two incompatible things
@@ -490,10 +517,24 @@ def _parse_circuit(inst: DeviceInstance) -> CircuitPhysics:
     # defect this key exists to fix -- a published priority nobody wrote -- and
     # would hide the producer's mistake instead of naming it. This way the
     # published value is always the one the manifest declares.
-    if priority_locked and priority != "OFF_GRID":
+    if is_never_backup and priority != "OFF_GRID":
         raise ManifestValidationError(
             "key 'never-backup': a never-backup circuit is commissioned permanently "
             f"OFF_GRID, so 'default-priority' must be 'OFF_GRID', got {priority!r}"
+        )
+
+    system = commissioned_system(md)
+    if system is not None and system not in _VALID_COMMISSIONED_SYSTEMS:
+        raise ManifestValidationError(
+            f"key 'commissioned-system': must be one of "
+            f"{sorted(_VALID_COMMISSIONED_SYSTEMS)}, got {system!r}"
+        )
+    # Rejected for the same reason as never-backup above: a commissioned-system
+    # circuit's priority is fixed at NEVER.
+    if system is not None and priority != "NEVER":
+        raise ManifestValidationError(
+            "key 'commissioned-system': a commissioned-system circuit's priority is "
+            f"fixed at NEVER, so 'default-priority' must be 'NEVER', got {priority!r}"
         )
 
     return CircuitPhysics(
@@ -505,7 +546,8 @@ def _parse_circuit(inst: DeviceInstance) -> CircuitPhysics:
         relay_behavior=relay_behavior,
         placement=placement,
         always_on=always_on,
-        never_backup=priority_locked,
+        never_backup=is_never_backup,
+        commissioned_system=system,
         pcs_priority=_opt_int(md, "pcs-priority", 0),
         initial_consumed_wh=_opt_float(md, "initial-consumed-wh", 0.0),
         initial_produced_wh=_opt_float(md, "initial-produced-wh", 0.0),

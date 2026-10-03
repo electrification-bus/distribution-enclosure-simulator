@@ -192,25 +192,15 @@ def _circuit_wire_exported_energy(snapshot: EbusPanelSnapshot, instance_id: str)
 
 
 def _bess_wire_active_power(snapshot: EbusPanelSnapshot, instance_id: str) -> object:
-    """BESS ``meter/active-power`` in the panel's frame, not the battery's.
-
-    The snapshot's ``active_power_w`` is device-frame: positive = the battery is
-    discharging, power flowing out of it. This emitter publishes a panel's view
-    of the world, and what a panel proxies for a battery it hosts is the panel's
-    reading of that battery, not the battery's reading of itself. So the wire
-    value is positive while *charging* -- power leaving the panel node into the
-    battery -- which is the same quantity and the same sign as the panel's
-    ``power-flows/battery``. Hence the negation, and hence
-    ``test_bess_meter_active_power_matches_power_flows_battery``.
-
-    A standalone BESS on the same bus publishes its own meter in its own frame,
-    where positive = discharging. That device is not this device, and the two
-    disagreeing about the same battery at the same instant is correct: they are
-    answering different questions."""
+    """BESS ``meter/active-power`` in the battery's own frame: positive while
+    discharging, as ``devices/bess.md`` defines it. That makes it the negative
+    of the panel's ``power-flows/battery`` (positive = toward the battery), and
+    ``test_bess_meter_active_power_is_the_negative_of_power_flows_battery``
+    pins the pair. ``-0.0`` is normalized so an idle battery publishes ``0``."""
     bess = snapshot.battery.get(instance_id)
     if bess is None:
         return None
-    return 0.0 if bess.active_power_w == 0 else -bess.active_power_w
+    return 0.0 if bess.active_power_w == 0 else bess.active_power_w
 
 
 def _upper_lugs_direction(snapshot: EbusPanelSnapshot, instance_id: str) -> object:

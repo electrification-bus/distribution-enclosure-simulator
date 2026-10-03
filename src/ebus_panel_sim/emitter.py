@@ -187,12 +187,12 @@ class Emitter:
         self._relays = RelayResolver()
         self._energy = EnergyIntegrator()
         self._priority_overrides: dict[str, str] = {}
-        # The circuits commissioned never-backup, resolved once from the manifest
-        # the way `RelayResolver` registers the relay lock once. Their priority is
-        # not settable, so an override never enters the map above and the
-        # published value stays the commissioned `OFF_GRID`.
+        # The circuits whose priority is locked (never-backup or a
+        # commissioned-system circuit), resolved once from the manifest the way
+        # `RelayResolver` registers the relay lock once. An override never enters
+        # the map above, so the published value stays the commissioned one.
         self._priority_locked: frozenset[str] = frozenset(
-            cid for cid, cphys in self._physics.all_circuits().items() if cphys.never_backup
+            cid for cid, cphys in self._physics.all_circuits().items() if cphys.priority_locked
         )
         self._name_overrides: dict[str, str] = {}
         self._dominant_power_source_override: str | None = None
@@ -912,9 +912,8 @@ class Emitter:
                 lock_state="LOCKED" if charging else "UNLOCKED",
                 advertised_current_a=ephys.max_current_a,
                 max_charge_current_a=int(ephys.max_current_a),
-                user_max_charge_current_a=self._evse_user_max_override.get(
-                    eid, int(ephys.max_current_a)
-                ),
+                # Unpublished until a user sets it; max-charge-current is the ceiling.
+                user_max_charge_current_a=self._evse_user_max_override.get(eid),
                 vendor_name=ephys.vendor_name,
                 model=ephys.model,
                 part_number=ephys.part_number,

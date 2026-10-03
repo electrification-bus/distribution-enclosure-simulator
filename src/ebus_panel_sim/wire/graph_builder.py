@@ -27,7 +27,7 @@ import ebus_sdk
 
 from ebus_panel_sim.exceptions import ManifestValidationError, ProfileValidationError
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
-from ebus_panel_sim.manifest_physics import never_backup, relay_locked
+from ebus_panel_sim.manifest_physics import priority_locked, relay_locked
 from ebus_panel_sim.wire._sdk_seam import MqttDeviceTransport, make_property
 from ebus_panel_sim.wire.mapping_loader import MappingDescriptor, MappingTable
 from ebus_panel_sim.wire.profile_loader import Profile, ProfileTable
@@ -332,7 +332,8 @@ def _attach_profile(
 # (``capabilities/switch.md``); ``load-shed/priority`` is published with
 # ``$settable = !never-backup`` (the eBus schema migration guide), which is a
 # lock on the *property*, unrelated to the priority's own value -- ``NEVER`` is
-# an ordinary settable value meaning "never shed".
+# an ordinary settable value meaning "never shed". A commissioned-system circuit
+# locks both.
 #
 # The two warrants differ in strength. ``capabilities/switch.md`` ties
 # ``relay``'s settability to ``relay-controllable`` per circuit. The public
@@ -343,7 +344,7 @@ def _attach_profile(
 # entry rests on the guide, not on ``capabilities/load-shed.md``.
 _INSTANCE_LOCKS: dict[tuple[str, str], Callable[[dict[str, str]], bool]] = {
     ("switch", "relay"): relay_locked,
-    ("load-shed", "priority"): never_backup,
+    ("load-shed", "priority"): priority_locked,
 }
 
 
