@@ -166,7 +166,7 @@ def main() -> None:
 main()
 ```
 
-To model the panel losing its link to a battery, report it in the tick: `TickInputs(..., bess_communication={"abc-123-bess": "LOST"})`. The battery publishes it as `status/communication-state`, the connection status of the circuit or lugs connecting it follows, and while any battery link is not `OK` the emitter's own handler accepts an `asserted-islanding-state` write, clearing it once every link has been `OK` for 30 seconds (see [DESIGN.md](DESIGN.md#islanding-assertion)).
+To model the panel losing its link to a battery, report it in the tick: `TickInputs(..., bess_communication={"abc-123-bess": "LOST"})`. The battery publishes it as `status/communication-state`, the connection status of the circuit or lugs connecting it follows, and while a battery link is not known to be healthy (before the first tick, or while any link is not `OK`) the emitter's own handler accepts an `asserted-islanding-state` write, clearing it once every link has been `OK` for 30 seconds (see [DESIGN.md](DESIGN.md#islanding-assertion)).
 
 Read the most recently published state back through `emitter.last_snapshot`. `mqtt_cfg` is handed straight to ebus-sdk: beyond `host`/`port` it takes the ebus-mqtt-client TLS and authentication keys for secured brokers (e.g. broker-quickstart's mTLS `discovery`/`strict` profiles).
 

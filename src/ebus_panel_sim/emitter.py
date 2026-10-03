@@ -75,6 +75,9 @@ clears an active ``shed/asserted-islanding-state`` back to ``NONE``."""
 
 _ASSERTABLE_ISLANDING_STATES: Final = frozenset({"ON_GRID", "OFF_GRID"})
 _BESS_COMMUNICATION_STATES: Final[frozenset[str]] = frozenset(get_args(BESSCommunication))
+# A SPAN panel declares the catalog's full enum on a connection status but reports
+# only these values there (SPAN-API-Client-Docs specs/r202633/homie-schema.json).
+_SPAN_REPORTED_LINK_STATUSES: Final = frozenset({"OK", "LOST"})
 
 
 def _declared_enum(
@@ -91,13 +94,20 @@ def _declared_enum(
     return frozenset(declared.format.split(","))
 
 
-def _link_status(communication: BESSCommunication, declared: frozenset[str]) -> str:
-    """The connection status a battery link of this health publishes.
+def _reported_link_statuses(
+    profiles: ProfileTable, variant: Variant, entity_class: str, prop: str
+) -> frozenset[str]:
+    """The values a connection status reports: what its profile declares, narrowed
+    to ``OK`` and ``LOST`` for the span variant, as a SPAN panel reports."""
+    declared = _declared_enum(profiles, entity_class, "connection", prop)
+    return declared & _SPAN_REPORTED_LINK_STATUSES if variant == "span" else declared
 
-    The health itself where the connection status declares it, and ``LOST``
-    otherwise: a SPAN panel reports only ``OK`` or ``LOST`` there, which its
-    overlay declares, and no variant's connection catalog has ``UNKNOWN``."""
-    return communication if communication in declared else "LOST"
+
+def _link_status(communication: BESSCommunication, reported: frozenset[str]) -> str:
+    """The connection status a battery link of this health publishes: the health
+    itself where the status reports it, and ``LOST`` otherwise. No connection catalog
+    declares ``UNKNOWN``, and a SPAN panel reports ``DEGRADED`` as ``LOST`` too."""
+    return communication if communication in reported else "LOST"
 
 
 class Emitter:
@@ -187,15 +197,15 @@ class Emitter:
         self._dominant_power_source_override: str | None = None
         self._asserted_islanding_override: str | None = None
         # Health of the panel's link to each battery as of the last tick, which
-        # the assertion handler reads between ticks, and the tick time since
-        # which every link has been OK.
-        self._bess_links: dict[str, BESSCommunication] = {}
+        # the assertion handler reads between ticks (None until the first tick
+        # has observed one), and the tick time since which every link has been OK.
+        self._bess_links: dict[str, BESSCommunication] | None = None
         self._links_healthy_since: float | None = None
-        self._feeds_status_values = _declared_enum(
-            self._profiles, "circuit", "connection", "feeds-device-status"
+        self._feeds_status_values = _reported_link_statuses(
+            self._profiles, variant, "circuit", "feeds-device-status"
         )
-        self._fed_by_status_values = _declared_enum(
-            self._profiles, "lugs", "connection", "fed-by-device-status"
+        self._fed_by_status_values = _reported_link_statuses(
+            self._profiles, variant, "lugs", "fed-by-device-status"
         )
         self._shed_policy_override: str | None = None
         self._evse_user_max_override: dict[str, int] = {}
@@ -588,11 +598,12 @@ class Emitter:
         ) -> None:
             del entity_class, instance_id, prop_path
             # A SPAN panel accepts ON_GRID or OFF_GRID only while its link to a
-            # battery is unhealthy, and ignores everything else -- NONE included,
-            # since only the panel clears an assertion -- leaving the published
-            # value unchanged, which is how a consumer sees the refusal.
+            # battery is not known to be healthy, and ignores everything else --
+            # NONE included, since only the panel clears an assertion -- leaving
+            # the published value unchanged, which is how a consumer sees the
+            # refusal.
             asserted = str(value).upper()
-            if asserted in _ASSERTABLE_ISLANDING_STATES and self._bess_link_unhealthy():
+            if asserted in _ASSERTABLE_ISLANDING_STATES and self._assertion_eligible():
                 self._asserted_islanding_override = asserted
 
         def on_shed_policy(
@@ -729,7 +740,7 @@ class Emitter:
         # the DER child: each DER's feed circuit publishes the feeds-* triple, and
         # an upstream BESS's fed-by triple lands on the upstream lugs. Status is a
         # link-health enum; PV/EVSE have no comms model so they report OK, a BESS
-        # reports its battery's link health in the status's declared vocabulary.
+        # reports its battery's link health in the values that status reports.
         feeds_by_circuit: dict[str, tuple[str, str, str]] = {}
         for pv_id, pv_phys in self._physics.all_pv().items():
             if pv_phys.feed:
@@ -1036,14 +1047,20 @@ class Emitter:
                 f"{sorted(_BESS_COMMUNICATION_STATES)!r}"
             )
 
-    def _bess_link_unhealthy(self) -> bool:
+    def _assertion_eligible(self) -> bool:
+        """Whether the panel would accept an assertion now: while its link to some
+        battery is not known to be healthy. Before the first tick no link has been
+        observed, so a panel with a battery accepts; one without a battery has no
+        link to lose and never does."""
+        if self._bess_links is None:
+            return bool(self._bess)
         return any(link != "OK" for link in self._bess_links.values())
 
     def _expire_assertion(self, now: float) -> None:
         """Clear an active assertion once every battery link has been ``OK`` for
         ``ASSERTION_CLEAR_AFTER_S``, as the panel does when it reclaims authority.
         Any unhealthy tick restarts the wait, so a flapping link keeps it."""
-        if self._bess_link_unhealthy():
+        if self._assertion_eligible():
             self._links_healthy_since = None
             return
         if self._links_healthy_since is None:

@@ -14,14 +14,6 @@
           "datatype": "string"
         }
       }
-    },
-    "connection": {
-      "type": "energy.ebus.capability.connection",
-      "properties": {
-        "feeds-device-status": {
-          "format": "OK,LOST"
-        }
-      }
     }
   }
 }

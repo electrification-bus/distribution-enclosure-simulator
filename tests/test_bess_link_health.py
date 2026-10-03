@@ -3,10 +3,10 @@ follows it.
 
 A SPAN panel publishes its link health as the battery's ``status/communication-state``
 and, from the same observation, on the connection status of the circuit or lugs that
-connects the battery, where it reports only ``OK`` or ``LOST``. It accepts an
-``asserted-islanding-state`` of ``ON_GRID`` or ``OFF_GRID`` only while that link is
-unhealthy, ignores ``NONE`` always, and clears an assertion once the link has been
-healthy for about 30 seconds."""
+connects the battery, where it reports only ``OK`` or ``LOST`` while declaring the
+catalog's full enum. It accepts an ``asserted-islanding-state`` of ``ON_GRID`` or
+``OFF_GRID`` only while that link is not known to be healthy, ignores ``NONE`` always,
+and clears an assertion once the link has been healthy for about 30 seconds."""
 
 from __future__ import annotations
 
@@ -112,6 +112,13 @@ def _emitter(setters: SetterRegistry | None = None, variant: Variant = "span") -
     return em
 
 
+def _batteryless_emitter(setters: SetterRegistry) -> Emitter:
+    batteryless = tuple(i for i in _manifest().instances if i.entity_class != "bess")
+    em = Emitter(DeviceManifest(instances=batteryless), setters)
+    em.start()
+    return em
+
+
 def _tick(
     current_time: float,
     *,
@@ -172,9 +179,8 @@ def test_the_connection_status_publishes_what_its_profile_declares(
     rec: PahoRecorder, variant: Variant, link: BESSCommunication, connection: str
 ) -> None:
     """The battery reports its link health as is; the connection status reports it
-    where its enum declares the value and as ``LOST`` otherwise. A SPAN panel's
-    connection status carries only ``OK`` and ``LOST``, and no connection catalog
-    carries ``UNKNOWN``."""
+    where it can and as ``LOST`` otherwise. A SPAN panel's connection status carries
+    only ``OK`` and ``LOST``, and no connection catalog carries ``UNKNOWN``."""
     em = _emitter(variant=variant)
     em.publish_tick(_tick(0.0, up=link, in_panel=link))
     retained = rec.retained
@@ -183,12 +189,13 @@ def test_the_connection_status_publishes_what_its_profile_declares(
     assert retained["ebus/5/battery/connection/feeds-device-status"] == connection
 
 
-@pytest.mark.parametrize(
-    ("variant", "declared"), [("span", "OK,LOST"), ("reference", "OK,LOST,DEGRADED")]
-)
-def test_the_connection_status_declares_its_variants_vocabulary(
-    rec: PahoRecorder, variant: Variant, declared: str
+@pytest.mark.parametrize("variant", ["span", "reference"])
+def test_the_connection_status_declares_the_catalogs_full_enum(
+    rec: PahoRecorder, variant: Variant
 ) -> None:
+    """A SPAN panel declares ``OK,LOST,DEGRADED`` on these statuses even though it
+    reports only ``OK`` or ``LOST`` (SPAN-API-Client-Docs
+    ``specs/r202633/homie-schema.json``), so the span variant declares it too."""
     em = _emitter(variant=variant)
     em.publish_tick(_tick(0.0))
     for device_id, prop in (
@@ -197,7 +204,9 @@ def test_the_connection_status_declares_its_variants_vocabulary(
         ("lugs-upstream", "feeds-device-status"),
     ):
         description = json.loads(rec.retained[f"ebus/5/{device_id}/$description"])
-        assert description["nodes"]["connection"]["properties"][prop]["format"] == declared
+        assert (
+            description["nodes"]["connection"]["properties"][prop]["format"] == "OK,LOST,DEGRADED"
+        )
 
 
 def test_a_tick_naming_an_unconfigured_battery_is_refused() -> None:
@@ -230,13 +239,28 @@ def test_an_assertion_is_ignored_while_every_link_is_ok(rec: PahoRecorder) -> No
     assert rec.retained[_ASSERTION] == "NONE"
 
 
-def test_an_assertion_is_ignored_before_the_first_tick(rec: PahoRecorder) -> None:
-    """No link has been reported yet, so none is known to be unhealthy."""
+def test_an_assertion_is_accepted_before_the_first_tick(rec: PahoRecorder) -> None:
+    """No link has been observed yet, so none is known to be healthy, and the panel
+    accepts. A healthy first tick then starts the wait that clears it."""
     setters = SetterRegistry()
     em = _emitter(setters)
     _assert_islanding(setters, "ON_GRID")
-    em.publish_tick(_tick(0.0, up="LOST"))
+    em.publish_tick(_tick(0.0))
+    assert rec.retained[_ASSERTION] == "ON_GRID"
+    em.publish_tick(_tick(30.0))
     assert rec.retained[_ASSERTION] == "NONE"
+
+
+@pytest.mark.parametrize("ticked", [False, True])
+def test_a_panel_without_a_battery_never_accepts_an_assertion(ticked: bool) -> None:
+    """With no battery there is no link to lose, before the first tick or after."""
+    setters = SetterRegistry()
+    em = _batteryless_emitter(setters)
+    if ticked:
+        em.publish_tick(_tick(0.0))
+    _assert_islanding(setters, "OFF_GRID")
+    snap = em.publish_tick(_tick(1.0))
+    assert snap.shed.asserted_islanding_state == "NONE"
 
 
 @pytest.mark.parametrize("link", ["LOST", "DEGRADED", "UNKNOWN"])
