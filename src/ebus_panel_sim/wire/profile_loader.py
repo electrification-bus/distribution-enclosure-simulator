@@ -10,8 +10,9 @@ property with no spec-catalog home (pv ``nominal-power``, the SPAN-vendor extras
 carries a full inline definition instead, which hydration uses as-is.
 
 ``variant='span'`` (the default) deep-merges the ``profiles/span/*.json`` overlay (the
-SPAN-vendor-specific surface + conformance-latitude overrides) onto the base;
-``variant='reference'`` loads the spec-conformant base only.
+SPAN-vendor-specific surface + conformance-latitude overrides) onto the base, where an
+overlay ``null`` removes a base capability or property; ``variant='reference'`` loads the
+spec-conformant base only.
 """
 
 from __future__ import annotations
@@ -83,7 +84,7 @@ def load_profiles(
         if variant == "span":
             overlay_path = overlay_dir / f"{entity_class}.json"
             if overlay_path.exists():
-                raw = _merge_overlay(raw, json.loads(overlay_path.read_text()))
+                raw = _merge_overlay(raw, json.loads(overlay_path.read_text()), overlay_path)
         table[entity_class] = _hydrate_profile(entity_class, path, raw, catalogs)
     return table
 
@@ -114,26 +115,39 @@ def _expand_pattern(pattern: str, body: dict[str, Any]) -> dict[str, dict[str, A
     return {f"{prefix}{t}{suffix}": dict(slim) for t in tokens}
 
 
-def _merge_overlay(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+def _merge_overlay(base: dict[str, Any], overlay: dict[str, Any], path: Path) -> dict[str, Any]:
     """Deep-merge a partial overlay profile onto a base profile (raw dicts).
 
     An overlay capability absent from the base is added whole; one that exists has
     its properties merged in, overlay entries overriding the base entry key-by-key
     (so an overlay can flip ``settable`` on an existing property without restating
-    its definition). Top-level ``$version``/``type`` stay the base's."""
+    its definition). A ``null`` capability or property removes it from the base, as
+    in JSON Merge Patch (RFC 7396); removing one the base lacks, or every property
+    of a capability, is an error. Top-level ``$version``/``type`` stay the base's."""
     merged: dict[str, Any] = {**base, "capabilities": {}}
     for cap_name, cap in base.get("capabilities", {}).items():
         merged["capabilities"][cap_name] = {**cap, "properties": dict(cap.get("properties", {}))}
     for cap_name, ov_cap in overlay.get("capabilities", {}).items():
-        if cap_name not in merged["capabilities"]:
-            merged["capabilities"][cap_name] = {
-                **ov_cap,
-                "properties": dict(ov_cap.get("properties", {})),
-            }
+        if ov_cap is None:
+            if merged["capabilities"].pop(cap_name, None) is None:
+                raise ProfileValidationError(
+                    f"{path}: removes capability {cap_name!r}, which the base lacks"
+                )
             continue
-        target = merged["capabilities"][cap_name]
+        target = merged["capabilities"].setdefault(cap_name, {**ov_cap, "properties": {}})
         for prop_key, ov_prop in ov_cap.get("properties", {}).items():
+            if ov_prop is None:
+                if target["properties"].pop(prop_key, None) is None:
+                    raise ProfileValidationError(
+                        f"{path}: removes {cap_name}/{prop_key}, which the base lacks"
+                    )
+                continue
             target["properties"][prop_key] = {**target["properties"].get(prop_key, {}), **ov_prop}
+        if not target["properties"]:
+            raise ProfileValidationError(
+                f"{path}: leaves capability {cap_name!r} with no properties; "
+                "remove the capability instead"
+            )
     return merged
 
 
