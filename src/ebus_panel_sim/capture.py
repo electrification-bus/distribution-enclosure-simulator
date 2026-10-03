@@ -28,9 +28,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, get_args
 
-from ebus_panel_sim.definition import PanelDefinition, dump_definition
+from ebus_panel_sim.definition import PanelDefinition, dump_definition, dump_ticks
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
 from ebus_panel_sim.native_devices import BESSConfig
+from ebus_panel_sim.tick_inputs import TickInputs
 from ebus_panel_sim.wire.profile_loader import Variant
 
 _DOMAIN = "ebus/5"
@@ -121,11 +122,15 @@ def capture_live(
     tls_insecure: bool = False,
     timeout_s: float = 30.0,
     settle_s: float = 5.0,
-) -> Tree:
+    record: int = 0,
+    interval_s: float = 1.0,
+) -> tuple[Tree, list[tuple[float, Tree]]]:
     """Read a live tree through ``ebus_sdk.Controller``.
 
-    Returns once every advertised device has a ``$description`` and no new
-    property has appeared for ``settle_s``, or at ``timeout_s``."""
+    Waits until every advertised device has a ``$description`` and no new
+    property has appeared for ``settle_s``, or until ``timeout_s``. Then takes
+    ``record`` further samples, ``interval_s`` apart, each stamped with the wall
+    clock. Returns the settled tree and the samples."""
     from ebus_sdk import Controller
 
     mqtt_cfg: dict[str, Any] = {
@@ -151,6 +156,20 @@ def capture_live(
             seen.add((device_id, node, prop))
             last_new = time.monotonic()
 
+    def snapshot() -> Tree:
+        return {
+            device_id: Device(
+                description=dict(d.description or {}),
+                properties={
+                    f"{node}/{prop}": _wire_str(value)
+                    for node, props in d.properties.items()
+                    for prop, value in props.items()
+                },
+            )
+            for device_id, d in controller.get_all_devices().items()
+            if d.description
+        }
+
     controller.set_on_property_changed_callback(on_property)
     controller.start_discovery()
     deadline = time.monotonic() + timeout_s
@@ -164,19 +183,12 @@ def capture_live(
             )
             if complete and time.monotonic() - last_new >= settle_s:
                 break
-        devices = controller.get_all_devices()
-        return {
-            device_id: Device(
-                description=dict(d.description or {}),
-                properties={
-                    f"{node}/{prop}": _wire_str(value)
-                    for node, props in d.properties.items()
-                    for prop, value in props.items()
-                },
-            )
-            for device_id, d in devices.items()
-            if d.description
-        }
+        tree = snapshot()
+        samples: list[tuple[float, Tree]] = []
+        for _ in range(record):
+            time.sleep(interval_s)
+            samples.append((time.time(), snapshot()))
+        return tree, samples
     finally:
         controller.stop()
 
@@ -200,6 +212,56 @@ def definition_from_tree(
     ``variant`` defaults to ``span`` for a SPAN panel and ``reference``
     otherwise."""
     return _Mapper(tree, mask).run(variant)
+
+
+def ticks_from_samples(
+    tree: Tree, samples: Sequence[tuple[float, Tree]], *, mask: bool = True
+) -> list[TickInputs]:
+    """Replayable ticks from timestamped samples of the same tree.
+
+    Device IDs match ``definition_from_tree(tree, mask=mask)``. A circuit's power
+    is its published ``meter/active-power`` negated back to the producer's sign
+    (positive = consuming); an EVSE draws what its feeding circuit does; the grid
+    is offline when a MID reports ``grid/islanding-state`` ``OFF_GRID`` or
+    ``grid/grid-state`` ``DOWN`` or, without a MID, the panel's main relay is
+    ``OPEN``."""
+    mapper = _Mapper(tree, mask)
+    feeds = mapper._feeds()
+    ticks: list[TickInputs] = []
+    for stamp, sample in samples:
+        circuits: dict[str, float] = {}
+        for device_id, device in sample.items():
+            power = device.value("meter/active-power")
+            if device.type == "circuit" and device_id in mapper.ids and power is not None:
+                circuits[mapper.ids[device_id]] = -float(power) + 0.0
+        evse = {
+            mapper.ids[evse_id]: circuits.get(feed, 0.0)
+            for evse_id, feed in feeds.items()
+            if evse_id in mapper.ids and tree[evse_id].type == "evse"
+        }
+        ticks.append(
+            TickInputs(
+                current_time=stamp,
+                grid_online=_grid_online(sample),
+                circuits=circuits,
+                evse=evse,
+            )
+        )
+    return ticks
+
+
+def _grid_online(sample: Tree) -> bool:
+    mids = [d for d in sample.values() if d.type == "mid"]
+    for mid in mids:
+        if (
+            mid.value("grid/islanding-state") == "OFF_GRID"
+            or mid.value("grid/grid-state") == "DOWN"
+        ):
+            return False
+    if mids:
+        return True
+    panel = next((d for d in sample.values() if d.type == "distribution-enclosure"), None)
+    return panel is None or panel.value("status/relay") != "OPEN"
 
 
 class _Mapper:
@@ -559,13 +621,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--timeout", type=float, default=30.0, help="live capture limit, s")
     parser.add_argument("--variant", choices=get_args(Variant))
     parser.add_argument("--no-mask", action="store_true", help="keep serials, IDs and site")
+    parser.add_argument("--record", type=int, default=0, help="live samples to record as ticks")
+    parser.add_argument("--interval", type=float, default=1.0, help="seconds between samples")
+    parser.add_argument("--ticks-output", type=Path, help="where --record writes its ticks")
     parser.add_argument("-o", "--output", type=Path, required=True)
     args = parser.parse_args(argv)
+    if args.record and (args.from_snapshot is not None or args.ticks_output is None):
+        parser.error("--record needs a live capture (--host) and --ticks-output")
 
+    samples: list[tuple[float, Tree]] = []
     if args.from_snapshot is not None:
         tree = tree_from_snapshot(json.loads(args.from_snapshot.read_text()))
     else:
-        tree = capture_live(
+        tree, samples = capture_live(
             args.host,
             args.port,
             username=args.username,
@@ -573,9 +641,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             use_tls=not args.no_tls,
             tls_insecure=args.insecure,
             timeout_s=args.timeout,
+            record=args.record,
+            interval_s=args.interval,
         )
     definition, notes = definition_from_tree(tree, variant=args.variant, mask=not args.no_mask)
     dump_definition(definition, args.output)
+    if samples:
+        dump_ticks(ticks_from_samples(tree, samples, mask=not args.no_mask), args.ticks_output)
+        print(f"wrote {args.ticks_output}: {len(samples)} ticks", file=sys.stderr)
     for n in notes:
         print(f"{n.device}: {n.key}: {n.note}", file=sys.stderr)
     print(

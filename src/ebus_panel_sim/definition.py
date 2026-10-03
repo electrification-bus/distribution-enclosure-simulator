@@ -4,6 +4,8 @@ The manifest, the variant, the native BESS configs and the load-shedding config
 together determine what an ``Emitter`` publishes for a given stream of
 ``TickInputs``. ``load_definition`` / ``dump_definition`` read and write them as
 YAML, and ``Emitter.from_definition`` builds an emitter from one.
+``dump_ticks`` / ``load_ticks`` do the same for a recorded sequence of
+``TickInputs`` (``schema: panel-sim-ticks/1``).
 
 File shape (``schema: panel-sim-definition/1``)::
 
@@ -26,6 +28,7 @@ expects (``true`` becomes ``"true"``, ``200`` becomes ``"200"``).
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar, get_args
@@ -35,9 +38,11 @@ import yaml
 from ebus_panel_sim.exceptions import ManifestValidationError
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
 from ebus_panel_sim.native_devices import BESSConfig, ChargeMode, LoadSheddingConfig
+from ebus_panel_sim.tick_inputs import TickInputs
 from ebus_panel_sim.wire.profile_loader import Variant
 
 SCHEMA = "panel-sim-definition/1"
+TICKS_SCHEMA = "panel-sim-ticks/1"
 
 _Config = TypeVar("_Config", BESSConfig, LoadSheddingConfig)
 
@@ -67,6 +72,51 @@ def dump_definition(definition: PanelDefinition, path: Path | str) -> None:
     Path(path).write_text(
         yaml.safe_dump(definition_to_dict(definition), sort_keys=False, allow_unicode=True)
     )
+
+
+def dump_ticks(ticks: Sequence[TickInputs], path: Path | str) -> None:
+    """Write a tick recording (``schema: panel-sim-ticks/1``): each tick's time,
+    grid flag, and circuit and EVSE powers."""
+    body = {
+        "schema": TICKS_SCHEMA,
+        "ticks": [
+            {
+                "current_time": t.current_time,
+                "grid_online": t.grid_online,
+                "circuits": dict(t.circuits),
+                "evse": dict(t.evse),
+            }
+            for t in ticks
+        ],
+    }
+    Path(path).write_text(yaml.safe_dump(body, sort_keys=False))
+
+
+def load_ticks(path: Path | str) -> list[TickInputs]:
+    """Read a tick recording written by ``dump_ticks``."""
+    where = str(path)
+    raw = yaml.safe_load(Path(path).read_text())
+    if not isinstance(raw, dict) or raw.get("schema") != TICKS_SCHEMA:
+        raise ManifestValidationError(f"{where}: schema must be {TICKS_SCHEMA!r}")
+    _no_unknown_keys(raw, frozenset({"schema", "ticks"}), where)
+    ticks: list[TickInputs] = []
+    for i, entry in enumerate(raw.get("ticks") or []):
+        at = f"{where}: ticks[{i}]"
+        if not isinstance(entry, dict):
+            raise ManifestValidationError(f"{at}: must be a mapping")
+        _no_unknown_keys(entry, frozenset({"current_time", "grid_online", "circuits", "evse"}), at)
+        try:
+            ticks.append(
+                TickInputs(
+                    current_time=float(entry["current_time"]),
+                    grid_online=bool(entry["grid_online"]),
+                    circuits={str(k): float(v) for k, v in (entry.get("circuits") or {}).items()},
+                    evse={str(k): float(v) for k, v in (entry.get("evse") or {}).items()},
+                )
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ManifestValidationError(f"{at}: {exc!r}") from exc
+    return ticks
 
 
 def definition_to_dict(definition: PanelDefinition) -> dict[str, Any]:

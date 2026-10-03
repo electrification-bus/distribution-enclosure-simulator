@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 from ebus_panel_sim import (
@@ -15,11 +16,14 @@ from ebus_panel_sim import (
     PanelDefinition,
     SetterRegistry,
     TickInputs,
+    dump_ticks,
     load_definition,
+    load_ticks,
 )
 from ebus_panel_sim.capture import (
     definition_from_tree,
     main,
+    ticks_from_samples,
     tree_from_retained,
     tree_from_snapshot,
 )
@@ -143,3 +147,72 @@ def test_the_command_line_writes_a_loadable_definition(rec: PahoRecorder, tmp_pa
     out = tmp_path / "panel.yaml"
     assert main(["--from-snapshot", str(snapshot), "-o", str(out)]) == 0
     assert load_definition(out).manifest.of_class("panel")[0].instance_id == "masked-panel"
+
+
+def _script(definition: PanelDefinition) -> list[TickInputs]:
+    """Three ticks a minute apart, the last one off-grid."""
+    circuits = [i.instance_id for i in definition.manifest.of_class("circuit")]
+    feeds = {i.instance_id: i.metadata["feed"] for i in definition.manifest.of_class("evse")}
+    out = []
+    for n, online in enumerate((True, True, False)):
+        powers = {cid: 100.0 * (k + 1) * (n + 1) for k, cid in enumerate(circuits)}
+        powers[circuits[-1]] = -1500.0 * (n + 1)  # a backfeeding circuit
+        out.append(
+            TickInputs(
+                current_time=60.0 * n,
+                grid_online=online,
+                circuits=powers,
+                evse={e: powers.get(f, 0.0) for e, f in feeds.items()},
+            )
+        )
+    return out
+
+
+def _run(
+    rec: PahoRecorder, definition: PanelDefinition, ticks: list[TickInputs]
+) -> list[dict[str, str]]:
+    """The retained tree after each tick."""
+    rec.reset()
+    emitter = Emitter.from_definition(definition, SetterRegistry())
+    emitter.start()
+    trees = []
+    for tick in ticks:
+        emitter.publish_tick(tick)
+        trees.append(dict(rec.retained))
+    emitter.stop()
+    return trees
+
+
+@pytest.mark.parametrize("mask", [False, True])
+def test_recorded_ticks_replay_the_same_trees(rec: PahoRecorder, mask: bool) -> None:
+    source = _source()
+    script = _script(source)
+    original = _run(rec, source, script)
+    tree = tree_from_retained(original[0])
+    samples = [
+        (t.current_time, tree_from_retained(r)) for t, r in zip(script, original, strict=True)
+    ]
+    captured, _ = definition_from_tree(tree, mask=mask)
+    replay = _run(rec, captured, ticks_from_samples(tree, samples, mask=mask))
+
+    assert [t.grid_online for t in ticks_from_samples(tree, samples, mask=mask)] == [
+        True,
+        True,
+        False,
+    ]
+    if not mask:
+        assert [_stable(r) for r in replay] == [_stable(r) for r in original]
+    else:
+        assert [len(r) for r in replay] == [len(r) for r in original]
+
+
+def test_a_tick_recording_round_trips_through_a_file(tmp_path: Path) -> None:
+    ticks = _script(_source())
+    path = tmp_path / "ticks.yaml"
+    dump_ticks(ticks, path)
+    assert load_ticks(path) == ticks
+
+
+def test_record_needs_a_live_capture(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit):
+        main(["--from-snapshot", "x.json", "--record", "3", "-o", str(tmp_path / "p.yaml")])
