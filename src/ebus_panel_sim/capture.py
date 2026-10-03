@@ -99,7 +99,10 @@ def tree_from_retained(retained: Mapping[str, str], domain: str = _DOMAIN) -> Tr
 
 
 def tree_from_snapshot(raw: Mapping[str, Any]) -> Tree:
-    """A tree from a ``tree-v1`` snapshot (SPAN's ``snapshot-tool capture-tree``)."""
+    """A tree from a ``tree-v1`` snapshot: ``{"metadata": {"schema": "tree-v1"},
+    "devices": {<id>: {"description": ..., "properties": ..., "numeric_properties": ...}}}``,
+    with string/enum/boolean values under ``properties`` and numbers under
+    ``numeric_properties``."""
     if raw.get("metadata", {}).get("schema") != "tree-v1":
         raise ValueError("not a tree-v1 snapshot (metadata.schema)")
     tree: Tree = {}
