@@ -156,6 +156,8 @@ _VALID_PRIORITIES = frozenset(
 _VALID_RELAY_BEHAVIORS = frozenset({"controllable", "always-on", "non-controllable"})
 _VALID_PLACEMENTS = frozenset({"upstream-of-lugs", "downstream-of-lugs"})
 _VALID_COMMISSIONED_SYSTEMS = frozenset({"pv", "backup"})
+# The lowest user charge-current ceiling an EVSE accepts, in amps.
+EVSE_MIN_CHARGE_CURRENT_A = 6
 _VALID_LUGS_DIRECTIONS = frozenset({"upstream", "downstream"})
 _VALID_INVERTER_TYPES = frozenset({"hybrid", "ac-coupled"})
 _VALID_TOPOLOGIES = frozenset({"flat", "parent-child"})

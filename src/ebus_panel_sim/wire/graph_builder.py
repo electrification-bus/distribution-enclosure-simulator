@@ -27,7 +27,11 @@ import ebus_sdk
 
 from ebus_panel_sim.exceptions import ManifestValidationError, ProfileValidationError
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
-from ebus_panel_sim.manifest_physics import priority_locked, relay_locked
+from ebus_panel_sim.manifest_physics import (
+    EVSE_MIN_CHARGE_CURRENT_A,
+    priority_locked,
+    relay_locked,
+)
 from ebus_panel_sim.wire._sdk_seam import MqttDeviceTransport, make_property
 from ebus_panel_sim.wire.mapping_loader import MappingDescriptor, MappingTable
 from ebus_panel_sim.wire.profile_loader import Profile, ProfileTable
@@ -316,7 +320,7 @@ def _attach_profile(
                         prop.datatype, where=f"{entity_class} {cap_name}/{prop_key}"
                     ),
                     unit=_to_sdk_unit(prop.unit),
-                    format_str=prop.format,
+                    format_str=_format_for(prop.format, instance, cap_name, prop_key),
                     settable=_settable_for(prop.settable, instance, cap_name, prop_key),
                 )
                 graph.properties[
@@ -366,6 +370,22 @@ def _settable_for(
     if not declared or locked_by is None:
         return declared
     return not locked_by(instance.metadata)
+
+
+# The properties whose ``$format`` depends on the instance: an EVSE's user
+# charge-current ceiling ranges up to that EVSE's commissioned maximum.
+_INSTANCE_FORMATS: dict[tuple[str, str], Callable[[dict[str, str]], str]] = {
+    ("config", "user-max-charge-current"): lambda md: (
+        f"{EVSE_MIN_CHARGE_CURRENT_A}:{int(float(md['max-current-a']))}"
+    ),
+}
+
+
+def _format_for(
+    declared: str | None, instance: DeviceInstance, cap_name: str, prop_key: str
+) -> str | None:
+    derive = _INSTANCE_FORMATS.get((cap_name, prop_key))
+    return declared if derive is None else derive(instance.metadata)
 
 
 def _render_node_id(template: str, instance: DeviceInstance) -> str:

@@ -22,7 +22,7 @@ from ebus_panel_sim.definition import PanelDefinition
 from ebus_panel_sim.energy_integrator import EnergyIntegrator
 from ebus_panel_sim.exceptions import EmitterStateError, ProfileValidationError
 from ebus_panel_sim.manifest import DeviceManifest
-from ebus_panel_sim.manifest_physics import ManifestPhysicsView
+from ebus_panel_sim.manifest_physics import EVSE_MIN_CHARGE_CURRENT_A, ManifestPhysicsView
 from ebus_panel_sim.native_devices import (
     BESSConfig,
     BESSDevice,
@@ -644,7 +644,17 @@ class Emitter:
             value: object,
         ) -> None:
             del entity_class, prop_path
-            self._evse_user_max_override[instance_id] = int(float(str(value)))
+            # An integer, clamped into [minimum, commissioned max]; anything
+            # else is refused and the value left unchanged.
+            try:
+                requested = value if isinstance(value, int) else int(str(value).strip())
+            except ValueError:
+                _LOG.warning("evse %s: refusing user-max-charge-current %r", instance_id, value)
+                return
+            ceiling = int(self._physics.evse(instance_id).max_current_a)
+            self._evse_user_max_override[instance_id] = max(
+                EVSE_MIN_CHARGE_CURRENT_A, min(requested, ceiling)
+            )
 
         if registry.get("circuit", "switch/relay") is None:
             registry.register("circuit", "switch/relay", on_circuit_relay)
