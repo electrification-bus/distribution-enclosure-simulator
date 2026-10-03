@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+No behavior change: nothing this package publishes moves.
+
+### Added
+
+- **A profile overlay can remove what the base declares.** A `null` capability or property in a `profiles/span/*.json` overlay removes it from the span variant, as in JSON Merge Patch (RFC 7396). Removing one the base lacks, or every property of a capability, raises `ProfileValidationError`.
+
 ## [0.8.0] - 2026-08-26
 
 **BREAKING (snapshot).** `EbusCircuitSnapshot.is_never_backup` no longer means "priority is `NEVER`", and `is_sheddable` now requires a controllable relay. Against an unchanged manifest both flags flip for the circuits the old derivations got wrong: every `NEVER`-priority circuit stops reporting itself never-backup (correctly), and a relay-locked circuit at `OFF_GRID`/`SOC_THRESHOLD` stops reporting itself sheddable (also correctly). The published Homie tree is unchanged for any manifest that does not use the new `never-backup` metadata key; a manifest that does use it publishes one `$settable` fewer on `load-shed/priority`, and nothing else on the wire moves. `CircuitPhysics` gains a `never_backup` field, defaulted to `False` so existing constructions of that exported dataclass keep working.
