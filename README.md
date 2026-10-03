@@ -135,6 +135,19 @@ emitter = Emitter.from_definition(load_definition("panel.yaml"), SetterRegistry(
 
 Each device's `metadata` takes the keys in the table above; a YAML number or boolean is read as the string the manifest expects. `bess` and `load_shedding` take the fields of `BESSConfig` and `LoadSheddingConfig`. An unknown key anywhere is an error.
 
+### 4. Capture a definition from a published panel
+
+`panel-sim-capture` reads a distribution enclosure's published tree and writes a panel definition that reproduces it:
+
+```bash
+panel-sim-capture --host <broker> --username <user> --password <pw> --insecure -o panel.yaml
+panel-sim-capture --from-snapshot snapshot.json -o panel.yaml   # a tree-v1 snapshot file
+```
+
+Live capture connects over TLS on port 8883 by default (`--no-tls`, `--port` and `--insecure` for a self-signed broker certificate) and returns once the tree has settled, or after `--timeout` seconds. Serial numbers, device IDs and the postal code are masked unless `--no-mask` is given. The variant is `span` for a SPAN panel and `reference` otherwise, unless `--variant` says.
+
+A published tree does not carry everything a definition holds. Each value the capture had to default is reported on stderr: BESS charge and discharge limits and charge mode, a PV inverter's coupling, panel size where the model name does not give it, and tabs where `info/spaces` is not published (the reference variant). Captured circuits are placed `upstream-of-lugs`, inside the panel. `ebus_panel_sim.capture` exposes the same steps as functions (`capture_live`, `tree_from_snapshot`, `tree_from_retained`, `definition_from_tree`).
+
 ## Usage (as a producer library)
 
 ```python
