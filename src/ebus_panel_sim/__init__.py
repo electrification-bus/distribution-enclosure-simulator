@@ -20,7 +20,7 @@ Producer contract (v0.3.0): build a ``DeviceManifest`` once at startup, then cal
 ``current_time``, and ``grid_online``. The emitter does the rest."""
 
 from ebus_panel_sim.conventions.tab_legs import Leg, legs_for_tabs
-from ebus_panel_sim.emitter import Emitter
+from ebus_panel_sim.emitter import ASSERTION_CLEAR_AFTER_S, Emitter
 from ebus_panel_sim.exceptions import (
     EmitterError,
     EmitterStateError,
@@ -68,7 +68,7 @@ from ebus_panel_sim.snapshot import (
     EbusPanelStatus,
     EbusPvSnapshot,
 )
-from ebus_panel_sim.tick_inputs import PanelEnvelopeTick, TickInputs
+from ebus_panel_sim.tick_inputs import BESSCommunication, PanelEnvelopeTick, TickInputs
 
 # `Emitter(mqttc=...)` is public API typed with this, so the name has to be
 # nameable from here. Without it a downstream annotating what it passes must
@@ -85,6 +85,8 @@ from ebus_panel_sim.wire.set_router import SetterHandler, SetterRegistry
 __version__ = "0.8.0"
 
 __all__ = [
+    "ASSERTION_CLEAR_AFTER_S",
+    "BESSCommunication",
     "BESSConfig",
     "BESSDevice",
     "BessPhysics",

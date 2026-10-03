@@ -2,10 +2,10 @@
 
 The producer hands the emitter a small per-tick driving signal via
 ``publish_tick(TickInputs)``: signed power per circuit/EVSE, current_time,
-grid_online, panel envelope. The emitter resolves BESS dispatch, gates circuit
-power through ``RelayResolver``, integrates energy via ``EnergyIntegrator``,
-aggregates panel-level fields via ``PanelMeter``, builds the internal snapshot,
-and publishes the Homie diff to MQTT.
+grid_online, panel envelope, battery link health. The emitter resolves BESS
+dispatch, gates circuit power through ``RelayResolver``, integrates energy via
+``EnergyIntegrator``, aggregates panel-level fields via ``PanelMeter``, builds
+the internal snapshot, and publishes the Homie diff to MQTT.
 
 The internal snapshot type (``EbusPanelSnapshot`` and friends) is used for the
 diff cache and read-back via ``last_snapshot``; producers do not construct it."""
@@ -15,10 +15,11 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, Final, get_args
 
 from ebus_panel_sim.energy_integrator import EnergyIntegrator
-from ebus_panel_sim.exceptions import EmitterStateError
+from ebus_panel_sim.exceptions import EmitterStateError, ProfileValidationError
 from ebus_panel_sim.manifest import DeviceManifest
 from ebus_panel_sim.manifest_physics import ManifestPhysicsView
 from ebus_panel_sim.native_devices import (
@@ -48,7 +49,7 @@ from ebus_panel_sim.snapshot import (
     EbusPanelStatus,
     EbusPvSnapshot,
 )
-from ebus_panel_sim.tick_inputs import TickInputs
+from ebus_panel_sim.tick_inputs import BESSCommunication, TickInputs
 from ebus_panel_sim.wire._sdk_seam import (
     MqttDeviceTransport,
     owned_client,
@@ -57,7 +58,7 @@ from ebus_panel_sim.wire._sdk_seam import (
 from ebus_panel_sim.wire.bag_builder import BagBuilder
 from ebus_panel_sim.wire.graph_builder import build_graph, root_instance_of
 from ebus_panel_sim.wire.mapping_loader import load_mapping_table
-from ebus_panel_sim.wire.profile_loader import Variant, load_profiles
+from ebus_panel_sim.wire.profile_loader import ProfileTable, Variant, load_profiles
 from ebus_panel_sim.wire.publisher import Publisher
 from ebus_panel_sim.wire.set_router import (
     SetterRegistry,
@@ -67,6 +68,36 @@ from ebus_panel_sim.wire.set_router import (
 
 _LOG = logging.getLogger(__name__)
 _DEFAULT_MQTT_CFG: dict[str, Any] = {"host": "127.0.0.1", "port": 1883}
+
+ASSERTION_CLEAR_AFTER_S: Final = 30.0
+"""Tick-time seconds every battery link must have been ``OK`` before the panel
+clears an active ``shed/asserted-islanding-state`` back to ``NONE``."""
+
+_ASSERTABLE_ISLANDING_STATES: Final = frozenset({"ON_GRID", "OFF_GRID"})
+_BESS_COMMUNICATION_STATES: Final[frozenset[str]] = frozenset(get_args(BESSCommunication))
+
+
+def _declared_enum(
+    profiles: ProfileTable, entity_class: str, capability: str, prop: str
+) -> frozenset[str]:
+    """The values a profile's enum property declares in its ``$format``."""
+    profile = profiles.get(entity_class)
+    cap = profile.capabilities.get(capability) if profile is not None else None
+    declared = cap.properties.get(prop) if cap is not None else None
+    if declared is None or not declared.format:
+        raise ProfileValidationError(
+            f"{entity_class} profile declares no enum {capability}/{prop}"
+        )
+    return frozenset(declared.format.split(","))
+
+
+def _link_status(communication: BESSCommunication, declared: frozenset[str]) -> str:
+    """The connection status a battery link of this health publishes.
+
+    The health itself where the connection status declares it, and ``LOST``
+    otherwise: a SPAN panel reports only ``OK`` or ``LOST`` there, which its
+    overlay declares, and no variant's connection catalog has ``UNKNOWN``."""
+    return communication if communication in declared else "LOST"
 
 
 class Emitter:
@@ -155,6 +186,17 @@ class Emitter:
         self._name_overrides: dict[str, str] = {}
         self._dominant_power_source_override: str | None = None
         self._asserted_islanding_override: str | None = None
+        # Health of the panel's link to each battery as of the last tick, which
+        # the assertion handler reads between ticks, and the tick time since
+        # which every link has been OK.
+        self._bess_links: dict[str, BESSCommunication] = {}
+        self._links_healthy_since: float | None = None
+        self._feeds_status_values = _declared_enum(
+            self._profiles, "circuit", "connection", "feeds-device-status"
+        )
+        self._fed_by_status_values = _declared_enum(
+            self._profiles, "lugs", "connection", "fed-by-device-status"
+        )
         self._shed_policy_override: str | None = None
         self._evse_user_max_override: dict[str, int] = {}
 
@@ -545,7 +587,13 @@ class Emitter:
             value: object,
         ) -> None:
             del entity_class, instance_id, prop_path
-            self._asserted_islanding_override = str(value).upper()
+            # A SPAN panel accepts ON_GRID or OFF_GRID only while its link to a
+            # battery is unhealthy, and ignores everything else -- NONE included,
+            # since only the panel clears an assertion -- leaving the published
+            # value unchanged, which is how a consumer sees the refusal.
+            asserted = str(value).upper()
+            if asserted in _ASSERTABLE_ISLANDING_STATES and self._bess_link_unhealthy():
+                self._asserted_islanding_override = asserted
 
         def on_shed_policy(
             entity_class: str,
@@ -583,6 +631,7 @@ class Emitter:
         self._last_snapshot = snapshot
 
     def _build_snapshot_from_tick(self, tick: TickInputs) -> EbusPanelSnapshot:
+        self._validate_bess_communication(tick.bess_communication)
         panel_phys = self._physics.panel
         circuits_phys = self._physics.all_circuits()
 
@@ -616,11 +665,14 @@ class Emitter:
             snap.firmware_version = bphys.firmware_version
             snap.relative_position = bphys.relative_position
             snap.feed_circuit_id = bphys.feed
+            snap.communication = tick.bess_communication.get(bess_id, snap.communication)
             snap.connected = snap.communication == "OK"
             snap.grid_state = "ON_GRID" if tick.grid_online else "OFF_GRID"
             battery_snapshots[bess_id] = snap
             battery_w += snap.active_power_w
         has_battery = bool(battery_snapshots)
+        self._bess_links = {bid: s.communication or "OK" for bid, s in battery_snapshots.items()}
+        self._expire_assertion(tick.current_time)
         # ``min_soc`` is None when no BESS reports a SOE value (all uninitialised);
         # ``decide_shed`` then treats SOC as unknown.
         soc_values = [
@@ -676,8 +728,8 @@ class Emitter:
         # the panel-side device (the circuit or lugs that feeds a DER), never on
         # the DER child: each DER's feed circuit publishes the feeds-* triple, and
         # an upstream BESS's fed-by triple lands on the upstream lugs. Status is a
-        # link-health enum (OK/LOST/DEGRADED); PV/EVSE have no comms model so they
-        # report OK, a BESS reports its battery snapshot's communication health.
+        # link-health enum; PV/EVSE have no comms model so they report OK, a BESS
+        # reports its battery's link health in the status's declared vocabulary.
         feeds_by_circuit: dict[str, tuple[str, str, str]] = {}
         for pv_id, pv_phys in self._physics.all_pv().items():
             if pv_phys.feed:
@@ -690,9 +742,17 @@ class Emitter:
             bsnap = battery_snapshots.get(bess_id)
             link = (bsnap.communication if bsnap else None) or "OK"
             if bess_phys.relative_position == "UPSTREAM":
-                upstream_fed_by = (bess_id, self._profiles["bess"].type, link)
+                upstream_fed_by = (
+                    bess_id,
+                    self._profiles["bess"].type,
+                    _link_status(link, self._fed_by_status_values),
+                )
             elif bess_phys.feed:
-                feeds_by_circuit[bess_phys.feed] = (bess_id, self._profiles["bess"].type, link)
+                feeds_by_circuit[bess_phys.feed] = (
+                    bess_id,
+                    self._profiles["bess"].type,
+                    _link_status(link, self._feeds_status_values),
+                )
 
         # Step 6: build per-circuit snapshots — applying any operator name and
         # priority overrides on top of manifest defaults.
@@ -959,6 +1019,40 @@ class Emitter:
             lugs=lugs_snaps,
             mid=mid_snaps,
         )
+
+    def _validate_bess_communication(self, links: Mapping[str, str]) -> None:
+        """Refuse a tick naming a battery that is not configured, or a link health
+        outside ``BESSCommunication``, before any state moves."""
+        unknown = sorted(set(links) - set(self._bess))
+        if unknown:
+            raise EmitterStateError(
+                f"TickInputs.bess_communication names {unknown!r}, which are not among "
+                f"the configured BESS instances {sorted(self._bess)!r}"
+            )
+        invalid = {bid: v for bid, v in links.items() if v not in _BESS_COMMUNICATION_STATES}
+        if invalid:
+            raise EmitterStateError(
+                f"TickInputs.bess_communication {invalid!r}: expected one of "
+                f"{sorted(_BESS_COMMUNICATION_STATES)!r}"
+            )
+
+    def _bess_link_unhealthy(self) -> bool:
+        return any(link != "OK" for link in self._bess_links.values())
+
+    def _expire_assertion(self, now: float) -> None:
+        """Clear an active assertion once every battery link has been ``OK`` for
+        ``ASSERTION_CLEAR_AFTER_S``, as the panel does when it reclaims authority.
+        Any unhealthy tick restarts the wait, so a flapping link keeps it."""
+        if self._bess_link_unhealthy():
+            self._links_healthy_since = None
+            return
+        if self._links_healthy_since is None:
+            self._links_healthy_since = now
+        if (
+            self._asserted_islanding_override is not None
+            and now - self._links_healthy_since >= ASSERTION_CLEAR_AFTER_S
+        ):
+            self._asserted_islanding_override = None
 
     def _grid_forming_device_id(self) -> str | None:
         """Homie id of the device forming the AC reference while islanded.

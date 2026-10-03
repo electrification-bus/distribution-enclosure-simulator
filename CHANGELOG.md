@@ -2,11 +2,18 @@
 
 ## [Unreleased]
 
-No behavior change: nothing this package publishes moves.
+**BREAKING (behavior).** The emitter's own `shed/asserted-islanding-state` handler now behaves like a SPAN panel's: it accepts `ON_GRID` or `OFF_GRID` only while the panel's link to some battery is not `OK`, ignores everything else, `NONE` included, and clears an assertion once every link has been `OK` for 30 seconds of tick time. A tick that leaves out `bess_communication` reports every link `OK`, so against an unchanged producer an assertion that used to be stored is now ignored, which is what the panel does. A producer that registers its own handler is unaffected. On the wire, the span variant's connection status now declares only `OK` and `LOST`, so the `$description` of every circuit and lugs device changes ([#60](https://github.com/electrification-bus/distribution-enclosure-simulator/issues/60)).
 
 ### Added
 
+- **A producer can model the panel's link to each battery.** `TickInputs.bess_communication` maps a configured BESS `instance_id` to `OK`, `DEGRADED`, `LOST` or `UNKNOWN` (the exported `BESSCommunication`); a battery left out is `OK`. The value is published as the battery's `status/communication-state` and drives `EbusBatterySnapshot.connected` and the connection status of the circuit or lugs that connects the battery. An id that is not a configured BESS, or a value outside `BESSCommunication`, raises `EmitterStateError` before anything in the tick is applied.
 - **A profile overlay can remove what the base declares.** A `null` capability or property in a `profiles/span/*.json` overlay removes it from the span variant, as in JSON Merge Patch (RFC 7396). Removing one the base lacks, or every property of a capability, raises `ProfileValidationError`.
+
+### Changed
+
+- **The islanding assertion follows the battery link**, as described above: accepted only while some battery's link is not `OK`, `NONE` and other values ignored, cleared after `ASSERTION_CLEAR_AFTER_S` (30 s) with every link `OK`. Any unhealthy tick restarts that wait.
+- **A connection status publishes only what its profile declares.** The circuit or lugs connecting a battery publishes the link health where its enum declares the value and `LOST` otherwise. The span overlay narrows `feeds-device-status` and `fed-by-device-status` to `OK,LOST`, because a SPAN panel reports `DEGRADED` and `UNKNOWN` there as `LOST`; the reference variant keeps the catalog's `OK,LOST,DEGRADED` and publishes only `UNKNOWN` as `LOST`.
+- **`EbusBatterySnapshot.communication` admits `UNKNOWN`**, the fourth value of the `status` catalog's `communication-state`.
 
 ## [0.8.0] - 2026-08-26
 

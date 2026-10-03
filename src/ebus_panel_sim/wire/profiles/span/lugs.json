@@ -11,6 +11,17 @@
           "format": "UPSTREAM,DOWNSTREAM"
         }
       }
+    },
+    "connection": {
+      "type": "energy.ebus.capability.connection",
+      "properties": {
+        "fed-by-device-status": {
+          "format": "OK,LOST"
+        },
+        "feeds-device-status": {
+          "format": "OK,LOST"
+        }
+      }
     }
   }
 }

@@ -4,7 +4,7 @@ Internals of the emitter. For what it is and how to run/configure it, see [READM
 
 ## The per-tick pipeline
 
-The producer builds a `DeviceManifest` (identity plus physics keys per device) at startup and hands it to `Emitter` together with a `SetterRegistry`, an `mqtt_cfg` (the broker coordinates ebus-sdk connects with), zero or more `BESSConfig`s, and an optional `LoadSheddingConfig`. Each tick the producer builds a `TickInputs` (signed power per circuit, current time, grid-online flag, panel envelope) and calls `emitter.publish_tick(tick_inputs)`. Inside, the emitter:
+The producer builds a `DeviceManifest` (identity plus physics keys per device) at startup and hands it to `Emitter` together with a `SetterRegistry`, an `mqtt_cfg` (the broker coordinates ebus-sdk connects with), zero or more `BESSConfig`s, and an optional `LoadSheddingConfig`. Each tick the producer builds a `TickInputs` (signed power per circuit, current time, grid-online flag, panel envelope, and optionally the health of the panel's link to each battery) and calls `emitter.publish_tick(tick_inputs)`. Inside, the emitter:
 
 1. Resolves BESS dispatch (charge/discharge/idle) for every native BESS.
 2. Decides load-shedding (which circuits open when off-grid).
@@ -33,6 +33,8 @@ Per-tick inputs (from `TickInputs`): `current_time` (received but not consulted 
 
 Per-tick outputs (into `snapshot.battery`): `soe_percentage`, `soe_kwh`, and `active_power_w` (positive = discharging, negative = charging).
 
+Link health is not the battery's own state but the panel's view of it, so the producer supplies it per tick in `TickInputs.bess_communication` (`OK`, `DEGRADED`, `LOST` or `UNKNOWN`; a battery left out is `OK`) and dispatch does not consult it. It lands in `communication` and `connected` on the battery snapshot, is published as the battery's `status/communication-state`, and sets the connection status of the circuit or lugs that connects the battery: the health itself where that status's enum declares it, and `LOST` otherwise. The span overlay declares only `OK,LOST` there, as a SPAN panel reports, while the reference variant keeps the catalog's `OK,LOST,DEGRADED`; `UNKNOWN` is in neither.
+
 Mid-run config changes: `emitter.update_bess_config(new_config)` swaps the `BESSConfig` reference while SOC/SOE state persists (the path for dashboard edits to mode and max charge/discharge rates; the charge/discharge hour-window fields are carried but not yet applied by the dispatch logic). Persistence across restart: call `emitter.seed_bess_soe(instance_id, soe_kwh)` between `__init__` and `start()`, or declare `initial-soe-kwh` in the manifest. Subclassing `BESSDevice` is supported for vendor-variant behaviour without a plugin framework.
 
 ### Load shedding (`ebus_panel_sim.native_devices.load_shedding`)
@@ -47,7 +49,7 @@ When the grid is offline the policy returns the circuit instance-ids whose prior
 |---|---|---|
 | circuit | `switch/relay` | Updates the `RelayResolver` user override |
 | circuit | `load-shed/priority` | Updates the emitter's per-circuit priority override (refused on a never-backup circuit) |
-| panel | `shed/asserted-islanding-state` | Updates the consumer-asserted islanding override |
+| panel | `shed/asserted-islanding-state` | Updates the consumer-asserted islanding override, accepted only while a battery link is not `OK` (see below) |
 | evse | `config/user-max-charge-current` | Updates the per-EVSE user charge-current ceiling |
 
 ### Relay state precedence
@@ -63,6 +65,10 @@ locked > /set override > load-shed > default-CLOSED
 - Default-CLOSED is the resting state when no decision-maker has spoken. `switch/relay-requester` reports `NONE`.
 
 Relay changes reach the wire on the next `publish_tick`, bounded by the producer's tick cadence (typically 1.0 s).
+
+### Islanding assertion
+
+The internal handler for `shed/asserted-islanding-state` does what a SPAN panel does. It accepts `ON_GRID` or `OFF_GRID` only while the panel's link to some battery, as of the last tick, is not `OK`, and ignores every other write, `NONE` included, since only the panel clears an assertion; an ignored write leaves the published value unchanged, which is how a consumer sees the refusal. Once every battery link has been `OK` for `ASSERTION_CLEAR_AFTER_S` (30 s) of tick time, the emitter clears an active assertion to `NONE`, and any unhealthy tick restarts that wait. The assertion is published and nothing else: load shedding and the MID still follow `grid_online`.
 
 ## Energy integration
 
@@ -86,7 +92,8 @@ Relay changes reach the wire on the next `publish_tick`, bounded by the producer
 | Relay state machine (locked > /set > shed > default-CLOSED) | emitter |
 | BESS dispatch + SOC/SOE integration | emitter |
 | Load-shedding policy (SOC threshold, off-grid priority) | emitter |
+| Islanding-assertion acceptance and clearing | emitter |
 | Energy integration + per-leg current + panel meter aggregation | emitter |
 | Device identity + static attributes (vendor, serial, ratings, tabs) | producer (via manifest) |
-| Per-circuit / per-EVSE signed power, `current_time`, `grid_online`, envelope | producer (per tick) |
+| Per-circuit / per-EVSE signed power, `current_time`, `grid_online`, envelope, battery link health | producer (per tick) |
 | Weather, schedules, rates, modelling, recorder/replay history | producer |

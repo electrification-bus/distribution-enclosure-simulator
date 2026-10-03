@@ -18,6 +18,11 @@ purely tells direction within that class."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Literal, TypeAlias
+
+BESSCommunication: TypeAlias = Literal["OK", "DEGRADED", "LOST", "UNKNOWN"]
+"""Health of the panel's link to a battery: the ``status`` catalog's
+``communication-state`` values."""
 
 
 @dataclass(slots=True)
@@ -57,10 +62,21 @@ class TickInputs:
                         in watts. Status (``CHARGING``/``AVAILABLE``) is
                         derived from this signal in the emitter.
         envelope:       Panel envelope facts; defaults are sensible for most
-                        producers."""
+                        producers.
+        bess_communication:
+                        Mapping of configured BESS ``instance_id`` → health of
+                        the panel's link to that battery. A battery left out is
+                        ``OK``. Published as the battery's
+                        ``status/communication-state`` and on the connection
+                        status of the circuit or lugs that connects it, and it
+                        decides whether the panel accepts an
+                        ``asserted-islanding-state`` write. An id that is not a
+                        configured BESS, or a value outside
+                        ``BESSCommunication``, raises ``EmitterStateError``."""
 
     current_time: float
     grid_online: bool
     circuits: dict[str, float]
     evse: dict[str, float] = field(default_factory=dict)
     envelope: PanelEnvelopeTick = field(default_factory=PanelEnvelopeTick)
+    bess_communication: dict[str, BESSCommunication] = field(default_factory=dict)
