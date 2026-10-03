@@ -140,6 +140,7 @@ def build_graph(
         entity_class=root_class,
         parent_for_path=None,
         node_id_template=None,
+        omit=frozenset() if manifest.of_class("bess") else _BESS_ONLY_CAPABILITIES,
     )
 
     # Topologically order non-root descriptors so a descriptor whose
@@ -286,8 +287,10 @@ def _attach_profile(
     entity_class: str,
     parent_for_path: DeviceInstance | None,
     node_id_template: str | None,
+    omit: frozenset[str] = frozenset(),
 ) -> None:
-    """Attach the profile's capabilities + properties to the given device.
+    """Attach the profile's capabilities + properties to the given device,
+    skipping the capabilities named in ``omit``.
 
     For its own device (parent_for_path is None) capability nodes use plain
     capability names. For node-on-parent entities, capability nodes are
@@ -296,9 +299,10 @@ def _attach_profile(
     ``state_transition()`` so the SDK coalesces the description republish into a
     single init->ready cycle instead of flapping per property.
     """
-    single_capability = len(profile.capabilities) == 1
+    capabilities = {name: cap for name, cap in profile.capabilities.items() if name not in omit}
+    single_capability = len(capabilities) == 1
     with device.state_transition():
-        for cap_name, cap in profile.capabilities.items():
+        for cap_name, cap in capabilities.items():
             if parent_for_path is None:
                 node_id = cap_name
             else:
@@ -326,6 +330,11 @@ def _attach_profile(
                 graph.properties[
                     (entity_class, instance.instance_id, f"{cap_name}/{prop_key}")
                 ] = sdk_prop
+
+
+# Enclosure capabilities published only when at least one BESS is commissioned
+# (``devices/distribution-enclosure.md`` §"shed" and §"shed-forecast").
+_BESS_ONLY_CAPABILITIES = frozenset({"shed", "shed-forecast"})
 
 
 # The properties whose settability is commissioned per circuit rather than
