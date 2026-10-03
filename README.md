@@ -12,7 +12,7 @@ A fully-loaded, spec-conformant **distribution-enclosure simulator** and produce
 It serves two roles:
 
 - **Simulator / test fixture.** Drive it from a small YAML definition and it publishes a spec-conformant, fully-commissioned enclosure to any MQTT broker. Consumers (Home Assistant integrations, dashboards, SDK code) validate against it before shipping to the field.
-- **Producer library.** The canonical eBus Homie publisher. A producer (a simulator, a real panel gateway, an LLM-driven model) hands the emitter a small per-tick driving signal (signed power per circuit, current time, grid-online flag) via `TickInputs`; the emitter derives all telemetry and publishes Homie-conformant retained MQTT with diff-only updates. The split is **identity = manifest (once at startup), telemetry = derived from TickInputs (per tick)**.
+- **Producer library.** The canonical eBus Homie publisher. A producer (a simulator, a real panel gateway, an LLM-driven model) hands the emitter a small per-tick driving signal (signed power per circuit, current time, grid-online flag, and optionally the panel's link health to each battery) via `TickInputs`; the emitter derives all telemetry and publishes Homie-conformant retained MQTT with diff-only updates. The split is **identity = manifest (once at startup), telemetry = derived from TickInputs (per tick)**.
 
 For the internals (the per-tick pipeline, the native BESS/load-shed devices, `/set` handling, the wire model) see [DESIGN.md](https://github.com/electrification-bus/distribution-enclosure-simulator/blob/main/DESIGN.md); for the dev setup see [DEVELOPER.md](https://github.com/electrification-bus/distribution-enclosure-simulator/blob/main/DEVELOPER.md).
 
@@ -165,6 +165,8 @@ def main() -> None:
 
 main()
 ```
+
+To model the panel losing its link to a battery, report it in the tick: `TickInputs(..., bess_communication={"abc-123-bess": "LOST"})`. The battery publishes it as `status/communication-state`, the connection status of the circuit or lugs connecting it follows, and while a battery link is not known to be healthy (before the first tick, or while any link is not `OK`) the emitter's own handler accepts an `asserted-islanding-state` write, clearing it once every link has been `OK` for 30 seconds (see [DESIGN.md](DESIGN.md#islanding-assertion)).
 
 Read the most recently published state back through `emitter.last_snapshot`. `mqtt_cfg` is handed straight to ebus-sdk: beyond `host`/`port` it takes the ebus-mqtt-client TLS and authentication keys for secured brokers (e.g. broker-quickstart's mTLS `discovery`/`strict` profiles).
 

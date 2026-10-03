@@ -19,7 +19,10 @@ the lugs profile can be populated cleanly. ``EbusPcsSnapshot`` is folded into
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from ebus_panel_sim.tick_inputs import BESSCommunication
 
 
 @dataclass(slots=True)
@@ -118,7 +121,7 @@ class EbusBatterySnapshot:
     nameplate_capacity_kwh: float | None = None
     connected: bool | None = None
     grid_state: str | None = None
-    communication: Literal["OK", "LOST", "DEGRADED"] | None = None
+    communication: BESSCommunication | None = None
 
 
 @dataclass(slots=True)
