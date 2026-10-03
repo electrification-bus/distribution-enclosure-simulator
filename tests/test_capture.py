@@ -155,9 +155,11 @@ def test_the_command_line_writes_a_loadable_definition(rec: PahoRecorder, tmp_pa
 
 
 def _script(definition: PanelDefinition) -> list[TickInputs]:
-    """Three ticks a minute apart, the last one off-grid."""
+    """Three ticks a minute apart: the battery link lost on the second, the grid
+    down on the third."""
     circuits = [i.instance_id for i in definition.manifest.of_class("circuit")]
     feeds = {i.instance_id: i.metadata["feed"] for i in definition.manifest.of_class("evse")}
+    battery = definition.bess_configs[0].instance_id
     out = []
     for n, online in enumerate((True, True, False)):
         powers = {cid: 100.0 * (k + 1) * (n + 1) for k, cid in enumerate(circuits)}
@@ -168,6 +170,7 @@ def _script(definition: PanelDefinition) -> list[TickInputs]:
                 grid_online=online,
                 circuits=powers,
                 evse={e: powers.get(f, 0.0) for e, f in feeds.items()},
+                bess_communication={battery: "LOST" if n == 1 else "OK"},
             )
         )
     return out
@@ -200,11 +203,9 @@ def test_recorded_ticks_replay_the_same_trees(rec: PahoRecorder, mask: bool) -> 
     captured, _ = definition_from_tree(tree, mask=mask)
     replay = _run(rec, captured, ticks_from_samples(tree, samples, mask=mask))
 
-    assert [t.grid_online for t in ticks_from_samples(tree, samples, mask=mask)] == [
-        True,
-        True,
-        False,
-    ]
+    recorded = ticks_from_samples(tree, samples, mask=mask)
+    assert [t.grid_online for t in recorded] == [True, True, False]
+    assert [list(t.bess_communication.values()) for t in recorded] == [["OK"], ["LOST"], ["OK"]]
     if not mask:
         assert [_stable(r) for r in replay] == [_stable(r) for r in original]
     else:

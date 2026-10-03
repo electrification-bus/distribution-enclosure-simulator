@@ -26,15 +26,16 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, get_args
+from typing import Any, cast, get_args
 
 from ebus_panel_sim.definition import PanelDefinition, dump_definition, dump_ticks
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
 from ebus_panel_sim.native_devices import BESSConfig
-from ebus_panel_sim.tick_inputs import TickInputs
+from ebus_panel_sim.tick_inputs import BESSCommunication, TickInputs
 from ebus_panel_sim.wire.profile_loader import Variant
 
 _DOMAIN = "ebus/5"
+_LINK_STATES = frozenset(get_args(BESSCommunication))
 _TYPE_PREFIX = "energy.ebus.device."
 
 
@@ -230,7 +231,7 @@ def ticks_from_samples(
     (positive = consuming); an EVSE draws what its feeding circuit does; the grid
     is offline when a MID reports ``grid/islanding-state`` ``OFF_GRID`` or
     ``grid/grid-state`` ``DOWN`` or, without a MID, the panel's main relay is
-    ``OPEN``."""
+    ``OPEN``; each battery's link is its ``status/communication-state``."""
     mapper = _Mapper(tree, mask)
     feeds = mapper._feeds()
     ticks: list[TickInputs] = []
@@ -245,12 +246,18 @@ def ticks_from_samples(
             for evse_id, feed in feeds.items()
             if evse_id in mapper.ids and tree[evse_id].type == "evse"
         }
+        links: dict[str, BESSCommunication] = {}
+        for device_id, device in sample.items():
+            state = device.value("status/communication-state")
+            if device.type == "bess" and device_id in mapper.ids and state in _LINK_STATES:
+                links[mapper.ids[device_id]] = cast("BESSCommunication", state)
         ticks.append(
             TickInputs(
                 current_time=stamp,
                 grid_online=_grid_online(sample),
                 circuits=circuits,
                 evse=evse,
+                bess_communication=links,
             )
         )
     return ticks

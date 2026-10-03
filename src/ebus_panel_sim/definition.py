@@ -85,6 +85,11 @@ def dump_ticks(ticks: Sequence[TickInputs], path: Path | str) -> None:
                 "grid_online": t.grid_online,
                 "circuits": dict(t.circuits),
                 "evse": dict(t.evse),
+                **(
+                    {"bess_communication": dict(t.bess_communication)}
+                    if t.bess_communication
+                    else {}
+                ),
             }
             for t in ticks
         ],
@@ -104,7 +109,11 @@ def load_ticks(path: Path | str) -> list[TickInputs]:
         at = f"{where}: ticks[{i}]"
         if not isinstance(entry, dict):
             raise ManifestValidationError(f"{at}: must be a mapping")
-        _no_unknown_keys(entry, frozenset({"current_time", "grid_online", "circuits", "evse"}), at)
+        _no_unknown_keys(
+            entry,
+            frozenset({"current_time", "grid_online", "circuits", "evse", "bess_communication"}),
+            at,
+        )
         try:
             ticks.append(
                 TickInputs(
@@ -112,6 +121,9 @@ def load_ticks(path: Path | str) -> list[TickInputs]:
                     grid_online=bool(entry["grid_online"]),
                     circuits={str(k): float(v) for k, v in (entry.get("circuits") or {}).items()},
                     evse={str(k): float(v) for k, v in (entry.get("evse") or {}).items()},
+                    bess_communication={
+                        str(k): v for k, v in (entry.get("bess_communication") or {}).items()
+                    },
                 )
             )
         except (KeyError, TypeError, ValueError) as exc:
