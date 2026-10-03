@@ -106,6 +106,35 @@ requester value — and at rest the circuit reports `NONE` like any other.
 This is a **separate commissioning input from the priority value**: `default-priority: NEVER`
 means "never shed" and stays fully settable, which is what real panels publish.
 
+### 3. Panel definition file
+
+A `PanelDefinition` holds everything that fixes a panel's makeup: the `DeviceManifest`, the variant, the native `BESSConfig`s and an optional `LoadSheddingConfig`. `dump_definition` and `load_definition` write and read it as YAML, and `Emitter.from_definition` builds an emitter from one:
+
+```yaml
+schema: panel-sim-definition/1
+variant: span
+devices:
+  - class: panel
+    id: abc-123
+    name: Span Panel
+    metadata: {vendor-name: Span, serial-number: abc-123, ...}
+  - class: circuit
+    id: kitchen
+    name: Kitchen
+    metadata: {tab-numbers: "1", breaker-rating-a: "20", ...}
+bess:
+  - {instance_id: abc-123-bess, nameplate_capacity_kwh: 13.5, max_charge_w: 3500.0, max_discharge_w: 3500.0}
+load_shedding: {soc_threshold_pct: 20.0}
+```
+
+```python
+from ebus_panel_sim import Emitter, SetterRegistry, load_definition
+
+emitter = Emitter.from_definition(load_definition("panel.yaml"), SetterRegistry())
+```
+
+Each device's `metadata` takes the keys in the table above; a YAML number or boolean is read as the string the manifest expects. `bess` and `load_shedding` take the fields of `BESSConfig` and `LoadSheddingConfig`. An unknown key anywhere is an error.
+
 ## Usage (as a producer library)
 
 ```python

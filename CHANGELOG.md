@@ -7,6 +7,7 @@
 ### Added
 
 - **A producer can model the panel's link to each battery.** `TickInputs.bess_communication` maps a configured BESS `instance_id` to `OK`, `DEGRADED`, `LOST` or `UNKNOWN` (the exported `BESSCommunication`); a battery left out is `OK`. The value is published as the battery's `status/communication-state` and drives `EbusBatterySnapshot.connected` and the connection status of the circuit or lugs that connects the battery. An id that is not a configured BESS, or a value outside `BESSCommunication`, raises `EmitterStateError` before anything in the tick is applied.
+- **Panel definition files.** `PanelDefinition` (manifest, variant, `BESSConfig`s, `LoadSheddingConfig`) is written and read as versioned YAML by `dump_definition` / `load_definition`, and `Emitter.from_definition` builds an emitter from one.
 - **A profile overlay can remove what the base declares.** A `null` capability or property in a `profiles/span/*.json` overlay removes it from the span variant, as in JSON Merge Patch (RFC 7396). Removing one the base lacks, or every property of a capability, raises `ProfileValidationError`.
 
 ### Changed
