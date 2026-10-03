@@ -123,6 +123,7 @@ def capture_live(
     password: str | None = None,
     use_tls: bool = True,
     tls_insecure: bool = False,
+    tls_ca_cert: str | None = None,
     timeout_s: float = 30.0,
     settle_s: float = 5.0,
     record: int = 0,
@@ -142,6 +143,8 @@ def capture_live(
         "use_tls": use_tls,
         "tls_insecure": tls_insecure,
     }
+    if tls_ca_cert is not None:
+        mqtt_cfg["tls_ca_cert"] = tls_ca_cert
     if username is not None:
         mqtt_cfg["authentication"] = {
             "type": "USER_PASS",
@@ -277,6 +280,11 @@ class _Mapper:
             raise ValueError(f"expected one distribution-enclosure, found {len(roots)}")
         self.panel_id = roots[0]
         self.ids = self._id_map()
+        # Strings a masked definition must not contain: every original device ID
+        # and published serial number.
+        self.secrets = {i for i in tree if i not in self.ids.values()} | {
+            serial for d in tree.values() if (serial := d.value("info/serial-number"))
+        }
         # Where tabs are not published, circuits get the next free ones.
         self.next_tab = 1 + max(
             (t for d in tree.values() for t in _tabs(d.value("info/spaces"))), default=0
@@ -311,6 +319,13 @@ class _Mapper:
         if raw is None or not self.mask:
             return raw
         return f"MASKED-{self.ids[device_id].upper()}"
+
+    def _name(self, device_id: str, raw: str) -> str:
+        """A display name, replaced by the masked ID if it embeds an original ID
+        or serial."""
+        if self.mask and any(secret.lower() in raw.lower() for secret in self.secrets):
+            return self.ids[device_id]
+        return raw
 
     def note(self, device_id: str, key: str, text: str) -> None:
         self.notes.append(CaptureNote(self.ids.get(device_id, device_id), key, text))
@@ -352,8 +367,9 @@ class _Mapper:
         )
 
     def _tree_order(self) -> list[str]:
-        """Device IDs breadth-first from the panel, in each ``children`` order,
-        so the rebuilt panel lists its children as the captured one does."""
+        """The panel's device tree, breadth-first in each ``children`` order, so
+        the rebuilt panel lists its children as the captured one does. Other
+        devices on the broker are not part of it."""
         order: list[str] = []
         queue = [self.panel_id]
         while queue:
@@ -362,7 +378,7 @@ class _Mapper:
                 continue
             order.append(device_id)
             queue.extend(self.tree[device_id].description.get("children", []))
-        return order + sorted(set(self.tree) - set(order))
+        return order
 
     def _feeds(self) -> dict[str, str]:
         """DER device ID -> the published ID of the circuit or lugs feeding it."""
@@ -412,7 +428,9 @@ class _Mapper:
             md["service-voltage-v"] = str(2 * float(voltage))
         if any(dev.type == "mid" for dev in self.tree.values()):
             md["islandable"] = "true"
-        return DeviceInstance("panel", self.ids[pid], str(d.description.get("name", pid)), md)
+        return DeviceInstance(
+            "panel", self.ids[pid], self._name(pid, str(d.description.get("name", pid))), md
+        )
 
     def _circuit(self, device_id: str, d: Device) -> DeviceInstance:
         name = d.value("info/name") or str(d.description.get("name", device_id))
@@ -466,7 +484,7 @@ class _Mapper:
             md["initial-consumed-wh"] = consumed
         if (produced := d.value("meter/imported-energy")) is not None:
             md["initial-produced-wh"] = produced
-        return DeviceInstance("circuit", self.ids[device_id], name, md)
+        return DeviceInstance("circuit", self.ids[device_id], self._name(device_id, name), md)
 
     def _lugs(self, device_id: str, d: Device) -> DeviceInstance:
         direction = (d.value("info/direction") or "").lower()
@@ -474,6 +492,12 @@ class _Mapper:
             direction = "downstream" if "down" in device_id else "upstream"
             self.note(device_id, "direction", f"not published; using {direction}")
         md = {"direction": direction}
+        if d.value("connection/fed-by-device-type") == _TYPE_PREFIX + "distribution-enclosure":
+            self.note(
+                device_id,
+                "fed-by",
+                "fed by another distribution enclosure, which a definition cannot express",
+            )
         return DeviceInstance("lugs", self.ids[device_id], f"{direction.title()} lugs", md)
 
     def _identity(self, entity_class: str, device_id: str, d: Device) -> dict[str, str]:
@@ -520,7 +544,7 @@ class _Mapper:
             max_discharge_w=5000.0,
             initial_soc_pct=float(soc) if soc is not None else 50.0,
         )
-        name = str(d.description.get("name", "Battery"))
+        name = self._name(device_id, str(d.description.get("name", "Battery")))
         return DeviceInstance("bess", self.ids[device_id], name, md), config
 
     def _pv(self, device_id: str, d: Device, feeds: dict[str, str]) -> DeviceInstance:
@@ -536,7 +560,12 @@ class _Mapper:
         md["relative-position"] = "IN_PANEL"
         if device_id in feeds:
             md["feed"] = feeds[device_id]
-        return DeviceInstance("pv", self.ids[device_id], str(d.description.get("name", "PV")), md)
+        return DeviceInstance(
+            "pv",
+            self.ids[device_id],
+            self._name(device_id, str(d.description.get("name", "PV"))),
+            md,
+        )
 
     def _evse(self, device_id: str, d: Device, feeds: dict[str, str]) -> DeviceInstance:
         md = self._identity("evse", device_id, d)
@@ -552,14 +581,14 @@ class _Mapper:
         md["max-current-a"] = current
         if device_id in feeds:
             md["feed"] = feeds[device_id]
-        name = str(d.description.get("name", "EV Charger"))
+        name = self._name(device_id, str(d.description.get("name", "EV Charger")))
         return DeviceInstance("evse", self.ids[device_id], name, md)
 
     def _mid(self, device_id: str, d: Device) -> DeviceInstance:
         md = self._identity("mid", device_id, d)
         if (hw := d.value("info/hardware-version")) is not None:
             md["hardware-version"] = hw
-        name = str(d.description.get("name", "MID"))
+        name = self._name(device_id, str(d.description.get("name", "MID")))
         return DeviceInstance("mid", self.ids[device_id], name, md)
 
     # -- helpers ---------------------------------------------------------
@@ -618,8 +647,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--username")
     parser.add_argument("--password")
     parser.add_argument("--no-tls", action="store_true", help="plaintext MQTT")
+    parser.add_argument("--cafile", help="CA certificate to verify the broker against")
     parser.add_argument(
-        "--insecure", action="store_true", help="accept a self-signed broker certificate"
+        "--insecure", action="store_true", help="skip broker certificate verification"
     )
     parser.add_argument("--timeout", type=float, default=30.0, help="live capture limit, s")
     parser.add_argument("--variant", choices=get_args(Variant))
@@ -643,6 +673,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             password=args.password,
             use_tls=not args.no_tls,
             tls_insecure=args.insecure,
+            tls_ca_cert=args.cafile,
             timeout_s=args.timeout,
             record=args.record,
             interval_s=args.interval,

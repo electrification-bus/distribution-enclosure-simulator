@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 
 from ebus_panel_sim import (
     BESSConfig,
@@ -27,7 +26,6 @@ from ebus_panel_sim.capture import (
     tree_from_retained,
     tree_from_snapshot,
 )
-from ebus_panel_sim.definition import definition_to_dict
 
 from .conftest import PahoRecorder
 from .test_definition import _EXAMPLES, _example, _stable
@@ -95,11 +93,18 @@ def test_masking_replaces_every_serial_and_keeps_references(rec: PahoRecorder) -
     source = _source()
     original = _publish(rec, source)
     captured, _ = definition_from_tree(tree_from_retained(original))
-    text = yaml.safe_dump(definition_to_dict(captured))
+    values = [
+        v
+        for i in captured.manifest.instances
+        for v in (i.instance_id, i.display_name, *i.metadata.values())
+    ]
+    kept = {i.instance_id for i in captured.manifest.instances}
     for inst in source.manifest.instances:
         serial = inst.metadata.get("serial-number")
         if serial:
-            assert serial not in text
+            assert not any(serial in v for v in values), serial
+        if inst.instance_id not in kept:
+            assert inst.instance_id not in values, inst.instance_id
     ids = {i.instance_id for i in captured.manifest.instances}
     feeds = [i.metadata["feed"] for i in captured.manifest.instances if "feed" in i.metadata]
     assert feeds and set(feeds) <= ids
