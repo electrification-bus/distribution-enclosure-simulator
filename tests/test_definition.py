@@ -20,8 +20,9 @@ from ebus_panel_sim import (
     TickInputs,
     dump_definition,
     load_definition,
+    load_ticks,
 )
-from ebus_panel_sim.definition import SCHEMA, definition_from_dict
+from ebus_panel_sim.definition import SCHEMA, TICKS_SCHEMA, definition_from_dict
 
 from .conftest import PahoRecorder
 
@@ -150,3 +151,108 @@ def _stable(retained: dict[str, str]) -> dict[str, object]:
         else:
             out[topic] = payload
     return out
+
+
+def test_metadata_is_read_exactly_as_written(tmp_path: Path) -> None:
+    """No YAML number, octal, sexagesimal or null resolution in metadata."""
+    path = tmp_path / "panel.yaml"
+    path.write_text(
+        f"schema: {SCHEMA}\n"
+        "devices:\n"
+        "  - class: panel\n"
+        "    id: p1\n"
+        "    metadata:\n"
+        "      postal-code: 02134\n"
+        "      zero: 00000\n"
+        "      hardware-version: 2.10\n"
+        "      clock: 1:30\n"
+        "      tilde: ~\n"
+        "      flag: true\n"
+    )
+    md = load_definition(path).manifest.instances[0].metadata
+    assert md == {
+        "postal-code": "02134",
+        "zero": "00000",
+        "hardware-version": "2.10",
+        "clock": "1:30",
+        "tilde": "~",
+        "flag": "true",
+    }
+
+
+def test_a_non_scalar_metadata_value_is_rejected() -> None:
+    raw = _minimal(devices=[{"class": "panel", "id": "p1", "metadata": {"tags": ["a", "b"]}}])
+    with pytest.raises(ManifestValidationError, match="must be a scalar"):
+        definition_from_dict(raw)
+
+
+def test_config_fields_are_converted_to_their_types(tmp_path: Path) -> None:
+    path = tmp_path / "panel.yaml"
+    path.write_text(
+        f"schema: {SCHEMA}\n"
+        "devices: [{class: panel, id: p1}]\n"
+        'bess: [{instance_id: b, nameplate_capacity_kwh: "13.5", max_charge_w: 3500, '
+        "max_discharge_w: 3500, charge_hours: [1, 2]}]\n"
+        "load_shedding: {soc_threshold_pct: 25}\n"
+    )
+    definition = load_definition(path)
+    (bess,) = definition.bess_configs
+    assert bess.nameplate_capacity_kwh == 13.5
+    assert bess.charge_hours == (1, 2)
+    assert definition.load_shedding == LoadSheddingConfig(soc_threshold_pct=25.0)
+
+
+def test_a_config_field_of_the_wrong_type_is_rejected() -> None:
+    raw = _minimal(
+        bess=[
+            {
+                "instance_id": "b",
+                "nameplate_capacity_kwh": "lots",
+                "max_charge_w": 1,
+                "max_discharge_w": 1,
+            }
+        ]
+    )
+    with pytest.raises(ManifestValidationError, match="nameplate_capacity_kwh must be float"):
+        definition_from_dict(raw)
+
+
+def test_a_wrong_schema_is_reported_before_unknown_keys() -> None:
+    with pytest.raises(ManifestValidationError, match="schema must be"):
+        definition_from_dict({"schema": "other/1", "devices": [], "extra": 1})
+
+
+def _ticks_file(tmp_path: Path, body: str) -> Path:
+    path = tmp_path / "ticks.yaml"
+    path.write_text(f"schema: {TICKS_SCHEMA}\nticks:\n{body}")
+    return path
+
+
+def test_tick_fields_are_converted_strictly(tmp_path: Path) -> None:
+    path = _ticks_file(
+        tmp_path,
+        "  - {current_time: 60, grid_online: false, circuits: {c1: 120}, "
+        "bess_communication: {b: LOST}}\n",
+    )
+    (tick,) = load_ticks(path)
+    assert tick.grid_online is False
+    assert tick.current_time == 60.0
+    assert tick.circuits == {"c1": 120.0}
+    assert tick.bess_communication == {"b": "LOST"}
+
+
+@pytest.mark.parametrize(
+    ("body", "match"),
+    [
+        ('  - {current_time: 0, grid_online: "maybe"}\n', "grid_online must be bool"),
+        ("  - {current_time: 0, grid_online: true, circuits: [1, 2]}\n", "circuits must be"),
+        (
+            "  - {current_time: 0, grid_online: true, bess_communication: {b: GONE}}\n",
+            "bess_communication",
+        ),
+        ("  - {grid_online: true}\n", "missing 'current_time'"),
+    ],
+)
+def test_a_malformed_tick_is_rejected(tmp_path: Path, body: str, match: str) -> None:
+    with pytest.raises(ManifestValidationError, match=match):
+        load_ticks(_ticks_file(tmp_path, body))

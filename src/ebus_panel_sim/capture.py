@@ -9,7 +9,8 @@ settings, panel size, an inverter's coupling).
 
 Command line::
 
-    panel-sim-capture --host span-<serial>.local --username <serial> --password <pw> -o panel.yaml
+    panel-sim-capture --host span-<serial>.local --username <serial> --password <pw> \
+        --cafile <serial>.crt -o panel.yaml
     panel-sim-capture --from-snapshot snapshot.json -o panel.yaml
 
 Masking is on by default: serial numbers, device IDs and the postal code are
@@ -30,13 +31,16 @@ from typing import Any, cast, get_args
 
 from ebus_panel_sim.definition import PanelDefinition, dump_definition, dump_ticks
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
-from ebus_panel_sim.native_devices import BESSConfig
+from ebus_panel_sim.native_devices import BESSConfig, LoadSheddingConfig
 from ebus_panel_sim.tick_inputs import BESSCommunication, TickInputs
 from ebus_panel_sim.wire.profile_loader import Variant
 
 _DOMAIN = "ebus/5"
 _LINK_STATES = frozenset(get_args(BESSCommunication))
 _TYPE_PREFIX = "energy.ebus.device."
+# A shorter original ID masks a display name only when it is the whole name, so
+# an ID such as ``bess`` does not rename "Example BESS".
+_MIN_EMBEDDED = 6
 
 
 @dataclass(slots=True)
@@ -64,6 +68,20 @@ class Device:
 
 
 Tree = dict[str, Device]
+
+
+class CaptureError(Exception):
+    """A capture that cannot produce a definition."""
+
+
+@dataclass(frozen=True, slots=True)
+class LiveCapture:
+    """What ``capture_live`` read: the tree, any recorded samples, and whether the
+    tree was complete (every advertised device described) before the timeout."""
+
+    tree: Tree
+    samples: list[tuple[float, Tree]]
+    complete: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,7 +129,8 @@ def tree_from_snapshot(raw: Mapping[str, Any]) -> Tree:
         merged = {**entry.get("properties", {}), **entry.get("numeric_properties", {})}
         tree[device_id] = Device(
             description=entry.get("description", {}),
-            properties={k: _wire_str(v) for k, v in merged.items()},
+            # A null is an unpublished value, not the string "None".
+            properties={k: _wire_str(v) for k, v in merged.items() if v is not None},
         )
     return tree
 
@@ -125,17 +144,21 @@ def capture_live(
     use_tls: bool = True,
     tls_insecure: bool = False,
     tls_ca_cert: str | None = None,
+    root: str | None = None,
     timeout_s: float = 30.0,
     settle_s: float = 5.0,
     record: int = 0,
     interval_s: float = 1.0,
-) -> tuple[Tree, list[tuple[float, Tree]]]:
+) -> LiveCapture:
     """Read a live tree through ``ebus_sdk.Controller``.
 
-    Waits until every advertised device has a ``$description`` and no new
-    property has appeared for ``settle_s``, or until ``timeout_s``. Then takes
-    ``record`` further samples, ``interval_s`` apart, each stamped with the wall
-    clock. Returns the settled tree and the samples."""
+    With ``root``, only that device's tree is subscribed. Waits until the tree is
+    complete (``Controller.is_tree_complete``) and no new property has appeared
+    for ``settle_s``, or until ``timeout_s``. Then takes ``record`` further
+    samples, ``interval_s`` apart, each stamped with the wall clock.
+
+    Over TLS without ``tls_ca_cert`` the broker's certificate is not verified,
+    whatever ``tls_insecure`` says (``ebus_mqtt_client`` 0.4)."""
     from ebus_sdk import Controller
 
     mqtt_cfg: dict[str, Any] = {
@@ -152,7 +175,7 @@ def capture_live(
             "username": username,
             "password": password or "",
         }
-    controller = Controller(mqtt_cfg=mqtt_cfg)
+    controller = Controller(mqtt_cfg=mqtt_cfg, root_device_id=root)
     seen: set[tuple[str, str, str]] = set()
     last_new = time.monotonic()
 
@@ -164,38 +187,49 @@ def capture_live(
             last_new = time.monotonic()
 
     def snapshot() -> Tree:
-        return {
-            device_id: Device(
-                description=dict(d.description or {}),
-                properties={
-                    f"{node}/{prop}": _wire_str(value)
-                    for node, props in d.properties.items()
-                    for prop, value in props.items()
-                },
-            )
-            for device_id, d in controller.get_all_devices().items()
-            if d.description
-        }
+        # The transport thread writes these dicts while this one reads them, so
+        # copy, and retry a copy that a concurrent insert interrupted.
+        for _ in range(10):
+            try:
+                return {
+                    device_id: Device(
+                        description=dict(d.description or {}),
+                        properties={
+                            f"{node}/{prop}": _wire_str(value)
+                            for node, props in list(d.properties.items())
+                            for prop, value in list(props.items())
+                        },
+                    )
+                    for device_id, d in list(controller.get_all_devices().items())
+                    if d.description
+                }
+            except RuntimeError:
+                time.sleep(0.01)
+        raise CaptureError("the device tree kept changing while it was being read")
+
+    def complete() -> bool:
+        devices = controller.get_all_devices()
+        roots = [root] if root else [i for i, d in devices.items() if d.is_root]
+        return bool(roots) and all(controller.is_tree_complete(r) for r in roots)
 
     controller.set_on_property_changed_callback(on_property)
     controller.start_discovery()
     deadline = time.monotonic() + timeout_s
+    done = False
     try:
         while time.monotonic() < deadline:
             time.sleep(0.25)
-            devices = controller.get_all_devices()
-            complete = bool(devices) and all(
-                d.description and all(c in devices for c in d.children_ids)
-                for d in devices.values()
-            )
-            if complete and time.monotonic() - last_new >= settle_s:
+            if complete() and time.monotonic() - last_new >= settle_s:
+                done = True
                 break
         tree = snapshot()
+        if not tree:
+            raise CaptureError(f"no devices discovered on {host}:{port} within {timeout_s} s")
         samples: list[tuple[float, Tree]] = []
         for _ in range(record):
             time.sleep(interval_s)
             samples.append((time.time(), snapshot()))
-        return tree, samples
+        return LiveCapture(tree=tree, samples=samples, complete=done or complete())
     finally:
         controller.stop()
 
@@ -212,17 +246,22 @@ def _wire_str(value: object) -> str:
 
 
 def definition_from_tree(
-    tree: Tree, *, variant: Variant | None = None, mask: bool = True
+    tree: Tree, *, variant: Variant | None = None, mask: bool = True, root: str | None = None
 ) -> tuple[PanelDefinition, list[CaptureNote]]:
     """Map a published tree onto a panel definition.
 
-    ``variant`` defaults to ``span`` for a SPAN panel and ``reference``
-    otherwise."""
-    return _Mapper(tree, mask).run(variant)
+    ``root`` names the distribution enclosure when the tree holds more than one;
+    only that enclosure's device tree is read. ``variant`` defaults to ``span``
+    for a SPAN panel and ``reference`` otherwise."""
+    return _Mapper(tree, mask, root).run(variant)
 
 
 def ticks_from_samples(
-    tree: Tree, samples: Sequence[tuple[float, Tree]], *, mask: bool = True
+    tree: Tree,
+    samples: Sequence[tuple[float, Tree]],
+    *,
+    mask: bool = True,
+    root: str | None = None,
 ) -> list[TickInputs]:
     """Replayable ticks from timestamped samples of the same tree.
 
@@ -231,25 +270,36 @@ def ticks_from_samples(
     (positive = consuming); an EVSE draws what its feeding circuit does; the grid
     is offline when a MID reports ``grid/islanding-state`` ``OFF_GRID`` or
     ``grid/grid-state`` ``DOWN`` or, without a MID, the panel's main relay is
-    ``OPEN``; each battery's link is its ``status/communication-state``."""
-    mapper = _Mapper(tree, mask)
-    feeds = mapper._feeds()
+    ``OPEN``; each battery's link is its ``status/communication-state``.
+
+    Only the panel's own device tree is read. A circuit feeding a battery is
+    left out: the simulated battery's dispatch already accounts for that power,
+    so recording it too would count it twice."""
+    mapper = _Mapper(tree, mask, root)
+    feeds = mapper.feeds()
+    battery_circuits = {feed for der, feed in feeds.items() if mapper.tree[der].type == "bess"}
     ticks: list[TickInputs] = []
-    for stamp, sample in samples:
+    for stamp, raw_sample in samples:
+        sample = {i: d for i, d in raw_sample.items() if i in mapper.ids}
         circuits: dict[str, float] = {}
         for device_id, device in sample.items():
             power = device.value("meter/active-power")
-            if device.type == "circuit" and device_id in mapper.ids and power is not None:
-                circuits[mapper.ids[device_id]] = -float(power) + 0.0
+            published = mapper.ids[device_id]
+            if (
+                device.type == "circuit"
+                and power is not None
+                and published not in battery_circuits
+            ):
+                circuits[published] = -float(power) + 0.0
         evse = {
             mapper.ids[evse_id]: circuits.get(feed, 0.0)
             for evse_id, feed in feeds.items()
-            if evse_id in mapper.ids and tree[evse_id].type == "evse"
+            if mapper.tree[evse_id].type == "evse"
         }
         links: dict[str, BESSCommunication] = {}
         for device_id, device in sample.items():
             state = device.value("status/communication-state")
-            if device.type == "bess" and device_id in mapper.ids and state in _LINK_STATES:
+            if device.type == "bess" and state in _LINK_STATES:
                 links[mapper.ids[device_id]] = cast("BESSCommunication", state)
         ticks.append(
             TickInputs(
@@ -278,23 +328,35 @@ def _grid_online(sample: Tree) -> bool:
 
 
 class _Mapper:
-    def __init__(self, tree: Tree, mask: bool) -> None:
-        self.tree = tree
+    def __init__(self, tree: Tree, mask: bool, root: str | None = None) -> None:
         self.mask = mask
         self.notes: list[CaptureNote] = []
-        roots = [i for i, d in tree.items() if d.type == "distribution-enclosure"]
-        if len(roots) != 1:
-            raise ValueError(f"expected one distribution-enclosure, found {len(roots)}")
-        self.panel_id = roots[0]
+        enclosures = sorted(i for i, d in tree.items() if d.type == "distribution-enclosure")
+        if root is not None:
+            if root not in enclosures:
+                raise CaptureError(f"{root!r} is not a distribution enclosure in the tree")
+            self.panel_id = root
+        elif len(enclosures) == 1:
+            self.panel_id = enclosures[0]
+        elif enclosures:
+            raise CaptureError(
+                f"the tree holds {len(enclosures)} distribution enclosures; choose one with "
+                f"root: {', '.join(enclosures)}"
+            )
+        else:
+            raise CaptureError("the tree holds no distribution enclosure")
+        # Only the panel's own device tree; other publishers on the broker are
+        # not part of it.
+        self.tree = {i: tree[i] for i in _tree_order(tree, self.panel_id)}
         self.ids = self._id_map()
         # Strings a masked definition must not contain: every original device ID
         # and published serial number.
-        self.secrets = {i for i in tree if i not in self.ids.values()} | {
-            serial for d in tree.values() if (serial := d.value("info/serial-number"))
+        self.secrets = {i for i in self.tree if i not in self.ids.values()} | {
+            serial for d in self.tree.values() if (serial := d.value("info/serial-number"))
         }
         # Where tabs are not published, circuits get the next free ones.
         self.next_tab = 1 + max(
-            (t for d in tree.values() for t in _tabs(d.value("info/spaces"))), default=0
+            (t for d in self.tree.values() for t in _tabs(d.value("info/spaces"))), default=0
         )
 
     # -- ids -------------------------------------------------------------
@@ -311,7 +373,7 @@ class _Mapper:
         )
         for n, cid in enumerate(circuits, start=1):
             out[cid] = f"circuit-{n}"
-        for device_id, device in self.tree.items():
+        for device_id, device in sorted(self.tree.items()):
             if device_id in out:
                 continue
             kind = device.type
@@ -325,12 +387,16 @@ class _Mapper:
     def _serial(self, entity_class: str, device_id: str, raw: str | None) -> str | None:
         if raw is None or not self.mask:
             return raw
-        return f"MASKED-{self.ids[device_id].upper()}"
+        return f"MASKED-{self.ids[device_id].removeprefix('masked-').upper()}"
 
     def _name(self, device_id: str, raw: str) -> str:
         """A display name, replaced by the masked ID if it embeds an original ID
         or serial."""
-        if self.mask and any(secret.lower() in raw.lower() for secret in self.secrets):
+        name = raw.lower()
+        if self.mask and any(
+            secret.lower() == name or (len(secret) >= _MIN_EMBEDDED and secret.lower() in name)
+            for secret in self.secrets
+        ):
             return self.ids[device_id]
         return raw
 
@@ -342,10 +408,11 @@ class _Mapper:
     def run(self, variant: Variant | None) -> tuple[PanelDefinition, list[CaptureNote]]:
         panel = self.tree[self.panel_id]
         chosen = variant or _infer_variant(panel)
-        feeds = self._feeds()
+        feeds = self.feeds()
         instances = [self._panel()]
         bess_configs: list[BESSConfig] = []
-        for device_id in self._tree_order():
+        batteries = sum(d.type == "bess" for d in self.tree.values())
+        for device_id in self.tree:
             device = self.tree[device_id]
             kind = device.type
             if kind == "circuit":
@@ -361,7 +428,15 @@ class _Mapper:
             elif kind == "evse":
                 instances.append(self._evse(device_id, device, feeds))
             elif kind == "mid":
-                instances.append(self._mid(device_id, device))
+                if batteries == 1:
+                    instances.append(self._mid(device_id, device))
+                else:
+                    self.note(
+                        device_id,
+                        "mid",
+                        f"a definition hosts a MID under exactly one BESS, and the panel "
+                        f"has {batteries}; skipped",
+                    )
             elif kind != "distribution-enclosure":
                 self.note(device_id, "type", f"unsupported device type {kind!r}; skipped")
         return (
@@ -369,25 +444,24 @@ class _Mapper:
                 manifest=DeviceManifest(instances=tuple(instances)),
                 variant=chosen,
                 bess_configs=tuple(bess_configs),
+                load_shedding=self._load_shedding(),
             ),
             self.notes,
         )
 
-    def _tree_order(self) -> list[str]:
-        """The panel's device tree, breadth-first in each ``children`` order, so
-        the rebuilt panel lists its children as the captured one does. Other
-        devices on the broker are not part of it."""
-        order: list[str] = []
-        queue = [self.panel_id]
-        while queue:
-            device_id = queue.pop(0)
-            if device_id in order or device_id not in self.tree:
-                continue
-            order.append(device_id)
-            queue.extend(self.tree[device_id].description.get("children", []))
-        return order
+    def _load_shedding(self) -> LoadSheddingConfig | None:
+        """The off-grid SOC shed threshold from the panel's published shed policy."""
+        raw = self.tree[self.panel_id].value("shed/policy")
+        if raw is None:
+            return None
+        try:
+            threshold = json.loads(raw)["parameters"]["soc-threshold-shed"]
+            return LoadSheddingConfig(soc_threshold_pct=float(threshold))
+        except (ValueError, KeyError, TypeError):
+            self.note(self.panel_id, "shed/policy", "no soc-threshold-shed; not captured")
+            return None
 
-    def _feeds(self) -> dict[str, str]:
+    def feeds(self) -> dict[str, str]:
         """DER device ID -> the published ID of the circuit or lugs feeding it."""
         out: dict[str, str] = {}
         for device_id, device in self.tree.items():
@@ -534,6 +608,7 @@ class _Mapper:
         if upstream:
             md["relative-position"] = "UPSTREAM"
         elif device_id in feeds:
+            md["relative-position"] = "IN_PANEL"
             md["feed"] = feeds[device_id]
         if (soe := d.value("soc/soe")) is not None:
             md["initial-soe-kwh"] = soe
@@ -610,6 +685,20 @@ class _Mapper:
             md[key] = value
 
 
+def _tree_order(tree: Tree, root: str) -> list[str]:
+    """``root``'s device tree, breadth-first in each ``children`` order, so a
+    rebuilt panel lists its children as the captured one does."""
+    order: list[str] = []
+    queue = [root]
+    while queue:
+        device_id = queue.pop(0)
+        if device_id in order or device_id not in tree:
+            continue
+        order.append(device_id)
+        queue.extend(tree[device_id].description.get("children", []))
+    return order
+
+
 def _infer_variant(panel: Device) -> Variant:
     if "span" in (panel.value("info/vendor-name") or "").lower():
         return "span"
@@ -656,8 +745,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--no-tls", action="store_true", help="plaintext MQTT")
     parser.add_argument("--cafile", help="CA certificate to verify the broker against")
     parser.add_argument(
-        "--insecure", action="store_true", help="skip broker certificate verification"
+        "--insecure",
+        action="store_true",
+        help="connect over TLS without verifying the broker's certificate",
     )
+    parser.add_argument("--root", help="the distribution enclosure's device ID, if several")
     parser.add_argument("--timeout", type=float, default=30.0, help="live capture limit, s")
     parser.add_argument("--variant", choices=get_args(Variant))
     parser.add_argument("--no-mask", action="store_true", help="keep serials, IDs and site")
@@ -666,30 +758,55 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--ticks-output", type=Path, help="where --record writes its ticks")
     parser.add_argument("-o", "--output", type=Path, required=True)
     args = parser.parse_args(argv)
+    if args.record < 0:
+        parser.error("--record must not be negative")
     if args.record and (args.from_snapshot is not None or args.ticks_output is None):
         parser.error("--record needs a live capture (--host) and --ticks-output")
+    if args.ticks_output is not None and not args.record:
+        parser.error("--ticks-output needs --record")
+    if args.host is not None and not args.no_tls and not (args.cafile or args.insecure):
+        parser.error("over TLS, give --cafile to verify the broker, or --insecure not to")
+    if args.username is not None and args.password is None:
+        parser.error("--username needs --password")
 
-    samples: list[tuple[float, Tree]] = []
-    if args.from_snapshot is not None:
-        tree = tree_from_snapshot(json.loads(args.from_snapshot.read_text()))
-    else:
-        tree, samples = capture_live(
-            args.host,
-            args.port,
-            username=args.username,
-            password=args.password,
-            use_tls=not args.no_tls,
-            tls_insecure=args.insecure,
-            tls_ca_cert=args.cafile,
-            timeout_s=args.timeout,
-            record=args.record,
-            interval_s=args.interval,
+    mask = not args.no_mask
+    try:
+        samples: list[tuple[float, Tree]] = []
+        if args.from_snapshot is not None:
+            raw = json.loads(args.from_snapshot.read_text(encoding="utf-8"))
+            tree = tree_from_snapshot(raw)
+        else:
+            live = capture_live(
+                args.host,
+                args.port,
+                username=args.username,
+                password=args.password,
+                use_tls=not args.no_tls,
+                tls_insecure=args.insecure,
+                tls_ca_cert=args.cafile,
+                root=args.root,
+                timeout_s=args.timeout,
+                record=args.record,
+                interval_s=args.interval,
+            )
+            tree, samples = live.tree, live.samples
+            if not live.complete:
+                print(
+                    f"warning: the tree was incomplete after {args.timeout} s; "
+                    "the definition may be missing devices",
+                    file=sys.stderr,
+                )
+        definition, notes = definition_from_tree(
+            tree, variant=args.variant, mask=mask, root=args.root
         )
-    definition, notes = definition_from_tree(tree, variant=args.variant, mask=not args.no_mask)
-    dump_definition(definition, args.output)
-    if samples:
-        dump_ticks(ticks_from_samples(tree, samples, mask=not args.no_mask), args.ticks_output)
-        print(f"wrote {args.ticks_output}: {len(samples)} ticks", file=sys.stderr)
+        dump_definition(definition, args.output)
+        if samples:
+            ticks = ticks_from_samples(tree, samples, mask=mask, root=args.root)
+            dump_ticks(ticks, args.ticks_output)
+            print(f"wrote {args.ticks_output}: {len(samples)} ticks", file=sys.stderr)
+    except (CaptureError, OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     for n in notes:
         print(f"{n.device}: {n.key}: {n.note}", file=sys.stderr)
     print(

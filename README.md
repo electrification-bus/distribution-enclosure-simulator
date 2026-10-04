@@ -133,20 +133,20 @@ from ebus_panel_sim import Emitter, SetterRegistry, load_definition
 emitter = Emitter.from_definition(load_definition("panel.yaml"), SetterRegistry())
 ```
 
-Each device's `metadata` takes the keys in the table above; a YAML number or boolean is read as the string the manifest expects. `bess` and `load_shedding` take the fields of `BESSConfig` and `LoadSheddingConfig`. An unknown key anywhere is an error.
+Each device's `metadata` takes the keys in the table above, read exactly as written (`postal-code: 02134` stays `02134`). `bess` and `load_shedding` take the fields of `BESSConfig` and `LoadSheddingConfig`, converted to their types. An unknown key, a non-scalar metadata value, or a field of the wrong type is an error.
 
 ### 4. Capture a definition from a published panel
 
 `panel-sim-capture` reads a distribution enclosure's published tree and writes a panel definition that reproduces it:
 
 ```bash
-panel-sim-capture --host <broker> --username <user> --password <pw> --insecure -o panel.yaml
+panel-sim-capture --host <broker> --username <user> --password <pw> --cafile <broker-ca>.crt -o panel.yaml
 panel-sim-capture --from-snapshot snapshot.json -o panel.yaml   # a tree-v1 snapshot file
 ```
 
-Live capture connects over TLS on port 8883 by default (`--no-tls`, `--port` and `--insecure` for a self-signed broker certificate) and returns once the tree has settled, or after `--timeout` seconds. Serial numbers, device IDs and the postal code are masked unless `--no-mask` is given. The variant is `span` for a SPAN panel and `reference` otherwise, unless `--variant` says.
+Live capture connects over TLS on port 8883 by default and needs either `--cafile` to verify the broker or `--insecure` to skip verification (`--no-tls` and `--port` otherwise). It returns once the tree is complete and has settled, or after `--timeout` seconds with a warning that it is incomplete. Only the distribution enclosure's own device tree is read; `--root` names it when the broker carries more than one. Serial numbers, device IDs and the postal code are masked unless `--no-mask` is given. The variant is `span` for a SPAN panel and `reference` otherwise, unless `--variant` says.
 
-A published tree does not carry everything a definition holds. Each value the capture had to default is reported on stderr: BESS charge and discharge limits and charge mode, a PV inverter's coupling, panel size where the model name does not give it, and tabs where `info/spaces` is not published (the reference variant). Captured circuits are placed `upstream-of-lugs`, inside the panel. `--record N --ticks-output ticks.yaml` also samples a live panel `N` times, `--interval` seconds apart, and writes the samples as replayable ticks (`schema: panel-sim-ticks/1`): each circuit's published power negated back to the producer's sign, each EVSE drawing what its feeding circuit does, each battery's link from its `status/communication-state`, and the grid offline when the MID reports `OFF_GRID` (or, without a MID, the main relay is open). `load_ticks` reads them back:
+A published tree does not carry everything a definition holds. Each value the capture had to default is reported on stderr: BESS charge and discharge limits and charge mode, a PV inverter's coupling, panel size where the model name does not give it, and tabs where `info/spaces` is not published (the reference variant). What a definition cannot express is reported and left out: upstream lugs fed by another enclosure, and a MID on a panel without exactly one battery. Captured circuits are placed `upstream-of-lugs`, inside the panel; a battery on a panel breaker stays on it (`relative-position: IN_PANEL`). The off-grid SOC shed threshold comes from the published `shed/policy`. `--record N --ticks-output ticks.yaml` also samples a live panel `N` times, `--interval` seconds apart, and writes the samples as replayable ticks (`schema: panel-sim-ticks/1`): each circuit's published power negated back to the producer's sign, each EVSE drawing what its feeding circuit does (a circuit feeding a battery is left out, since the simulated battery's dispatch accounts for it), each battery's link from its `status/communication-state`, and the grid offline when the MID reports `OFF_GRID` (or, without a MID, the main relay is open). `load_ticks` reads them back:
 
 ```python
 emitter = Emitter.from_definition(load_definition("panel.yaml"), SetterRegistry())

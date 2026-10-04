@@ -5,13 +5,16 @@ from __future__ import annotations
 import dataclasses
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
 from ebus_panel_sim import (
     BESSConfig,
+    DeviceInstance,
+    DeviceManifest,
     Emitter,
+    LoadSheddingConfig,
     PanelDefinition,
     SetterRegistry,
     TickInputs,
@@ -20,6 +23,8 @@ from ebus_panel_sim import (
     load_ticks,
 )
 from ebus_panel_sim.capture import (
+    CaptureError,
+    capture_live,
     definition_from_tree,
     main,
     ticks_from_samples,
@@ -39,7 +44,8 @@ _TICK = TickInputs(
 
 def _source() -> PanelDefinition:
     """The shipped example, with what a tree cannot carry set to capture's defaults:
-    branch circuits in the panel, and default BESS dispatch."""
+    branch circuits in the panel, and default BESS dispatch. Load shedding uses the
+    threshold the emitter's default shed policy publishes, which capture reads back."""
     example = _example()
     profile = example._load_profile(_EXAMPLES / "forty_tab_minimal.yaml")
     for circuit in profile["circuits"]:
@@ -56,6 +62,7 @@ def _source() -> PanelDefinition:
                 max_discharge_w=5000.0,
             ),
         ),
+        load_shedding=LoadSheddingConfig(soc_threshold_pct=20.0),
     )
 
 
@@ -169,7 +176,8 @@ def _script(definition: PanelDefinition) -> list[TickInputs]:
                 current_time=60.0 * n,
                 grid_online=online,
                 circuits=powers,
-                evse={e: powers.get(f, 0.0) for e, f in feeds.items()},
+                # Off-grid the EVSE circuits are shed, so the chargers draw nothing.
+                evse={e: powers.get(f, 0.0) if online else 0.0 for e, f in feeds.items()},
                 bess_communication={battery: "LOST" if n == 1 else "OK"},
             )
         )
@@ -222,3 +230,250 @@ def test_a_tick_recording_round_trips_through_a_file(tmp_path: Path) -> None:
 def test_record_needs_a_live_capture(tmp_path: Path) -> None:
     with pytest.raises(SystemExit):
         main(["--from-snapshot", "x.json", "--record", "3", "-o", str(tmp_path / "p.yaml")])
+
+
+# --- review fixes ----------------------------------------------------------
+
+
+def _with_instances(definition: PanelDefinition, *changes: Any) -> PanelDefinition:
+    """``definition`` with instances replaced (same id) or appended."""
+    by_id = {i.instance_id: i for i in definition.manifest.instances}
+    for inst in changes:
+        by_id[inst.instance_id] = inst
+    return dataclasses.replace(
+        definition, manifest=DeviceManifest(instances=tuple(by_id.values()))
+    )
+
+
+def _battery_on_a_breaker() -> PanelDefinition:
+    source = _source()
+    bess = source.manifest.of_class("bess")[0]
+    feed = source.manifest.of_class("circuit")[0].instance_id
+    md = {k: v for k, v in bess.metadata.items() if k != "relative-position"}
+    return _with_instances(
+        source,
+        DeviceInstance(
+            "bess",
+            bess.instance_id,
+            bess.display_name,
+            {**md, "relative-position": "IN_PANEL", "feed": feed},
+        ),
+    )
+
+
+def test_a_null_in_a_snapshot_is_an_unpublished_value(rec: PahoRecorder) -> None:
+    snapshot = _snapshot(_publish(rec, _source()))
+    circuit = next(
+        d
+        for d in snapshot["devices"].values()
+        if d["description"]["type"] == "energy.ebus.device.circuit"
+    )
+    circuit["numeric_properties"]["breaker/rating"] = None
+    definition, notes = definition_from_tree(tree_from_snapshot(snapshot), mask=False)
+    values = [v for i in definition.manifest.instances for v in i.metadata.values()]
+    assert "None" not in values
+    assert "breaker-rating-a" in {n.key for n in notes}
+    _publish(rec, definition)
+
+
+def test_a_battery_on_a_breaker_stays_on_its_breaker(rec: PahoRecorder) -> None:
+    source = _battery_on_a_breaker()
+    original = _publish(rec, source)
+    captured, _ = definition_from_tree(tree_from_retained(original), mask=False)
+    bess = captured.manifest.of_class("bess")[0]
+    assert bess.metadata["relative-position"] == "IN_PANEL"
+    assert _stable(_publish(rec, captured)) == _stable(original)
+
+
+def test_a_battery_circuit_is_left_out_of_recorded_ticks(rec: PahoRecorder) -> None:
+    source = _battery_on_a_breaker()
+    feed = source.manifest.of_class("bess")[0].metadata["feed"]
+    retained = _publish(rec, source)
+    tree = tree_from_retained(retained)
+    (tick,) = ticks_from_samples(tree, [(0.0, tree)], mask=False)
+    assert feed not in tick.circuits
+    assert tick.circuits
+
+
+def _foreign_battery(retained: dict[str, str]) -> dict[str, str]:
+    """Another publisher's battery on the same broker, outside the panel's tree."""
+    bess_topics = {
+        t: v for t, v in retained.items() if t.startswith("ebus/5/bess/") and "/$" not in t
+    }
+    out = dict(retained)
+    out["ebus/5/aaa-other-bess/$description"] = retained["ebus/5/bess/$description"]
+    for t, v in bess_topics.items():
+        out[t.replace("ebus/5/bess/", "ebus/5/aaa-other-bess/")] = v
+    return out
+
+
+def test_other_publishers_do_not_reach_the_ids_or_the_ticks(rec: PahoRecorder) -> None:
+    retained = _foreign_battery(_publish(rec, _source()))
+    tree = tree_from_retained(retained)
+    captured, _ = definition_from_tree(tree)
+    assert [i.instance_id for i in captured.manifest.of_class("bess")] == ["bess-1"]
+    (tick,) = ticks_from_samples(tree, [(0.0, tree)])
+    assert list(tick.bess_communication) == ["bess-1"]
+
+
+def test_two_enclosures_need_a_root(rec: PahoRecorder) -> None:
+    retained = _publish(rec, _source())
+    other = {
+        t.replace("ebus/5/example-40t-001/", "ebus/5/second-panel/"): v
+        for t, v in retained.items()
+        if t.startswith("ebus/5/example-40t-001/")
+    }
+    tree = tree_from_retained({**retained, **other})
+    with pytest.raises(CaptureError, match="choose one with root"):
+        definition_from_tree(tree)
+    captured, _ = definition_from_tree(tree, root="example-40t-001", mask=False)
+    assert captured.manifest.of_class("panel")[0].instance_id == "example-40t-001"
+
+
+def test_a_mid_without_exactly_one_battery_is_reported_not_written(rec: PahoRecorder) -> None:
+    source = _source()
+    bess = source.manifest.of_class("bess")[0]
+    second = DeviceInstance("bess", "bess-two", "Second battery", dict(bess.metadata))
+    two = dataclasses.replace(
+        _with_instances(source, second),
+        bess_configs=(
+            *source.bess_configs,
+            dataclasses.replace(source.bess_configs[0], instance_id="bess-two"),
+        ),
+    )
+    retained = _publish(
+        rec,
+        dataclasses.replace(
+            two,
+            manifest=DeviceManifest(
+                instances=tuple(i for i in two.manifest.instances if i.entity_class != "mid")
+            ),
+        ),
+    )
+    # Re-add the published MID of the single-battery panel to the two-battery tree.
+    single = _publish(rec, source)
+    retained.update({t: v for t, v in single.items() if t.startswith("ebus/5/bess-mid/")})
+    tree = tree_from_retained(retained)
+    tree["example-40t-001"].description.setdefault("children", []).append("bess-mid")
+    captured, notes = definition_from_tree(tree, mask=False)
+    assert not captured.manifest.of_class("mid")
+    assert "mid" in {n.key for n in notes}
+    _publish(rec, captured)
+
+
+def test_masking_names_the_panel_serial_once_and_leaves_short_ids_alone(
+    rec: PahoRecorder,
+) -> None:
+    captured, _ = definition_from_tree(tree_from_retained(_publish(rec, _source())))
+    panel = captured.manifest.of_class("panel")[0]
+    assert panel.metadata["serial-number"] == "MASKED-PANEL"
+    # The example's battery ID is "bess"; its display name keeps its own text.
+    assert captured.manifest.of_class("bess")[0].display_name == "Battery"
+
+
+@pytest.mark.parametrize(
+    ("argv", "match"),
+    [
+        (["--host", "h", "-o", "x.yaml"], "--cafile"),
+        (["--host", "h", "--insecure", "--username", "u", "-o", "x.yaml"], "--password"),
+        (["--from-snapshot", "s.json", "--ticks-output", "t.yaml", "-o", "x.yaml"], "--record"),
+        (["--host", "h", "--insecure", "--record", "-1", "-o", "x.yaml"], "negative"),
+    ],
+)
+def test_the_command_line_rejects_unsafe_or_ignored_options(
+    argv: list[str], match: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        main(argv)
+    assert match in capsys.readouterr().err
+
+
+def test_a_missing_snapshot_is_an_error_not_a_traceback(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert (
+        main(["--from-snapshot", str(tmp_path / "nope.json"), "-o", str(tmp_path / "p.yaml")]) == 2
+    )
+    assert "error:" in capsys.readouterr().err
+
+
+class _FakeDevice:
+    def __init__(self, description: dict[str, Any], properties: dict[str, dict[str, str]]):
+        self.description = description
+        self.properties = properties
+        self.is_root = "parent" not in description
+
+
+class _FakeController:
+    """Stands in for ``ebus_sdk.Controller``: serves a fixed set of devices."""
+
+    devices: ClassVar[dict[str, _FakeDevice]] = {}
+    complete: ClassVar[bool] = True
+    last: ClassVar[_FakeController | None] = None
+
+    def __init__(self, mqtt_cfg: dict[str, Any], root_device_id: str | None = None) -> None:
+        self.mqtt_cfg = mqtt_cfg
+        self.root_device_id = root_device_id
+        type(self).last = self
+
+    def set_on_property_changed_callback(self, callback: Any) -> None:
+        del callback
+
+    def start_discovery(self) -> None:
+        pass
+
+    def get_all_devices(self) -> dict[str, _FakeDevice]:
+        return dict(self.devices)
+
+    def is_tree_complete(self, root_id: str) -> bool:
+        del root_id
+        return self.complete
+
+    def stop(self) -> None:
+        pass
+
+
+def _fake(monkeypatch: pytest.MonkeyPatch, retained: dict[str, str], complete: bool) -> None:
+    import ebus_sdk
+
+    tree = tree_from_retained(retained)
+    devices = {}
+    for device_id, device in tree.items():
+        props: dict[str, dict[str, str]] = {}
+        for path, value in device.properties.items():
+            node, prop = path.split("/", 1)
+            props.setdefault(node, {})[prop] = value
+        devices[device_id] = _FakeDevice(device.description, props)
+    monkeypatch.setattr(_FakeController, "devices", devices)
+    monkeypatch.setattr(_FakeController, "complete", complete)
+    monkeypatch.setattr(ebus_sdk, "Controller", _FakeController)
+
+
+def test_capture_live_reads_the_tree_and_passes_the_root(
+    rec: PahoRecorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    retained = _publish(rec, _source())
+    _fake(monkeypatch, retained, complete=True)
+    live = capture_live(
+        "h", 1883, use_tls=False, root="example-40t-001", settle_s=0, record=2, interval_s=0
+    )
+    assert live.complete
+    assert len(live.samples) == 2
+    assert _FakeController.last is not None
+    assert _FakeController.last.root_device_id == "example-40t-001"
+    captured, _ = definition_from_tree(live.tree, mask=False)
+    assert _stable(_publish(rec, captured)) == _stable(retained)
+
+
+def test_capture_live_reports_an_incomplete_tree(
+    rec: PahoRecorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fake(monkeypatch, _publish(rec, _source()), complete=False)
+    live = capture_live("h", 1883, use_tls=False, timeout_s=0.3, settle_s=0)
+    assert not live.complete
+
+
+def test_capture_live_on_an_empty_broker_is_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    _fake(monkeypatch, {}, complete=False)
+    with pytest.raises(CaptureError, match="no devices discovered"):
+        capture_live("h", 1883, use_tls=False, timeout_s=0.3, settle_s=0)
