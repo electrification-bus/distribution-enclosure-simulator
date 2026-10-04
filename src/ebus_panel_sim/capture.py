@@ -246,14 +246,20 @@ def _wire_str(value: object) -> str:
 
 
 def definition_from_tree(
-    tree: Tree, *, variant: Variant | None = None, mask: bool = True, root: str | None = None
+    tree: Tree,
+    *,
+    variant: Variant | None = None,
+    mask: bool = True,
+    root: str | None = None,
+    generic_names: bool = False,
 ) -> tuple[PanelDefinition, list[CaptureNote]]:
     """Map a published tree onto a panel definition.
 
     ``root`` names the distribution enclosure when the tree holds more than one;
     only that enclosure's device tree is read. ``variant`` defaults to ``span``
-    for a SPAN panel and ``reference`` otherwise."""
-    return _Mapper(tree, mask, root).run(variant)
+    for a SPAN panel and ``reference`` otherwise. ``generic_names`` replaces each
+    circuit's name with ``Circuit <n>``, numbered in tab order."""
+    return _Mapper(tree, mask, root, generic_names).run(variant)
 
 
 def ticks_from_samples(
@@ -328,8 +334,11 @@ def _grid_online(sample: Tree) -> bool:
 
 
 class _Mapper:
-    def __init__(self, tree: Tree, mask: bool, root: str | None = None) -> None:
+    def __init__(
+        self, tree: Tree, mask: bool, root: str | None = None, generic_names: bool = False
+    ) -> None:
         self.mask = mask
+        self.generic_names = generic_names
         self.notes: list[CaptureNote] = []
         enclosures = sorted(i for i, d in tree.items() if d.type == "distribution-enclosure")
         if root is not None:
@@ -349,6 +358,16 @@ class _Mapper:
         # not part of it.
         self.tree = {i: tree[i] for i in _tree_order(tree, self.panel_id)}
         self.ids = self._id_map()
+        self.circuit_numbers = {
+            cid: n
+            for n, cid in enumerate(
+                sorted(
+                    (i for i, d in self.tree.items() if d.type == "circuit"),
+                    key=lambda i: (_first_tab(self.tree[i].value("info/spaces")), i),
+                ),
+                start=1,
+            )
+        }
         # Strings a masked definition must not contain: every original device ID
         # and published serial number.
         self.secrets = {i for i in self.tree if i not in self.ids.values()} | {
@@ -565,6 +584,8 @@ class _Mapper:
             md["initial-consumed-wh"] = consumed
         if (produced := d.value("meter/imported-energy")) is not None:
             md["initial-produced-wh"] = produced
+        if self.generic_names:
+            name = f"Circuit {self.circuit_numbers[device_id]}"
         return DeviceInstance("circuit", self.ids[device_id], self._name(device_id, name), md)
 
     def _lugs(self, device_id: str, d: Device) -> DeviceInstance:
@@ -753,6 +774,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--timeout", type=float, default=30.0, help="live capture limit, s")
     parser.add_argument("--variant", choices=get_args(Variant))
     parser.add_argument("--no-mask", action="store_true", help="keep serials, IDs and site")
+    parser.add_argument(
+        "--generic-names", action="store_true", help="name circuits Circuit 1, Circuit 2, ..."
+    )
     parser.add_argument("--record", type=int, default=0, help="live samples to record as ticks")
     parser.add_argument("--interval", type=float, default=1.0, help="seconds between samples")
     parser.add_argument("--ticks-output", type=Path, help="where --record writes its ticks")
@@ -797,7 +821,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     file=sys.stderr,
                 )
         definition, notes = definition_from_tree(
-            tree, variant=args.variant, mask=mask, root=args.root
+            tree,
+            variant=args.variant,
+            mask=mask,
+            root=args.root,
+            generic_names=args.generic_names,
         )
         dump_definition(definition, args.output)
         if samples:

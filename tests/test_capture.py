@@ -477,3 +477,15 @@ def test_capture_live_on_an_empty_broker_is_an_error(monkeypatch: pytest.MonkeyP
     _fake(monkeypatch, {}, complete=False)
     with pytest.raises(CaptureError, match="no devices discovered"):
         capture_live("h", 1883, use_tls=False, timeout_s=0.3, settle_s=0)
+
+
+def test_generic_names_number_circuits_in_tab_order(rec: PahoRecorder) -> None:
+    source = _source()
+    captured, _ = definition_from_tree(
+        tree_from_retained(_publish(rec, source)), mask=False, generic_names=True
+    )
+    circuits = captured.manifest.of_class("circuit")
+    by_tab = sorted(circuits, key=lambda i: int(i.metadata["tab-numbers"].split(",")[0]))
+    assert [c.display_name for c in by_tab] == [f"Circuit {n}" for n in range(1, len(by_tab) + 1)]
+    originals = {i.display_name for i in source.manifest.of_class("circuit")}
+    assert not originals & {c.display_name for c in circuits}
