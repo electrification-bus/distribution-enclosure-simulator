@@ -10,8 +10,7 @@ broker-quickstart bundle in its ``open`` profile (see ../broker-quickstart), or
 any local broker (e.g. ``mosquitto -p 1883``). Then:
 
     uv run python examples/run_forty_tab_minimal.py
-    uv run python examples/run_forty_tab_minimal.py --broker 127.0.0.1:1883 --ticks 3 \
-        > /tmp/ebus-topics.txt
+    uv run python examples/run_forty_tab_minimal.py --broker 127.0.0.1:1883 > /tmp/ebus-topics.txt
 """
 
 from __future__ import annotations
@@ -62,7 +61,10 @@ def _parse_args() -> argparse.Namespace:
         default="127.0.0.1:1883",
         help="MQTT broker host:port (plaintext). Default matches broker-quickstart 'open'.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.ticks is not None and args.ticks < 1:
+        parser.error("--ticks must be at least 1")
+    return args
 
 
 def _parse_broker(spec: str) -> tuple[str, int]:

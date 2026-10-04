@@ -41,7 +41,7 @@ It depends on `ebus-sdk`.
 
 ## Run
 
-The repo ships a runnable example: it builds an emitter from a YAML definition, publishes a couple of ticks to an MQTT broker, then reads the retained tree back through an ebus-sdk `Controller` and prints it. It expects a plaintext broker on `localhost:1883`.
+The repo ships a runnable example: it builds an emitter from a panel definition, publishes its three ticks (the last with the grid down) to an MQTT broker, then reads the retained tree back through an ebus-sdk `Controller` and prints it. It expects a plaintext broker on `localhost:1883`.
 
 The quickest broker is the companion [broker-quickstart](https://github.com/electrification-bus/broker-quickstart) in its `open` profile (plaintext, anonymous, port 1883):
 
@@ -55,7 +55,7 @@ Then, in this repo, publish to it and print the retained tree:
 ```bash
 uv sync --group dev
 uv run python examples/run_forty_tab_minimal.py                        # print the retained tree
-uv run python examples/run_forty_tab_minimal.py --broker 127.0.0.1:1883 --ticks 2 > tree.txt
+uv run python examples/run_forty_tab_minimal.py --broker 127.0.0.1:1883 > tree.txt
 ```
 
 Any broker that accepts anonymous connections on `localhost:1883` works; `--broker host:port` points the example elsewhere.

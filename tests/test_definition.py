@@ -44,11 +44,13 @@ def test_the_shipped_example_runs_its_ticks(rec: PahoRecorder) -> None:
     for tick in ticks:
         emitter.publish_tick(tick)
     for inst in definition.manifest.instances:
-        if inst.entity_class != "mid":
-            assert f"ebus/5/{inst.instance_id}/$description" in rec.retained
-    assert set(ticks[0].circuits) == {
-        i.instance_id for i in definition.manifest.of_class("circuit")
-    }
+        assert f"ebus/5/{inst.instance_id}/$description" in rec.retained
+    # The emitter ignores unknown IDs, so check every tick names only real devices.
+    circuits = {i.instance_id for i in definition.manifest.of_class("circuit")}
+    evse = {i.instance_id for i in definition.manifest.of_class("evse")}
+    for tick in ticks:
+        assert set(tick.circuits) == circuits
+        assert set(tick.evse) == evse
 
 
 def test_a_definition_round_trips_through_a_file(tmp_path: Path) -> None:
@@ -316,3 +318,10 @@ def test_the_shipped_example_sheds_when_the_grid_goes_down(rec: PahoRecorder) ->
     assert rec.retained["ebus/5/span-drive-garage/switch/relay-requester"] == "LOAD_SHED"
     assert rec.retained["ebus/5/pool-pump/switch/relay-requester"] == "LOAD_SHED"
     assert rec.retained["ebus/5/garage-outlet/switch/relay-requester"] == "NONE"
+    snapshot = emitter.last_snapshot
+    assert snapshot is not None
+    flows = snapshot.power_flows
+    values = [flows.pv, flows.battery, flows.grid, flows.site]
+    assert all(v is not None for v in values)
+    # The four power flows balance (AGENTS.md); off-grid with shed loads too.
+    assert sum(v for v in values if v is not None) == pytest.approx(0.0, abs=1e-6)

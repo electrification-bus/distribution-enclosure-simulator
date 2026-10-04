@@ -26,17 +26,17 @@ ticks:
   evse:
     evse: 2410.0
     evse-2: 0.0
-# The grid goes down: OFF_GRID circuits (the SPAN Drives and the pool pump) shed,
-# so the chargers draw nothing.
+# The grid goes down on a cloudy afternoon: OFF_GRID circuits (the SPAN Drives
+# and the pool pump) shed and draw nothing, and the battery carries the rest.
 - current_time: 120.0
   grid_online: false
   circuits:
     kitchen-lights: 121.0
     garage-outlet: 122.0
-    pool-pump: 1230.0
+    pool-pump: 0.0
     span-drive-garage: 0.0
     span-drive-driveway: 0.0
-    solar-inverter: -2000.0
+    solar-inverter: -100.0
   evse:
     evse: 0.0
     evse-2: 0.0
