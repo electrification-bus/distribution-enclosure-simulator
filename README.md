@@ -60,24 +60,19 @@ uv run python examples/run_forty_tab_minimal.py --broker 127.0.0.1:1883 --ticks 
 
 Any broker that accepts anonymous connections on `localhost:1883` works; `--broker host:port` points the example elsewhere.
 
-The definition is `examples/forty_tab_minimal.yaml`: a fully-commissioned enclosure with circuits, upstream/downstream lugs, a BESS (plus its MID), PV, and SPAN Drive EVSEs. Each node is its own Homie device: the enclosure at `ebus/5/<enclosure-id>/…` and each circuit, lugs pair, and DER at its own topic root, for example `ebus/5/<circuit-id>/switch/relay`, `ebus/5/<lugs-id>/meter/current-a`, `ebus/5/<bess-id>-mid/grid/islanding-state`.
+The definition is `examples/forty_tab_minimal.yaml`, driven by `examples/forty_tab_minimal.ticks.yaml`: a fully-commissioned enclosure with circuits, upstream/downstream lugs, a BESS (plus its MID), PV, and SPAN Drive EVSEs. Each node is its own Homie device: the enclosure at `ebus/5/<enclosure-id>/…` and each circuit, lugs pair, and DER at its own topic root, for example `ebus/5/<circuit-id>/switch/relay`, `ebus/5/<lugs-id>/meter/current-a`, `ebus/5/<bess-id>-mid/grid/islanding-state`.
 
 ## Configure
 
 The simulator is driven by a config that says which enclosure, which add-ons, and which circuits. There are two entry points.
 
-### 1. Example YAML
+### 1. Example definition
 
-`examples/forty_tab_minimal.yaml` is the quickest path. Top-level sections:
-
-- `panel_config` — enclosure identity plus `total_tabs`, `main_size`, `postal_code`, `time_zone`, and `islandable`. A grid-forming BESS in an islandable enclosure automatically exposes an integrated MID (the islanding authority), mirroring a real SPAN panel.
-- `circuit_templates` and `circuits` — per-circuit `tabs`, breaker rating, priority, relay behavior, and an optional `device_type` (`evse` or `pv`) to land a DER on a circuit.
-- `bess` — nameplate capacity, charge mode, charge/discharge limits.
-- `ticks` — the per-tick driving signal: signed watts per circuit and the grid-online flag.
+`examples/forty_tab_minimal.yaml` is the quickest path: a panel definition file (see "Panel definition file" below) listing each device with its metadata, plus the BESS dispatch settings. A DER sits on a circuit by naming it in its `feed`, and the MID, the islanding authority of a grid-forming BESS in an islandable enclosure, is listed under the BESS as on a real SPAN panel. `examples/forty_tab_minimal.ticks.yaml` is the per-tick driving signal: signed watts per circuit, EVSE draw, and the grid-online flag. Copy and edit both, or generate them from a live panel with `panel-sim-capture`.
 
 ### 2. DeviceManifest (programmatic)
 
-A producer can build `DeviceInstance`s directly instead of using the YAML loader. Each device class's identity and static attributes live in the instance's `metadata`, validated once at startup by `ManifestPhysicsView` (missing required keys or malformed values raise `ManifestValidationError` naming the offending instance). The metadata keys per device class:
+A producer can build `DeviceInstance`s directly instead of loading a definition file. Each device class's identity and static attributes live in the instance's `metadata`, validated once at startup by `ManifestPhysicsView` (missing required keys or malformed values raise `ManifestValidationError` naming the offending instance). The metadata keys per device class:
 
 | entity_class | required keys | optional keys |
 | --- | --- | --- |

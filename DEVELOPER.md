@@ -43,6 +43,8 @@ uv add <package>          # runtime
 uv add --group dev <pkg>  # dev only
 ```
 
+To check that a change is wire-neutral, compare the retained tree before and after it, but drop `$description.version` first: it is a wall-clock stamp, so two runs never match byte for byte otherwise. `tests/test_definition.py`'s `_stable` does this.
+
 This package is a producer library. Its one console entry point, `panel-sim-capture` (`[project.scripts]` in `pyproject.toml`), writes a panel definition from a published panel tree. The `examples/` directory is the runnable demonstration of correct output.
 
 ## Pre-commit Hooks
@@ -105,7 +107,8 @@ distribution-enclosure-simulator/
   .github/workflows/
     ci.yaml                    # CI: ruff, ruff-format, mypy --strict, pytest
   examples/
-    forty_tab_minimal.yaml     # Example device manifest
+    forty_tab_minimal.yaml     # Example panel definition file
+    forty_tab_minimal.ticks.yaml  # Ticks that drive it
     run_forty_tab_minimal.py   # Minimal standalone producer + emitter demo
   src/ebus_panel_sim/
     __init__.py                # Public surface

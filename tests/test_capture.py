@@ -33,7 +33,7 @@ from ebus_panel_sim.capture import (
 )
 
 from .conftest import PahoRecorder
-from .test_definition import _EXAMPLES, _example, _stable
+from .test_definition import _EXAMPLES, _stable
 
 _TICK = TickInputs(
     current_time=0.0,
@@ -46,14 +46,21 @@ def _source() -> PanelDefinition:
     """The shipped example, with what a tree cannot carry set to capture's defaults:
     branch circuits in the panel, and default BESS dispatch. Load shedding uses the
     threshold the emitter's default shed policy publishes, which capture reads back."""
-    example = _example()
-    profile = example._load_profile(_EXAMPLES / "forty_tab_minimal.yaml")
-    for circuit in profile["circuits"]:
-        circuit["placement"] = "upstream-of-lugs"
-    manifest = example._build_manifest(profile)
-    bess = example._build_bess_config(profile)
+    example = load_definition(_EXAMPLES / "forty_tab_minimal.yaml")
+    instances = tuple(
+        DeviceInstance(
+            i.entity_class,
+            i.instance_id,
+            i.display_name,
+            {**i.metadata, "placement": "upstream-of-lugs"}
+            if i.entity_class == "circuit"
+            else i.metadata,
+        )
+        for i in example.manifest.instances
+    )
+    (bess,) = example.bess_configs
     return PanelDefinition(
-        manifest=manifest,
+        manifest=DeviceManifest(instances=instances),
         bess_configs=(
             BESSConfig(
                 instance_id=bess.instance_id,

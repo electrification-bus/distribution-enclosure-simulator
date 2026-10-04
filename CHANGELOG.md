@@ -13,6 +13,7 @@
 
 ### Changed
 
+- **The shipped example is a panel definition file and a tick file** (`examples/forty_tab_minimal.yaml`, `examples/forty_tab_minimal.ticks.yaml`), loaded by `load_definition` / `load_ticks`; its own YAML profile format and loader are gone. Circuit IDs are now readable (`kitchen-lights`), PCS priorities are fixed in the file rather than numbered by position, the two circuits on the legacy `NICE_TO_HAVE` priority (published as `UNKNOWN`) are `SOC_THRESHOLD` and `NEVER`, and a load-shedding config plus a third, off-grid tick exercise shedding and `relay-requester = LOAD_SHED`.
 - **The islanding assertion follows the battery link**, as described above: accepted before the first tick when a battery is configured, since no link has been observed yet, and afterwards only while some battery's link is not `OK`; `NONE` and other values ignored; cleared after `ASSERTION_CLEAR_AFTER_S` (30 s) with every link `OK`. Any unhealthy tick restarts that wait.
 - **A connection status reports the link the way the variant's panel does.** The circuit or lugs connecting a battery publishes the link health on `feeds-device-status` or `fed-by-device-status`. The span variant reports `DEGRADED` and `UNKNOWN` there as `LOST`, as a SPAN panel does while still declaring the catalog's `OK,LOST,DEGRADED`; the reference variant publishes `DEGRADED` as is and only `UNKNOWN`, which no connection catalog declares, as `LOST`.
 - **`EbusBatterySnapshot.communication` admits `UNKNOWN`**, the fourth value of the `status` catalog's `communication-state`.

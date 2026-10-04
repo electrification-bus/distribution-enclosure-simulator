@@ -1,0 +1,42 @@
+# Ticks for forty_tab_minimal.yaml (load_ticks): signed watts per circuit
+# (positive = consuming), EVSE draw, and the grid flag.
+schema: panel-sim-ticks/1
+ticks:
+- current_time: 0.0
+  grid_online: true
+  circuits:
+    kitchen-lights: 121.0
+    garage-outlet: 122.0
+    pool-pump: 1230.0
+    span-drive-garage: 2410.0
+    span-drive-driveway: 2420.0
+    solar-inverter: -2430.0
+  evse:
+    evse: 2410.0
+    evse-2: 2420.0
+- current_time: 60.0
+  grid_online: true
+  circuits:
+    kitchen-lights: 121.0
+    garage-outlet: 122.0
+    pool-pump: 1230.0
+    span-drive-garage: 2410.0
+    span-drive-driveway: 0.0
+    solar-inverter: -8500.0
+  evse:
+    evse: 2410.0
+    evse-2: 0.0
+# The grid goes down: OFF_GRID circuits (the SPAN Drives and the pool pump) shed,
+# so the chargers draw nothing.
+- current_time: 120.0
+  grid_online: false
+  circuits:
+    kitchen-lights: 121.0
+    garage-outlet: 122.0
+    pool-pump: 1230.0
+    span-drive-garage: 0.0
+    span-drive-driveway: 0.0
+    solar-inverter: -2000.0
+  evse:
+    evse: 0.0
+    evse-2: 0.0
