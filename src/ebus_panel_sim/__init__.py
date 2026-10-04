@@ -20,6 +20,13 @@ Producer contract (v0.3.0): build a ``DeviceManifest`` once at startup, then cal
 ``current_time``, and ``grid_online``. The emitter does the rest."""
 
 from ebus_panel_sim.conventions.tab_legs import Leg, legs_for_tabs
+from ebus_panel_sim.definition import (
+    PanelDefinition,
+    dump_definition,
+    dump_ticks,
+    load_definition,
+    load_ticks,
+)
 from ebus_panel_sim.emitter import ASSERTION_CLEAR_AFTER_S, Emitter
 from ebus_panel_sim.exceptions import (
     EmitterError,
@@ -125,6 +132,7 @@ __all__ = [
     "MqttDeviceTransport",
     "NativeDevice",
     "NativeTickContext",
+    "PanelDefinition",
     "PanelEnvelopeTick",
     "PanelPhysics",
     "ProfileValidationError",
@@ -138,5 +146,9 @@ __all__ = [
     "TickInputs",
     "Variant",
     "__version__",
+    "dump_definition",
+    "dump_ticks",
     "legs_for_tabs",
+    "load_definition",
+    "load_ticks",
 ]

@@ -18,6 +18,7 @@ import time
 from collections.abc import Mapping
 from typing import Any, Final, get_args
 
+from ebus_panel_sim.definition import PanelDefinition
 from ebus_panel_sim.energy_integrator import EnergyIntegrator
 from ebus_panel_sim.exceptions import EmitterStateError, ProfileValidationError
 from ebus_panel_sim.manifest import DeviceManifest
@@ -350,6 +351,26 @@ class Emitter:
         ``$description`` missing.
         """
         self._root.refresh_tree()
+
+    @classmethod
+    def from_definition(
+        cls,
+        definition: PanelDefinition,
+        setter_registry: SetterRegistry,
+        *,
+        mqtt_cfg: dict[str, Any] | None = None,
+        mqttc: MqttDeviceTransport | None = None,
+    ) -> Emitter:
+        """Build an emitter for a panel definition (see ``load_definition``)."""
+        return cls(
+            definition.manifest,
+            setter_registry,
+            mqtt_cfg=mqtt_cfg,
+            mqttc=mqttc,
+            bess_configs=definition.bess_configs,
+            load_shedding_config=definition.load_shedding,
+            variant=definition.variant,
+        )
 
     def start(self, *, connect_timeout_s: float = 5.0) -> None:
         """Mark the emitter ready to publish; with ``mqtt_cfg=``, open the connection too.

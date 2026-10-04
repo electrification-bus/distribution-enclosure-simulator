@@ -43,7 +43,7 @@ uv add <package>          # runtime
 uv add --group dev <pkg>  # dev only
 ```
 
-This package has no console entry point (`pyproject.toml` defines no `[project.scripts]`): it is a producer library. The `examples/` directory is the runnable demonstration of correct output.
+This package is a producer library. Its one console entry point, `panel-sim-capture` (`[project.scripts]` in `pyproject.toml`), writes a panel definition from a published panel tree. The `examples/` directory is the runnable demonstration of correct output.
 
 ## Pre-commit Hooks
 

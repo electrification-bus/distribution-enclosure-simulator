@@ -54,6 +54,9 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
+[project.scripts]
+panel-sim-capture = "ebus_panel_sim.capture:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
