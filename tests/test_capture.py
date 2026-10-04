@@ -178,6 +178,12 @@ def _script(definition: PanelDefinition) -> list[TickInputs]:
     for n, online in enumerate((True, True, False)):
         powers = {cid: 100.0 * (k + 1) * (n + 1) for k, cid in enumerate(circuits)}
         powers[circuits[-1]] = -1500.0 * (n + 1)  # a backfeeding circuit
+        if not online:
+            # Shed circuits draw nothing: the emitter sizes battery dispatch on the
+            # tick's circuit powers, before relay gating.
+            for inst in definition.manifest.of_class("circuit"):
+                if inst.metadata["default-priority"] == "OFF_GRID":
+                    powers[inst.instance_id] = 0.0
         out.append(
             TickInputs(
                 current_time=60.0 * n,
