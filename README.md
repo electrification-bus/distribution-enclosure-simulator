@@ -68,7 +68,7 @@ The simulator is driven by a config that says which enclosure, which add-ons, an
 
 ### 1. Example definition
 
-`examples/forty_tab_minimal.yaml` is the quickest path: a panel definition file (see "Panel definition file" below) listing each device with its metadata, plus the BESS dispatch settings. A DER sits on a circuit by naming it in its `feed`, and the MID, the islanding authority of a grid-forming BESS in an islandable enclosure, is listed under the BESS as on a real SPAN panel. `examples/forty_tab_minimal.ticks.yaml` is the per-tick driving signal: signed watts per circuit, EVSE draw, and the grid-online flag. Copy and edit both, or generate them from a live panel with `panel-sim-capture`.
+`examples/forty_tab_minimal.yaml` is the quickest path: a panel definition file (see "Panel definition file" below) listing each device with its metadata, plus the BESS dispatch settings. A DER sits on a circuit by naming it in its `feed` (the two PV inverters each sit on a `commissioned-system: pv` circuit), and the MID, the islanding authority of a grid-forming BESS in an islandable enclosure, is listed under the BESS as on a real SPAN panel. `examples/forty_tab_minimal.ticks.yaml` is the per-tick driving signal: signed watts per circuit, EVSE draw, and the grid-online flag. Copy and edit both, or generate them from a live panel with `panel-sim-capture`.
 
 ### 2. DeviceManifest (programmatic)
 

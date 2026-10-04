@@ -10,6 +10,7 @@ ticks:
     pool-pump: 1230.0
     span-drive-garage: 2410.0
     span-drive-driveway: 2420.0
+    solar-inverter-garage: -910.0
     solar-inverter: -2430.0
   evse:
     evse: 2410.0
@@ -22,6 +23,7 @@ ticks:
     pool-pump: 1230.0
     span-drive-garage: 2410.0
     span-drive-driveway: 0.0
+    solar-inverter-garage: -3400.0
     solar-inverter: -8500.0
   evse:
     evse: 2410.0
@@ -36,6 +38,7 @@ ticks:
     pool-pump: 0.0
     span-drive-garage: 0.0
     span-drive-driveway: 0.0
+    solar-inverter-garage: 0.0
     solar-inverter: -100.0
   evse:
     evse: 0.0
