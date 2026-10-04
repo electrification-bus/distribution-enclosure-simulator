@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import importlib.util
+import dataclasses
 import json
 from pathlib import Path
-from types import ModuleType
 from typing import Any
 
 import pytest
@@ -29,24 +28,29 @@ from .conftest import PahoRecorder
 _EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
 
 
-def _example() -> ModuleType:
-    spec = importlib.util.spec_from_file_location(
-        "run_forty_tab_minimal", _EXAMPLES / "run_forty_tab_minimal.py"
-    )
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 def _example_definition() -> PanelDefinition:
-    example = _example()
-    profile = example._load_profile(_EXAMPLES / "forty_tab_minimal.yaml")
-    return PanelDefinition(
-        manifest=example._build_manifest(profile),
-        bess_configs=(example._build_bess_config(profile),),
+    """The shipped example definition, with load shedding added to cover it."""
+    return dataclasses.replace(
+        load_definition(_EXAMPLES / "forty_tab_minimal.yaml"),
         load_shedding=LoadSheddingConfig(soc_threshold_pct=25.0),
     )
+
+
+def test_the_shipped_example_runs_its_ticks(rec: PahoRecorder) -> None:
+    definition = load_definition(_EXAMPLES / "forty_tab_minimal.yaml")
+    ticks = load_ticks(_EXAMPLES / "forty_tab_minimal.ticks.yaml")
+    emitter = Emitter.from_definition(definition, SetterRegistry())
+    emitter.start()
+    for tick in ticks:
+        emitter.publish_tick(tick)
+    for inst in definition.manifest.instances:
+        assert f"ebus/5/{inst.instance_id}/$description" in rec.retained
+    # The emitter ignores unknown IDs, so check every tick names only real devices.
+    circuits = {i.instance_id for i in definition.manifest.of_class("circuit")}
+    evse = {i.instance_id for i in definition.manifest.of_class("evse")}
+    for tick in ticks:
+        assert set(tick.circuits) == circuits
+        assert set(tick.evse) == evse
 
 
 def test_a_definition_round_trips_through_a_file(tmp_path: Path) -> None:
@@ -303,3 +307,21 @@ def test_a_duplicate_key_is_rejected(tmp_path: Path) -> None:
     )
     with pytest.raises(ManifestValidationError, match="duplicate key 'postal-code'"):
         load_definition(path)
+
+
+def test_the_shipped_example_sheds_when_the_grid_goes_down(rec: PahoRecorder) -> None:
+    definition = load_definition(_EXAMPLES / "forty_tab_minimal.yaml")
+    emitter = Emitter.from_definition(definition, SetterRegistry())
+    emitter.start()
+    for tick in load_ticks(_EXAMPLES / "forty_tab_minimal.ticks.yaml"):
+        emitter.publish_tick(tick)
+    assert rec.retained["ebus/5/span-drive-garage/switch/relay-requester"] == "LOAD_SHED"
+    assert rec.retained["ebus/5/pool-pump/switch/relay-requester"] == "LOAD_SHED"
+    assert rec.retained["ebus/5/garage-outlet/switch/relay-requester"] == "NONE"
+    snapshot = emitter.last_snapshot
+    assert snapshot is not None
+    flows = snapshot.power_flows
+    values = [flows.pv, flows.battery, flows.grid, flows.site]
+    assert all(v is not None for v in values)
+    # The four power flows balance (AGENTS.md); off-grid with shed loads too.
+    assert sum(v for v in values if v is not None) == pytest.approx(0.0, abs=1e-6)
