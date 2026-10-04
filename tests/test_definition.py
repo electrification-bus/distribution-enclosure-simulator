@@ -256,3 +256,50 @@ def test_tick_fields_are_converted_strictly(tmp_path: Path) -> None:
 def test_a_malformed_tick_is_rejected(tmp_path: Path, body: str, match: str) -> None:
     with pytest.raises(ManifestValidationError, match=match):
         load_ticks(_ticks_file(tmp_path, body))
+
+
+@pytest.mark.parametrize("bad", ["nan", "inf", "-inf", ".nan"])
+def test_a_non_finite_number_is_rejected(tmp_path: Path, bad: str) -> None:
+    path = _ticks_file(
+        tmp_path, f"  - {{current_time: 0, grid_online: true, circuits: {{c1: {bad}}}}}\n"
+    )
+    with pytest.raises(ManifestValidationError, match="must be float"):
+        load_ticks(path)
+
+
+def test_a_zero_battery_capacity_is_rejected() -> None:
+    raw = _minimal(
+        bess=[
+            {
+                "instance_id": "b",
+                "nameplate_capacity_kwh": 0,
+                "max_charge_w": 1,
+                "max_discharge_w": 1,
+            }
+        ]
+    )
+    with pytest.raises(ManifestValidationError, match="must be positive"):
+        definition_from_dict(raw)
+
+
+def test_an_empty_load_shedding_mapping_means_the_defaults(tmp_path: Path) -> None:
+    path = tmp_path / "panel.yaml"
+    path.write_text(
+        f"schema: {SCHEMA}\ndevices: [{{class: panel, id: p1}}]\nload_shedding: {{}}\n"
+    )
+    assert load_definition(path).load_shedding == LoadSheddingConfig()
+
+
+def test_a_duplicate_key_is_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "panel.yaml"
+    path.write_text(
+        f"schema: {SCHEMA}\n"
+        "devices:\n"
+        "  - class: panel\n"
+        "    id: p1\n"
+        "    metadata:\n"
+        "      postal-code: '94103'\n"
+        "      postal-code: '02134'\n"
+    )
+    with pytest.raises(ManifestValidationError, match="duplicate key 'postal-code'"):
+        load_definition(path)

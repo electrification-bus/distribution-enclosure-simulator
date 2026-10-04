@@ -28,6 +28,7 @@ expects (``true`` becomes ``"true"``, ``200`` becomes ``"200"``).
 from __future__ import annotations
 
 import dataclasses
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -78,9 +79,28 @@ def dump_definition(definition: PanelDefinition, path: Path | str) -> None:
     )
 
 
+class _ExactLoader(yaml.BaseLoader):
+    """No implicit types (every scalar is a string), and no duplicate keys: a
+    hand-edited file that repeats a key is an error, not a silent last-wins."""
+
+
+def _construct_mapping(loader: _ExactLoader, node: yaml.MappingNode) -> dict[Any, Any]:
+    out: dict[Any, Any] = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node)  # type: ignore[no-untyped-call]
+        if key in out:
+            raise ManifestValidationError(
+                f"duplicate key {key!r} at line {key_node.start_mark.line + 1}"
+            )
+        out[key] = loader.construct_object(value_node)  # type: ignore[no-untyped-call]
+    return out
+
+
+_ExactLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
+
+
 def _read_yaml(path: Path | str) -> object:
-    # BaseLoader resolves no implicit types: every scalar is a string.
-    return yaml.load(Path(path).read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    return yaml.load(Path(path).read_text(encoding="utf-8"), Loader=_ExactLoader)
 
 
 def dump_ticks(ticks: Sequence[TickInputs], path: Path | str) -> None:
@@ -200,7 +220,9 @@ def definition_from_dict(raw: object, *, where: str = "definition") -> PanelDefi
     bess = raw.get("bess") or []
     if not isinstance(bess, list):
         raise ManifestValidationError(f"{where}: bess must be a list")
-    shedding = raw.get("load_shedding") or None
+    shedding = raw.get("load_shedding")
+    if shedding == "":  # an empty value in a file, as opposed to {} (the defaults)
+        shedding = None
     return PanelDefinition(
         manifest=DeviceManifest(
             instances=tuple(_device(d, f"{where}: devices[{i}]") for i, d in enumerate(devices))
@@ -260,6 +282,8 @@ def _config(cls: type[_Config], raw: object, where: str) -> _Config:
     hints = get_type_hints(cls)
     _no_unknown_keys(raw, frozenset(f.name for f in dataclasses.fields(cls)), where)
     kwargs = {str(k): _coerce(v, hints[str(k)], where, str(k)) for k, v in raw.items()}
+    if cls is BESSConfig and kwargs.get("nameplate_capacity_kwh", 1.0) <= 0:
+        raise ManifestValidationError(f"{where}: nameplate_capacity_kwh must be positive")
     try:
         return cls(**kwargs)
     except TypeError as exc:
@@ -279,7 +303,10 @@ def _coerce(value: Any, hint: Any, where: str, key: str) -> Any:
         if hint in (int, float) and isinstance(value, bool):
             raise ValueError
         if hint is float:
-            return float(value)
+            number = float(value)
+            if not math.isfinite(number):
+                raise ValueError
+            return number
         if hint is int:
             return int(value) if isinstance(value, (int, str)) else _exact_int(value)
         if hint is str:

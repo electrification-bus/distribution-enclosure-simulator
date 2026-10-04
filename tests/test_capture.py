@@ -426,8 +426,12 @@ class _FakeController:
         return dict(self.devices)
 
     def is_tree_complete(self, root_id: str) -> bool:
-        del root_id
-        return self.complete
+        # A device that is not a distribution enclosure never completes, as a
+        # foreign publisher's partial tree would not.
+        enclosure = (
+            self.devices[root_id].description.get("type", "").endswith("distribution-enclosure")
+        )
+        return self.complete and enclosure
 
     def stop(self) -> None:
         pass
@@ -489,3 +493,46 @@ def test_generic_names_number_circuits_in_tab_order(rec: PahoRecorder) -> None:
     assert [c.display_name for c in by_tab] == [f"Circuit {n}" for n in range(1, len(by_tab) + 1)]
     originals = {i.display_name for i in source.manifest.of_class("circuit")}
     assert not originals & {c.display_name for c in circuits}
+
+
+def test_a_battery_with_no_connection_record_is_noted_not_moved_upstream(
+    rec: PahoRecorder,
+) -> None:
+    retained = {
+        t: v for t, v in _publish(rec, _source()).items() if "/connection/fed-by-device-" not in t
+    }
+    captured, notes = definition_from_tree(tree_from_retained(retained), mask=False)
+    bess = captured.manifest.of_class("bess")[0]
+    assert bess.metadata["relative-position"] == "IN_PANEL"
+    assert "feed" not in bess.metadata
+    assert "relative-position" in {n.key for n in notes}
+    rebuilt = _publish(rec, captured)
+    assert not any("/connection/fed-by-device-" in t for t in rebuilt)
+
+
+def test_a_feed_outside_the_tree_is_noted_and_recording_survives(rec: PahoRecorder) -> None:
+    retained = _publish(rec, _source())
+    circuit = next(t.split("/")[2] for t in retained if t.endswith("/info/spaces"))
+    retained[f"ebus/5/{circuit}/connection/feeds-device-id"] = "not-in-this-tree"
+    tree = tree_from_retained(retained)
+    _, notes = definition_from_tree(tree, mask=False)
+    assert "feed" in {n.key for n in notes}
+    (tick,) = ticks_from_samples(tree, [(0.0, tree)], mask=False)
+    assert tick.circuits
+
+
+def test_completeness_ignores_other_roots_on_the_broker(
+    rec: PahoRecorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    retained = _publish(rec, _source())
+    retained["ebus/5/foreign-bridge/$description"] = json.dumps(
+        {"homie": "5.0", "type": "energy.ebus.device.bridge", "nodes": {}}
+    )
+    _fake(monkeypatch, retained, complete=True)
+    live = capture_live("h", 1883, use_tls=False, timeout_s=0.5, settle_s=0)
+    assert live.complete
+
+
+def test_capture_live_refuses_a_username_without_a_password() -> None:
+    with pytest.raises(CaptureError, match="needs a password"):
+        capture_live("h", 1883, use_tls=False, username="u")

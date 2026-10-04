@@ -169,11 +169,13 @@ def capture_live(
     }
     if tls_ca_cert is not None:
         mqtt_cfg["tls_ca_cert"] = tls_ca_cert
+    if username is not None and password is None:
+        raise CaptureError("a username needs a password")
     if username is not None:
         mqtt_cfg["authentication"] = {
             "type": "USER_PASS",
             "username": username,
-            "password": password or "",
+            "password": password,
         }
     controller = Controller(mqtt_cfg=mqtt_cfg, root_device_id=root)
     seen: set[tuple[str, str, str]] = set()
@@ -209,7 +211,19 @@ def capture_live(
 
     def complete() -> bool:
         devices = controller.get_all_devices()
-        roots = [root] if root else [i for i, d in devices.items() if d.is_root]
+        # The enclosure(s) a definition can be built from, not every root on the
+        # broker: another publisher, or a stale retained device with no
+        # $description, must not hold completion back.
+        roots = (
+            [root]
+            if root
+            else [
+                i
+                for i, d in devices.items()
+                if d.is_root
+                and (d.description or {}).get("type") == _TYPE_PREFIX + "distribution-enclosure"
+            ]
+        )
         return bool(roots) and all(controller.is_tree_complete(r) for r in roots)
 
     controller.set_on_property_changed_callback(on_property)
@@ -428,6 +442,7 @@ class _Mapper:
         panel = self.tree[self.panel_id]
         chosen = variant or _infer_variant(panel)
         feeds = self.feeds()
+        self._note_dangling_feeds()
         instances = [self._panel()]
         bess_configs: list[BESSConfig] = []
         batteries = sum(d.type == "bess" for d in self.tree.values())
@@ -481,13 +496,20 @@ class _Mapper:
             return None
 
     def feeds(self) -> dict[str, str]:
-        """DER device ID -> the published ID of the circuit or lugs feeding it."""
+        """DER device ID -> the published ID of the circuit feeding it, for DERs
+        in the panel's tree."""
         out: dict[str, str] = {}
         for device_id, device in self.tree.items():
             target = device.value("connection/feeds-device-id")
-            if target is not None and device.type == "circuit":
+            if target is not None and device.type == "circuit" and target in self.tree:
                 out[target] = self.ids[device_id]
         return out
+
+    def _note_dangling_feeds(self) -> None:
+        for device_id, device in self.tree.items():
+            target = device.value("connection/feeds-device-id")
+            if target is not None and device.type == "circuit" and target not in self.tree:
+                self.note(device_id, "feed", "feeds a device the captured tree does not contain")
 
     # -- per class -------------------------------------------------------
 
@@ -631,6 +653,15 @@ class _Mapper:
         elif device_id in feeds:
             md["relative-position"] = "IN_PANEL"
             md["feed"] = feeds[device_id]
+        else:
+            # The emitter publishes a battery's connection edge only for UPSTREAM
+            # or a feed, so IN_PANEL without a feed reproduces "no record".
+            md["relative-position"] = "IN_PANEL"
+            self.note(
+                device_id,
+                "relative-position",
+                "no lugs or circuit names this battery; written IN_PANEL with no feed",
+            )
         if (soe := d.value("soc/soe")) is not None:
             md["initial-soe-kwh"] = soe
         self.note(
