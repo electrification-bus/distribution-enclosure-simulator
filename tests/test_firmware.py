@@ -3,6 +3,8 @@ conventions the span variant keys on it."""
 
 from __future__ import annotations
 
+from typing import get_args
+
 import pytest
 
 from ebus_panel_sim.firmware import (
@@ -12,6 +14,7 @@ from ebus_panel_sim.firmware import (
     release_build,
 )
 from ebus_panel_sim.manifest_physics import ManifestPhysicsView
+from ebus_panel_sim.wire.profile_loader import Variant
 
 from .test_connection import _manifest
 from .test_firmware_gate import with_panel_firmware
@@ -77,6 +80,9 @@ def test_the_span_variant_keys_on_the_release(
     assert firmware_conventions("span", release) == expected
 
 
+@pytest.mark.parametrize("variant", [v for v in get_args(Variant) if v != "span"])
 @pytest.mark.parametrize("release", [202633, CURRENT_CONVENTIONS_RELEASE, None])
-def test_the_reference_variant_always_uses_the_current_conventions(release: int | None) -> None:
-    assert firmware_conventions("reference", release) == _CURRENT
+def test_every_other_variant_always_uses_the_current_conventions(
+    variant: Variant, release: int | None
+) -> None:
+    assert firmware_conventions(variant, release) == _CURRENT

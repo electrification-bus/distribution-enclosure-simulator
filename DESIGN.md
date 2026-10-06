@@ -61,7 +61,7 @@ When the grid is offline the policy returns the circuit instance-ids whose prior
 | circuit | `switch/relay` | Updates the `RelayResolver` user override |
 | circuit | `load-shed/priority` | Updates the emitter's per-circuit priority override (refused on a never-backup or commissioned-system circuit) |
 | panel | `shed/asserted-islanding-state` | Updates the consumer-asserted islanding override, accepted only while a battery link is not `OK` (see below) |
-| evse | `config/user-max-charge-current` | Sets the per-EVSE user charge-current ceiling, which is unpublished until first set (published at `max-current-a` from the start under firmware before release 202639; see [Firmware-keyed conventions](#firmware-keyed-conventions)); an integer, clamped into `[6, max-charge-current]` (the advertised `$format`), anything else refused |
+| evse | `config/user-max-charge-current` | Sets the per-EVSE user charge-current ceiling, which is unpublished until first set (published at `max-current-a` from the start by the span variant under firmware before release 202639; see [Firmware-keyed conventions](#firmware-keyed-conventions)); an integer, clamped into `[6, max-charge-current]` (the advertised `$format`), anything else refused |
 
 ### Relay state precedence
 

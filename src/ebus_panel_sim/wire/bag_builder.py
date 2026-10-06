@@ -22,8 +22,10 @@ properties — the property's retained topic just isn't updated this tick)."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Final
 
 from ebus_panel_sim.exceptions import EmitterStateError
 from ebus_panel_sim.firmware import BessMeterFrame
@@ -225,10 +227,12 @@ def _bess_enclosure_frame_active_power(snapshot: EbusPanelSnapshot, instance_id:
 
 
 # The ``meter/active-power`` resolver for each frame a hosted BESS can publish in.
-_BESS_ACTIVE_POWER: dict[BessMeterFrame, Resolver] = {
-    "device": _bess_wire_active_power,
-    "enclosure": _bess_enclosure_frame_active_power,
-}
+_BESS_ACTIVE_POWER: Final[Mapping[BessMeterFrame, Resolver]] = MappingProxyType(
+    {
+        "device": _bess_wire_active_power,
+        "enclosure": _bess_enclosure_frame_active_power,
+    }
+)
 
 
 def _upper_lugs_direction(snapshot: EbusPanelSnapshot, instance_id: str) -> object:
