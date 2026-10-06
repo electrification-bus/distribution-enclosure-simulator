@@ -38,6 +38,8 @@ from ebus_panel_sim.wire.profile_loader import Variant
 _DOMAIN = "ebus/5"
 _LINK_STATES = frozenset(get_args(BESSCommunication))
 _TYPE_PREFIX = "energy.ebus.device."
+# The circuits a SPAN panel adds for a commissioned PV or battery system.
+_COMMISSIONED_NAMES = {"Commissioned PV System": "pv", "Commissioned Backup System": "backup"}
 # A shorter original ID masks a display name only when it is the whole name, so
 # an ID such as ``bess`` does not rename "Example BESS".
 _MIN_EMBEDDED = 6
@@ -590,7 +592,10 @@ class _Mapper:
         # A never-backup circuit publishes OFF_GRID with no $settable, on a relay
         # that is otherwise controllable.
         priority_settable = bool((d.declaration("load-shed/priority") or {}).get("settable"))
-        if (
+        system = _COMMISSIONED_NAMES.get(name)
+        if system is not None and locked and priority == "NEVER" and not priority_settable:
+            md["commissioned-system"] = system
+        elif (
             not locked
             and priority == "OFF_GRID"
             and d.declares("load-shed/priority")

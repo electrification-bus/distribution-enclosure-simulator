@@ -676,18 +676,15 @@ def test_lugs_energy_integrates_its_own_meter_not_the_circuits_behind_it() -> No
     assert snap.circuits["solar"].produced_energy_wh > 0.0
 
 
-def test_bess_meter_active_power_matches_power_flows_battery(rec: PahoRecorder) -> None:
-    """The panel's two views of the same battery agree, value and sign.
+def test_bess_meter_active_power_is_the_negative_of_power_flows_battery(
+    rec: PahoRecorder,
+) -> None:
+    """The BESS meter is the battery's own frame; ``power-flows/battery`` is the panel's.
 
-    A panel proxying a battery it hosts publishes its own reading of that
-    battery, not the battery's reading of itself, so ``bess/meter/active-power``
-    is positive while charging -- power leaving the panel node into the battery
-    -- and is the same quantity as ``power-flows/battery``. Publishing the
-    device-frame value here made the two exact opposites of each other, on one
-    panel, describing one battery, at one instant.
-
-    A standalone BESS device on the same bus still publishes its own meter in
-    its own frame. That disagreement is correct; this one was not.
+    ``devices/bess.md`` publishes ``meter/active-power`` positive while the
+    battery discharges. ``power-flows/battery`` is positive toward the battery,
+    i.e. while charging. The two describe one battery at one instant, so each
+    is the negative of the other.
     """
     manifest = DeviceManifest(instances=(_panel_inst(), _circuit_inst(), _bess_inst()))
     bess_cfg = BESSConfig(
@@ -714,14 +711,13 @@ def test_bess_meter_active_power_matches_power_flows_battery(rec: PahoRecorder) 
         wire = float(rec.retained["ebus/5/abc-123-bess/meter/active-power"])
         flows = float(rec.retained["ebus/5/abc-123/power-flows/battery"])
 
-        assert wire == pytest.approx(flows), (
-            f"tick {tick_no}: bess meter {wire} != power-flows/battery {flows}"
+        assert wire == pytest.approx(-flows), (
+            f"tick {tick_no}: bess meter {wire} != -power-flows/battery {-flows}"
         )
-        # ...and both are the panel's frame, the inverse of the device frame the
-        # snapshot carries. Asserted against the snapshot so the sign is pinned
-        # absolutely, not just pinned to itself.
+        # Pinned against the snapshot's device frame too, so the pair cannot
+        # pass by both flipping.
         device_frame = snap.battery["abc-123-bess"].active_power_w
-        assert wire == pytest.approx(-device_frame)
+        assert wire == pytest.approx(device_frame)
 
 
 def test_downstream_lugs_meter_is_positive_when_the_panel_feeds_the_subpanel() -> None:

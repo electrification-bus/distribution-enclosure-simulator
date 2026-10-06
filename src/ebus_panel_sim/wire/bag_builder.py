@@ -22,10 +22,13 @@ properties — the property's retained topic just isn't updated this tick)."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Final
 
 from ebus_panel_sim.exceptions import EmitterStateError
+from ebus_panel_sim.firmware import BessMeterFrame
 from ebus_panel_sim.snapshot import EbusPanelSnapshot
 from ebus_panel_sim.wire.graph_builder import BuiltGraph
 from ebus_panel_sim.wire.mapping_loader import MappingTable
@@ -192,25 +195,44 @@ def _circuit_wire_exported_energy(snapshot: EbusPanelSnapshot, instance_id: str)
 
 
 def _bess_wire_active_power(snapshot: EbusPanelSnapshot, instance_id: str) -> object:
-    """BESS ``meter/active-power`` in the panel's frame, not the battery's.
+    """BESS ``meter/active-power`` in the battery's own frame: positive while
+    discharging, as ``devices/bess.md`` defines it. That makes it the negative
+    of the panel's ``power-flows/battery`` (positive = toward the battery), and
+    ``test_bess_meter_active_power_is_the_negative_of_power_flows_battery``
+    pins the pair. ``-0.0`` is normalized so an idle battery publishes ``0``.
 
-    The snapshot's ``active_power_w`` is device-frame: positive = the battery is
-    discharging, power flowing out of it. This emitter publishes a panel's view
-    of the world, and what a panel proxies for a battery it hosts is the panel's
-    reading of that battery, not the battery's reading of itself. So the wire
-    value is positive while *charging* -- power leaving the panel node into the
-    battery -- which is the same quantity and the same sign as the panel's
-    ``power-flows/battery``. Hence the negation, and hence
-    ``test_bess_meter_active_power_matches_power_flows_battery``.
+    The default: the reference variant always publishes it, and the span
+    variant does unless its panel reports a SPAN release before 202639 (see
+    :func:`_bess_enclosure_frame_active_power`)."""
+    bess = snapshot.battery.get(instance_id)
+    if bess is None:
+        return None
+    return 0.0 if bess.active_power_w == 0 else bess.active_power_w
 
-    A standalone BESS on the same bus publishes its own meter in its own frame,
-    where positive = discharging. That device is not this device, and the two
-    disagreeing about the same battery at the same instant is correct: they are
-    answering different questions."""
+
+def _bess_enclosure_frame_active_power(snapshot: EbusPanelSnapshot, instance_id: str) -> object:
+    """BESS ``meter/active-power`` in the panel's frame, as a span-variant panel
+    on a SPAN release before 202639 publishes it (``ebus_panel_sim.firmware``).
+
+    The snapshot's ``active_power_w`` stays device-frame (positive = the battery
+    is discharging); that firmware published the panel's reading of the battery
+    instead, positive while *charging*, which is the same quantity and sign as
+    the panel's ``power-flows/battery``. Hence the negation, and hence
+    ``test_before_202639_the_bess_meter_equals_power_flows_battery``.
+    ``-0.0`` is normalized as above."""
     bess = snapshot.battery.get(instance_id)
     if bess is None:
         return None
     return 0.0 if bess.active_power_w == 0 else -bess.active_power_w
+
+
+# The ``meter/active-power`` resolver for each frame a hosted BESS can publish in.
+_BESS_ACTIVE_POWER: Final[Mapping[BessMeterFrame, Resolver]] = MappingProxyType(
+    {
+        "device": _bess_wire_active_power,
+        "enclosure": _bess_enclosure_frame_active_power,
+    }
+)
 
 
 def _upper_lugs_direction(snapshot: EbusPanelSnapshot, instance_id: str) -> object:
@@ -399,9 +421,18 @@ class BagBuilder:
         graph: BuiltGraph,
         mapping: MappingTable,
         profiles: ProfileTable,
+        *,
+        bess_meter_frame: BessMeterFrame = "device",
     ) -> None:
+        """``bess_meter_frame`` picks the frame a hosted BESS publishes
+        ``meter/active-power`` in, fixed for the emitter's life by the panel's
+        firmware (``ebus_panel_sim.firmware``)."""
         del mapping  # accepted for API symmetry; not consulted today.
         self._bound: list[_BoundProperty] = []
+        resolvers = {
+            **_RESOLVERS,
+            ("bess", "meter/active-power"): _BESS_ACTIVE_POWER[bess_meter_frame],
+        }
 
         # First pass: structural coverage check. Every profile property the
         # graph references must have a resolver entry. A missing resolver is a
@@ -412,7 +443,7 @@ class BagBuilder:
             for cap_name, cap in profile.capabilities.items():
                 for prop_key in cap.properties:
                     full = f"{cap_name}/{prop_key}"
-                    if (ec, full) not in _RESOLVERS:
+                    if (ec, full) not in resolvers:
                         missing.append((ec, full))
         if missing:
             joined = ", ".join(f"{ec}.{p}" for ec, p in missing)
@@ -426,7 +457,7 @@ class BagBuilder:
         # property_path) keys actually present in the graph. The graph already
         # encodes which instances exist for each entity_class.
         for entity_class, instance_id, property_path in graph.properties:
-            resolver = _RESOLVERS[(entity_class, property_path)]
+            resolver = resolvers[(entity_class, property_path)]
             self._bound.append(
                 _BoundProperty(
                     entity_class=entity_class,

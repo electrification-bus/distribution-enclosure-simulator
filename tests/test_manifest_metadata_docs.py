@@ -55,6 +55,8 @@ _NOT_KEYS = frozenset(
         "non-controllable",
         "hybrid",
         "ac-coupled",
+        "pv",
+        "backup",
         "UPSTREAM",
         "IN_PANEL",
         "len(tab-numbers) > 1",

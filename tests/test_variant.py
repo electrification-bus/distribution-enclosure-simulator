@@ -54,6 +54,13 @@ def _manifest() -> DeviceManifest:
                     "placement": "downstream-of-lugs",
                 },
             ),
+            # shed is published only with a commissioned BESS.
+            DeviceInstance(
+                "bess",
+                "abc-123-bess",
+                "Battery",
+                metadata={"vendor-name": "Span", "nameplate-capacity-kwh": "13.5"},
+            ),
         )
     )
 

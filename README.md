@@ -68,7 +68,7 @@ The simulator is driven by a config that says which enclosure, which add-ons, an
 
 ### 1. Example definition
 
-`examples/forty_tab_minimal.yaml` is the quickest path: a panel definition file (see "Panel definition file" below) listing each device with its metadata, plus the BESS dispatch settings. A DER sits on a circuit by naming it in its `feed`, and the MID, the islanding authority of a grid-forming BESS in an islandable enclosure, is listed under the BESS as on a real SPAN panel. `examples/forty_tab_minimal.ticks.yaml` is the per-tick driving signal: signed watts per circuit, EVSE draw, and the grid-online flag. Copy and edit both, or generate them from a live panel with `panel-sim-capture`.
+`examples/forty_tab_minimal.yaml` is the quickest path: a panel definition file (see "Panel definition file" below) listing each device with its metadata, plus the BESS dispatch settings. A DER sits on a circuit by naming it in its `feed` (the two PV inverters each sit on a `commissioned-system: pv` circuit), and the MID, the islanding authority of a grid-forming BESS in an islandable enclosure, is listed under the BESS as on a real SPAN panel. `examples/forty_tab_minimal.ticks.yaml` is the per-tick driving signal: signed watts per circuit, EVSE draw, and the grid-online flag. Copy and edit both, or generate them from a live panel with `panel-sim-capture`.
 
 ### 2. DeviceManifest (programmatic)
 
@@ -78,7 +78,7 @@ A producer can build `DeviceInstance`s directly instead of loading a definition 
 | --- | --- | --- |
 | `panel` | `vendor-name`, `serial-number`, `firmware-version` (or `software-version`), `hardware-version`, `panel-size`, `main-breaker-rating-a`, `panel-model`, `postal-code`, `time-zone` | `service-voltage-v` (240), `line-voltage-v` (120), `islandable` (false), `schema-topology` (`flat` \| `parent-child`) |
 | `lugs` | `direction` (`upstream` \| `downstream`) | |
-| `circuit` | `tab-numbers` (CSV ints), `breaker-rating-a`, `default-priority`, `relay-behavior` (`controllable` \| `non-controllable` \| `always-on`), `placement` (`upstream-of-lugs` \| `downstream-of-lugs`) | `always-on`, `never-backup` (false), `dipole` (defaults to `len(tab-numbers) > 1`), `pcs-priority` (0), `initial-consumed-wh` (0), `initial-produced-wh` (0) |
+| `circuit` | `tab-numbers` (CSV ints), `breaker-rating-a`, `default-priority`, `relay-behavior` (`controllable` \| `non-controllable` \| `always-on`), `placement` (`upstream-of-lugs` \| `downstream-of-lugs`) | `always-on`, `never-backup` (false), `commissioned-system` (`pv` \| `backup`), `dipole` (defaults to `len(tab-numbers) > 1`), `pcs-priority` (0), `initial-consumed-wh` (0), `initial-produced-wh` (0) |
 | `bess` | `vendor-name`, `nameplate-capacity-kwh` | `model`, `part-number`, `serial-number`, `firmware-version`/`software-version`, `relative-position` (`UPSTREAM`), `feed`, `initial-soe-kwh` |
 | `pv` | `vendor-name`, `nominal-power-w`, `inverter-type` (`hybrid` \| `ac-coupled`) | `model`, `serial-number`, `firmware-version`/`software-version`, `relative-position` (`IN_PANEL`), `feed` |
 | `evse` | `vendor-name`, `model`, `part-number`, `serial-number`, `firmware-version` (or `software-version`), `max-current-a` | `feed` |
@@ -100,6 +100,10 @@ shed publishes `switch/relay-requester` as `LOAD_SHED`, like any other shed — 
 requester value — and at rest the circuit reports `NONE` like any other.
 This is a **separate commissioning input from the priority value**: `default-priority: NEVER`
 means "never shed" and stays fully settable, which is what real panels publish.
+
+A circuit carrying `commissioned-system: pv` or `commissioned-system: backup` is the circuit a SPAN panel adds for a commissioned PV or battery system. It locks both: the relay as above, and `load-shed/priority`, which must be `NEVER` (any other `default-priority` is rejected).
+
+The span variant publishes the way the panel's `firmware-version` says its SPAN firmware did. The release build is the first `/`-separated segment that is exactly `r` plus six digits, so `spanos2/r202633/02` is release 202633. Before release 202639 the BESS's `meter/active-power` is the panel's reading of the battery, equal to `power-flows/battery` (positive while charging), and each EVSE's `config/user-max-charge-current` is published at its `max-current-a` until a user sets one. From release 202639, or for a string naming no release such as the example's `example/v0.1.0`, the BESS meter is the battery's own frame (positive while discharging, the negative of `power-flows/battery`) and the user limit is unpublished until set. The reference variant always publishes the latter.
 
 ### 3. Panel definition file
 

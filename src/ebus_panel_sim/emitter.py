@@ -21,8 +21,9 @@ from typing import Any, Final, get_args
 from ebus_panel_sim.definition import PanelDefinition
 from ebus_panel_sim.energy_integrator import EnergyIntegrator
 from ebus_panel_sim.exceptions import EmitterStateError, ProfileValidationError
+from ebus_panel_sim.firmware import firmware_conventions
 from ebus_panel_sim.manifest import DeviceManifest
-from ebus_panel_sim.manifest_physics import ManifestPhysicsView
+from ebus_panel_sim.manifest_physics import EVSE_MIN_CHARGE_CURRENT_A, ManifestPhysicsView
 from ebus_panel_sim.native_devices import (
     BESSConfig,
     BESSDevice,
@@ -184,15 +185,18 @@ class Emitter:
         # is missing required physics keys. publish_tick is the only publish
         # path now, so a malformed manifest is a hard error at construction.
         self._physics = ManifestPhysicsView(manifest)
+        # The conventions that changed across SPAN releases, fixed once for the
+        # emitter's life by the variant and the panel's own firmware-version.
+        self._conventions = firmware_conventions(variant, self._physics.panel.release_build)
         self._relays = RelayResolver()
         self._energy = EnergyIntegrator()
         self._priority_overrides: dict[str, str] = {}
-        # The circuits commissioned never-backup, resolved once from the manifest
-        # the way `RelayResolver` registers the relay lock once. Their priority is
-        # not settable, so an override never enters the map above and the
-        # published value stays the commissioned `OFF_GRID`.
+        # The circuits whose priority is locked (never-backup or a
+        # commissioned-system circuit), resolved once from the manifest the way
+        # `RelayResolver` registers the relay lock once. An override never enters
+        # the map above, so the published value stays the commissioned one.
         self._priority_locked: frozenset[str] = frozenset(
-            cid for cid, cphys in self._physics.all_circuits().items() if cphys.never_backup
+            cid for cid, cphys in self._physics.all_circuits().items() if cphys.priority_locked
         )
         self._name_overrides: dict[str, str] = {}
         self._dominant_power_source_override: str | None = None
@@ -257,7 +261,12 @@ class Emitter:
         self._wire_set_callbacks(setter_registry, instances, settables_by_class)
 
         self._publisher = Publisher(self._graph)
-        self._bag_builder = BagBuilder(self._graph, self._mapping, self._profiles)
+        self._bag_builder = BagBuilder(
+            self._graph,
+            self._mapping,
+            self._profiles,
+            bess_meter_frame=self._conventions.bess_meter_frame,
+        )
         self._last_snapshot: EbusPanelSnapshot | None = None
         self._started = False
 
@@ -644,7 +653,17 @@ class Emitter:
             value: object,
         ) -> None:
             del entity_class, prop_path
-            self._evse_user_max_override[instance_id] = int(float(str(value)))
+            # An integer, clamped into [minimum, commissioned max]; anything
+            # else is refused and the value left unchanged.
+            try:
+                requested = value if isinstance(value, int) else int(str(value).strip())
+            except ValueError:
+                _LOG.warning("evse %s: refusing user-max-charge-current %r", instance_id, value)
+                return
+            ceiling = int(self._physics.evse(instance_id).max_current_a)
+            self._evse_user_max_override[instance_id] = max(
+                EVSE_MIN_CHARGE_CURRENT_A, min(requested, ceiling)
+            )
 
         if registry.get("circuit", "switch/relay") is None:
             registry.register("circuit", "switch/relay", on_circuit_relay)
@@ -905,6 +924,14 @@ class Emitter:
         for eid, ephys in self._physics.all_evse().items():
             power = tick.evse.get(eid, 0.0)
             charging = power > 100.0
+            # Unpublished until a user sets it, max-charge-current being the
+            # ceiling; SPAN firmware before release 202639 published the
+            # commissioned maximum until then (`ebus_panel_sim.firmware`).
+            user_max_unset = (
+                int(ephys.max_current_a)
+                if self._conventions.user_max_charge_current_preset
+                else None
+            )
             evse_snaps[eid] = EbusEvseSnapshot(
                 node_id=eid,
                 feed_circuit_id=ephys.feed,
@@ -912,9 +939,7 @@ class Emitter:
                 lock_state="LOCKED" if charging else "UNLOCKED",
                 advertised_current_a=ephys.max_current_a,
                 max_charge_current_a=int(ephys.max_current_a),
-                user_max_charge_current_a=self._evse_user_max_override.get(
-                    eid, int(ephys.max_current_a)
-                ),
+                user_max_charge_current_a=self._evse_user_max_override.get(eid, user_max_unset),
                 vendor_name=ephys.vendor_name,
                 model=ephys.model,
                 part_number=ephys.part_number,

@@ -23,7 +23,7 @@ the same instant.
 | | the device's own view | the enclosure's view (what this publishes) |
 |---|---|---|
 | PV | positive = generating | **negative** while generating into the enclosure |
-| BESS | positive = discharging | **positive** while charging, out of the enclosure |
+| BESS | positive = discharging | `power-flows/battery`: **positive** while charging, out of the enclosure. The hosted BESS's `meter/active-power` matches it only on a span-variant panel on firmware before release 202639; otherwise it is the battery's own frame |
 | grid | positive = supplying the home | **positive** while exporting, out of the enclosure |
 | circuit | positive = consuming | **negative** while consuming, out of the busbar |
 | `site` | — not a device at the interface | positive = consuming; no mirror to take |
@@ -39,9 +39,10 @@ describing the same battery with opposite signs at the same instant is correct.
 - **Never "reconcile" the two frames.** An enclosure exporting publishes `lugs-upstream/meter/active-power` negative and `power-flows/grid` positive
   simultaneously. Both are right; making them agree removes information.
 - **The snapshot is device-frame; the wire layer mirrors it.** `EbusCircuitSnapshot.instant_power_w` is positive while consuming and
-  `EbusBatterySnapshot.active_power_w` is positive while discharging. The negation lives in the `bag_builder` resolver
-  (`_circuit_wire_active_power`, `_bess_wire_active_power`), next to the docstring explaining it — never by redefining a snapshot field, which would silently
-  change every other reader.
+  `EbusBatterySnapshot.active_power_w` is positive while discharging. The negation lives in the `bag_builder` resolver (`_circuit_wire_active_power`; for
+  the hosted BESS's `meter/active-power`, `_bess_enclosure_frame_active_power`, used only by a span-variant panel on firmware before release 202639 —
+  `_bess_wire_active_power` publishes the battery's own frame on purpose; see DESIGN.md 'Firmware-keyed conventions'), next to the docstring explaining it —
+  never by redefining a snapshot field, which would silently change every other reader.
 - **The four `power-flows` values sum to zero.** They are four terms of one balance at one node, not four independent meters. Derive `power_flow_grid` from the
   lugs and the BESS, never by back-solving from the other three — a residual satisfies the balance by construction and detects nothing.
 - **`meter/imported-energy` and `meter/exported-energy` integrate their own `active-power`,** not some other signal that happens to be nearby. Only one of the

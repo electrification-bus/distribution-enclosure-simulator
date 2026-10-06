@@ -1,5 +1,5 @@
 # A fully commissioned 40-tab enclosure: circuits, upstream/downstream lugs, a
-# BESS with its MID, PV, and two SPAN Drive EVSEs. A panel definition file
+# BESS with its MID, two PV inverters, and two SPAN Drive EVSEs. A panel definition file
 # (load_definition); forty_tab_minimal.ticks.yaml drives it.
 schema: panel-sim-definition/1
 variant: span
@@ -84,7 +84,7 @@ devices:
     pcs-priority: '5'
 - class: circuit
   id: solar-inverter
-  name: Solar Inverter
+  name: Commissioned PV System
   metadata:
     tab-numbers: 36,38
     breaker-rating-a: '30.0'
@@ -92,6 +92,20 @@ devices:
     relay-behavior: non-controllable
     placement: downstream-of-lugs
     pcs-priority: '6'
+    # The circuit a SPAN panel adds for an in-panel PV inverter: relay and
+    # priority both locked, priority fixed at NEVER.
+    commissioned-system: pv
+- class: circuit
+  id: solar-inverter-garage
+  name: Commissioned PV System
+  metadata:
+    tab-numbers: 31,33
+    breaker-rating-a: '20.0'
+    default-priority: NEVER
+    relay-behavior: non-controllable
+    placement: downstream-of-lugs
+    pcs-priority: '7'
+    commissioned-system: pv
 - class: bess
   id: bess
   name: Battery
@@ -101,8 +115,11 @@ devices:
     relative-position: UPSTREAM
     model: Example BESS
     initial-soe-kwh: '6.75'
+# One pv device per inverter, IDed as a SPAN panel does: <panel>-<serial or
+# model>, plus a per-inverter discriminator when there are two or more (here
+# the feeding circuit's ID).
 - class: pv
-  id: pv
+  id: example-40t-001-iq8plus-72-2-us-solar-inverter
   name: Solar
   metadata:
     vendor-name: Enphase
@@ -111,6 +128,16 @@ devices:
     inverter-type: ac-coupled
     relative-position: IN_PANEL
     feed: solar-inverter
+- class: pv
+  id: example-40t-001-se3800h-us-solar-inverter-garage
+  name: Solar 2
+  metadata:
+    vendor-name: SolarEdge
+    model: SE3800H-US
+    nominal-power-w: '3800.0'
+    inverter-type: ac-coupled
+    relative-position: IN_PANEL
+    feed: solar-inverter-garage
 - class: evse
   id: evse
   name: SPAN Drive - Garage

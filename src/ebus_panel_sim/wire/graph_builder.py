@@ -27,7 +27,11 @@ import ebus_sdk
 
 from ebus_panel_sim.exceptions import ManifestValidationError, ProfileValidationError
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
-from ebus_panel_sim.manifest_physics import never_backup, relay_locked
+from ebus_panel_sim.manifest_physics import (
+    EVSE_MIN_CHARGE_CURRENT_A,
+    priority_locked,
+    relay_locked,
+)
 from ebus_panel_sim.wire._sdk_seam import MqttDeviceTransport, make_property
 from ebus_panel_sim.wire.mapping_loader import MappingDescriptor, MappingTable
 from ebus_panel_sim.wire.profile_loader import Profile, ProfileTable
@@ -136,6 +140,7 @@ def build_graph(
         entity_class=root_class,
         parent_for_path=None,
         node_id_template=None,
+        omit=frozenset() if manifest.of_class("bess") else _BESS_ONLY_CAPABILITIES,
     )
 
     # Topologically order non-root descriptors so a descriptor whose
@@ -282,8 +287,10 @@ def _attach_profile(
     entity_class: str,
     parent_for_path: DeviceInstance | None,
     node_id_template: str | None,
+    omit: frozenset[str] = frozenset(),
 ) -> None:
-    """Attach the profile's capabilities + properties to the given device.
+    """Attach the profile's capabilities + properties to the given device,
+    skipping the capabilities named in ``omit``.
 
     For its own device (parent_for_path is None) capability nodes use plain
     capability names. For node-on-parent entities, capability nodes are
@@ -292,9 +299,10 @@ def _attach_profile(
     ``state_transition()`` so the SDK coalesces the description republish into a
     single init->ready cycle instead of flapping per property.
     """
-    single_capability = len(profile.capabilities) == 1
+    capabilities = {name: cap for name, cap in profile.capabilities.items() if name not in omit}
+    single_capability = len(capabilities) == 1
     with device.state_transition():
-        for cap_name, cap in profile.capabilities.items():
+        for cap_name, cap in capabilities.items():
             if parent_for_path is None:
                 node_id = cap_name
             else:
@@ -316,12 +324,17 @@ def _attach_profile(
                         prop.datatype, where=f"{entity_class} {cap_name}/{prop_key}"
                     ),
                     unit=_to_sdk_unit(prop.unit),
-                    format_str=prop.format,
+                    format_str=_format_for(prop.format, instance, cap_name, prop_key),
                     settable=_settable_for(prop.settable, instance, cap_name, prop_key),
                 )
                 graph.properties[
                     (entity_class, instance.instance_id, f"{cap_name}/{prop_key}")
                 ] = sdk_prop
+
+
+# Enclosure capabilities published only when at least one BESS is commissioned
+# (``devices/distribution-enclosure.md`` §"shed" and §"shed-forecast").
+_BESS_ONLY_CAPABILITIES = frozenset({"shed", "shed-forecast"})
 
 
 # The properties whose settability is commissioned per circuit rather than
@@ -332,7 +345,8 @@ def _attach_profile(
 # (``capabilities/switch.md``); ``load-shed/priority`` is published with
 # ``$settable = !never-backup`` (the eBus schema migration guide), which is a
 # lock on the *property*, unrelated to the priority's own value -- ``NEVER`` is
-# an ordinary settable value meaning "never shed".
+# an ordinary settable value meaning "never shed". A commissioned-system circuit
+# locks both.
 #
 # The two warrants differ in strength. ``capabilities/switch.md`` ties
 # ``relay``'s settability to ``relay-controllable`` per circuit. The public
@@ -343,7 +357,7 @@ def _attach_profile(
 # entry rests on the guide, not on ``capabilities/load-shed.md``.
 _INSTANCE_LOCKS: dict[tuple[str, str], Callable[[dict[str, str]], bool]] = {
     ("switch", "relay"): relay_locked,
-    ("load-shed", "priority"): never_backup,
+    ("load-shed", "priority"): priority_locked,
 }
 
 
@@ -365,6 +379,22 @@ def _settable_for(
     if not declared or locked_by is None:
         return declared
     return not locked_by(instance.metadata)
+
+
+# The properties whose ``$format`` depends on the instance: an EVSE's user
+# charge-current ceiling ranges up to that EVSE's commissioned maximum.
+_INSTANCE_FORMATS: dict[tuple[str, str], Callable[[dict[str, str]], str]] = {
+    ("config", "user-max-charge-current"): lambda md: (
+        f"{EVSE_MIN_CHARGE_CURRENT_A}:{int(float(md['max-current-a']))}"
+    ),
+}
+
+
+def _format_for(
+    declared: str | None, instance: DeviceInstance, cap_name: str, prop_key: str
+) -> str | None:
+    derive = _INSTANCE_FORMATS.get((cap_name, prop_key))
+    return declared if derive is None else derive(instance.metadata)
 
 
 def _render_node_id(template: str, instance: DeviceInstance) -> str:

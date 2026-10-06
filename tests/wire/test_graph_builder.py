@@ -4,19 +4,20 @@ from ebus_panel_sim.wire.mapping_loader import load_mapping_table
 from ebus_panel_sim.wire.profile_loader import load_profiles
 
 
-def _manifest_panel_with_one_circuit() -> DeviceManifest:
-    return DeviceManifest(
-        instances=(
-            DeviceInstance(entity_class="panel", instance_id="p1", display_name="Span"),
-            DeviceInstance(entity_class="circuit", instance_id="c1", display_name="Kitchen"),
-        )
-    )
+def _manifest_panel_with_one_circuit(*, bess: bool = False) -> DeviceManifest:
+    instances = [
+        DeviceInstance(entity_class="panel", instance_id="p1", display_name="Span"),
+        DeviceInstance(entity_class="circuit", instance_id="c1", display_name="Kitchen"),
+    ]
+    if bess:
+        instances.append(DeviceInstance(entity_class="bess", instance_id="b1", display_name="Bat"))
+    return DeviceManifest(instances=tuple(instances))
 
 
-def _build() -> BuiltGraph:
+def _build(*, bess: bool = False) -> BuiltGraph:
     profiles = load_profiles()
     mapping = load_mapping_table()
-    return build_graph(_manifest_panel_with_one_circuit(), mapping, profiles, mqtt_cfg={})
+    return build_graph(_manifest_panel_with_one_circuit(bess=bess), mapping, profiles, mqtt_cfg={})
 
 
 def test_build_graph_for_panel_and_one_circuit() -> None:
@@ -46,5 +47,14 @@ def test_build_graph_is_deterministic() -> None:
 
 
 def test_build_graph_includes_panel_settable_property() -> None:
-    g = _build()
+    g = _build(bess=True)
     assert ("panel", "p1", "shed/asserted-islanding-state") in g.properties
+
+
+def test_shed_and_shed_forecast_are_published_only_with_a_bess() -> None:
+    """``devices/distribution-enclosure.md``: both are published only when at
+    least one BESS is commissioned."""
+    for node in ("shed", "shed-forecast"):
+        assert node in _build(bess=True).devices["p1"].description()["nodes"]
+        assert node not in _build().devices["p1"].description()["nodes"]
+    assert not any(path.startswith("shed") for _ec, _id, path in _build().properties)
