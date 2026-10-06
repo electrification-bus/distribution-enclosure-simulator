@@ -21,6 +21,17 @@ Placement is declarative. Each `wire/mapping/*.yaml` descriptor says whether its
 
 That description assumes the emitter owns the connection. With an injected transport (`Emitter(mqttc=...)`) the same teardown still moves the root to `$state=lost` and publishes it, but three things move to the caller, because the emitter never starts or stops a client it did not build. The LWT is registered by the caller before they connect (`Emitter.lwt_settings(manifest)` answers it without an instance, since the will rides the CONNECT packet); the on-(re)connect whole-tree republish is wired by the caller (`Emitter.republish_tree`), the SDK registering its own only inside `connect_broker()`, below the `if self.mqttc` early return an injected client always takes; and the ungraceful `lost` is *queued* on the caller's loop rather than flushed, since flushing would block the thread running `loop_write`, so the caller must let the loop turn before closing the client. Absent the first, the tree has no will and an unclean death leaves consumers on a stale retained `ready`; absent the second, a broker that loses its retained store never gets the tree back.
 
+### Firmware-keyed conventions
+
+SPAN changed two conventions in release 202639, and the span variant publishes whichever side the panel's own `firmware-version` names, so one emitter can stand in for a panel on either. `ebus_panel_sim.firmware.release_build` reads the release out of the string: the first `/`-separated segment that is exactly `r` plus six digits (`spanos2/r202633/02` is 202633); anything else, such as the examples' `example/v0.1.0`, names none. `PanelPhysics.release_build` exposes it, and the emitter turns it and the variant into a `FirmwareConventions` once, at construction:
+
+| | span variant, release before 202639 | release 202639 or later, no release, or the reference variant |
+|---|---|---|
+| BESS `meter/active-power` | the panel's frame, equal to `power-flows/battery` (positive while charging) | the battery's own frame, as `devices/bess.md` defines it (positive while discharging) |
+| EVSE `config/user-max-charge-current` | `max-current-a` until a user sets it | unpublished until a user sets it |
+
+The snapshot is device-frame either way: `EbusBatterySnapshot.active_power_w` is positive while discharging, and only `bag_builder`'s resolver for the BESS meter changes. A `/set` on the user limit is clamped the same way on both sides, and `$format` stays `6:<max-current-a>`. Only the span variant is firmware-keyed; the reference variant always publishes the specification's frame. A consumer is tested across the change by restarting the emitter on a definition reporting the other firmware.
+
 ## Native devices
 
 Two device classes are not pure publishers: their behaviour runs inside the emitter.
@@ -50,7 +61,7 @@ When the grid is offline the policy returns the circuit instance-ids whose prior
 | circuit | `switch/relay` | Updates the `RelayResolver` user override |
 | circuit | `load-shed/priority` | Updates the emitter's per-circuit priority override (refused on a never-backup or commissioned-system circuit) |
 | panel | `shed/asserted-islanding-state` | Updates the consumer-asserted islanding override, accepted only while a battery link is not `OK` (see below) |
-| evse | `config/user-max-charge-current` | Sets the per-EVSE user charge-current ceiling, which is unpublished until first set; an integer, clamped into `[6, max-charge-current]` (the advertised `$format`), anything else refused |
+| evse | `config/user-max-charge-current` | Sets the per-EVSE user charge-current ceiling, which is unpublished until first set (published at `max-current-a` from the start under firmware before release 202639; see [Firmware-keyed conventions](#firmware-keyed-conventions)); an integer, clamped into `[6, max-charge-current]` (the advertised `$format`), anything else refused |
 
 ### Relay state precedence
 

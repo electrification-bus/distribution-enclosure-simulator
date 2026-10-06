@@ -103,6 +103,8 @@ means "never shed" and stays fully settable, which is what real panels publish.
 
 A circuit carrying `commissioned-system: pv` or `commissioned-system: backup` is the circuit a SPAN panel adds for a commissioned PV or battery system. It locks both: the relay as above, and `load-shed/priority`, which must be `NEVER` (any other `default-priority` is rejected).
 
+The span variant publishes the way the panel's `firmware-version` says its SPAN firmware did. The release build is the first `/`-separated segment that is exactly `r` plus six digits, so `spanos2/r202633/02` is release 202633. Before release 202639 the BESS's `meter/active-power` is the panel's reading of the battery, equal to `power-flows/battery` (positive while charging), and each EVSE's `config/user-max-charge-current` is published at its `max-current-a` until a user sets one. From release 202639, or for a string naming no release such as the example's `example/v0.1.0`, the BESS meter is the battery's own frame (positive while discharging, the negative of `power-flows/battery`) and the user limit is unpublished until set. The reference variant always publishes the latter.
+
 ### 3. Panel definition file
 
 A `PanelDefinition` holds everything that fixes a panel's makeup: the `DeviceManifest`, the variant, the native `BESSConfig`s and an optional `LoadSheddingConfig`. `dump_definition` and `load_definition` write and read it as YAML, and `Emitter.from_definition` builds an emitter from one:

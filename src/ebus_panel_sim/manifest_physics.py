@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Literal
 
 from ebus_panel_sim.conventions.tab_legs import Leg, legs_for_tabs
 from ebus_panel_sim.exceptions import ManifestValidationError
+from ebus_panel_sim.firmware import release_build
 
 if TYPE_CHECKING:
     from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
@@ -46,6 +47,13 @@ class PanelPhysics:
     # ``parent-child`` = post-migration shape where children become separate
     # Homie devices. Producer-overridable via metadata key ``schema-topology``.
     topology: Literal["flat", "parent-child"] = "flat"
+
+    @property
+    def release_build(self) -> int | None:
+        """The SPAN release build ``firmware_version`` names (``spanos2/r202633/02``
+        is ``202633``), or None when it names none. See
+        :func:`ebus_panel_sim.firmware.release_build`."""
+        return release_build(self.firmware_version)
 
 
 @dataclass(frozen=True, slots=True)

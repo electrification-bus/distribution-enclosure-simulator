@@ -21,6 +21,7 @@ from typing import Any, Final, get_args
 from ebus_panel_sim.definition import PanelDefinition
 from ebus_panel_sim.energy_integrator import EnergyIntegrator
 from ebus_panel_sim.exceptions import EmitterStateError, ProfileValidationError
+from ebus_panel_sim.firmware import firmware_conventions
 from ebus_panel_sim.manifest import DeviceManifest
 from ebus_panel_sim.manifest_physics import EVSE_MIN_CHARGE_CURRENT_A, ManifestPhysicsView
 from ebus_panel_sim.native_devices import (
@@ -184,6 +185,9 @@ class Emitter:
         # is missing required physics keys. publish_tick is the only publish
         # path now, so a malformed manifest is a hard error at construction.
         self._physics = ManifestPhysicsView(manifest)
+        # The conventions that changed across SPAN releases, fixed once for the
+        # emitter's life by the variant and the panel's own firmware-version.
+        self._conventions = firmware_conventions(variant, self._physics.panel.release_build)
         self._relays = RelayResolver()
         self._energy = EnergyIntegrator()
         self._priority_overrides: dict[str, str] = {}
@@ -257,7 +261,12 @@ class Emitter:
         self._wire_set_callbacks(setter_registry, instances, settables_by_class)
 
         self._publisher = Publisher(self._graph)
-        self._bag_builder = BagBuilder(self._graph, self._mapping, self._profiles)
+        self._bag_builder = BagBuilder(
+            self._graph,
+            self._mapping,
+            self._profiles,
+            bess_meter_frame=self._conventions.bess_meter_frame,
+        )
         self._last_snapshot: EbusPanelSnapshot | None = None
         self._started = False
 
@@ -915,6 +924,14 @@ class Emitter:
         for eid, ephys in self._physics.all_evse().items():
             power = tick.evse.get(eid, 0.0)
             charging = power > 100.0
+            # Unpublished until a user sets it, max-charge-current being the
+            # ceiling; SPAN firmware before release 202639 published the
+            # commissioned maximum until then (`ebus_panel_sim.firmware`).
+            user_max_unset = (
+                int(ephys.max_current_a)
+                if self._conventions.user_max_charge_current_preset
+                else None
+            )
             evse_snaps[eid] = EbusEvseSnapshot(
                 node_id=eid,
                 feed_circuit_id=ephys.feed,
@@ -922,8 +939,7 @@ class Emitter:
                 lock_state="LOCKED" if charging else "UNLOCKED",
                 advertised_current_a=ephys.max_current_a,
                 max_charge_current_a=int(ephys.max_current_a),
-                # Unpublished until a user sets it; max-charge-current is the ceiling.
-                user_max_charge_current_a=self._evse_user_max_override.get(eid),
+                user_max_charge_current_a=self._evse_user_max_override.get(eid, user_max_unset),
                 vendor_name=ephys.vendor_name,
                 model=ephys.model,
                 part_number=ephys.part_number,
