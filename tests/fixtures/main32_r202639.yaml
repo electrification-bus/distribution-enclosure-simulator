@@ -1,0 +1,279 @@
+schema: panel-sim-definition/1
+variant: span
+devices:
+- class: panel
+  id: masked-panel
+  name: SPAN Panel eBus Adapter
+  metadata:
+    vendor-name: SPAN
+    serial-number: MASKED-PANEL
+    firmware-version: spanos3/r202639/03
+    hardware-version: '1.2'
+    panel-model: MAIN_32
+    panel-size: '32'
+    main-breaker-rating-a: '200'
+    postal-code: '00000'
+    time-zone: America/Los_Angeles
+    line-voltage-v: '121.9'
+    service-voltage-v: '243.8'
+    islandable: 'true'
+- class: lugs
+  id: lugs-upstream
+  name: Upstream lugs
+  metadata:
+    direction: upstream
+- class: lugs
+  id: lugs-downstream
+  name: Downstream lugs
+  metadata:
+    direction: downstream
+- class: bess
+  id: bess-1
+  name: bess-1
+  metadata:
+    vendor-name: Tesla
+    model: Powerwall 2 AC
+    part-number: 1232100-00-E
+    firmware-version: 26.26.4 68c2bc82
+    serial-number: MASKED-BESS-1
+    nameplate-capacity-kwh: '81'
+    relative-position: UPSTREAM
+    initial-soe-kwh: '81.0'
+- class: pv
+  id: pv-1
+  name: pv-1
+  metadata:
+    vendor-name: Enphase Energy
+    model: IQ7PLUS-72-x-US-&
+    nominal-power-w: '4640'
+    inverter-type: ac-coupled
+    relative-position: IN_PANEL
+    feed: circuit-16
+- class: circuit
+  id: circuit-9
+  name: Ovens
+  metadata:
+    tab-numbers: 14,16
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    pcs-priority: '12'
+    initial-consumed-wh: '1084195.6'
+    initial-produced-wh: '32973.4'
+- class: circuit
+  id: circuit-2
+  name: Clothes-Dryer
+  metadata:
+    tab-numbers: 2,4
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    pcs-priority: '6'
+    initial-consumed-wh: '855286.7'
+    initial-produced-wh: '3382.6'
+- class: circuit
+  id: circuit-8
+  name: HVAC-Air-Handler
+  metadata:
+    tab-numbers: 13,15
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    pcs-priority: '2'
+    initial-consumed-wh: '1139556.4'
+    initial-produced-wh: '2052.6'
+- class: circuit
+  id: circuit-12
+  name: Future-240VAC-1
+  metadata:
+    tab-numbers: 21,23
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    pcs-priority: '15'
+    initial-consumed-wh: '175306.0'
+    initial-produced-wh: '51850.9'
+- class: circuit
+  id: circuit-7
+  name: HVAC-Heat-Pump
+  metadata:
+    tab-numbers: 10,12
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    pcs-priority: '8'
+    initial-consumed-wh: '1362032.1'
+    initial-produced-wh: '10343.3'
+- class: circuit
+  id: circuit-13
+  name: Espresso-Machine
+  metadata:
+    tab-numbers: 22,24
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'true'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    pcs-priority: '3'
+    initial-consumed-wh: '1555166.1'
+    initial-produced-wh: '2068.8'
+- class: circuit
+  id: circuit-15
+  name: Shed-240VAC-Outlet
+  metadata:
+    tab-numbers: 26,28
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    pcs-priority: '9'
+    initial-consumed-wh: '18920.0'
+    initial-produced-wh: '4080.8'
+- class: circuit
+  id: circuit-14
+  name: Future-240VAC-2
+  metadata:
+    tab-numbers: 25,27
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    pcs-priority: '7'
+    initial-consumed-wh: '35474.6'
+    initial-produced-wh: '45345.5'
+- class: circuit
+  id: circuit-6
+  name: Water-Heater
+  metadata:
+    tab-numbers: 9,11
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: NEVER
+    relay-behavior: controllable
+    pcs-priority: '5'
+    initial-consumed-wh: '717909.1'
+    initial-produced-wh: '38743.0'
+- class: circuit
+  id: circuit-5
+  name: Wine Refrigerator
+  metadata:
+    tab-numbers: '7'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    pcs-priority: '13'
+    initial-consumed-wh: '4176976.8'
+    initial-produced-wh: '4928.9'
+- class: circuit
+  id: circuit-4
+  name: HVAC-Heating-Coil
+  metadata:
+    tab-numbers: 6,8
+    placement: upstream-of-lugs
+    breaker-rating-a: '45'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    pcs-priority: '4'
+    initial-consumed-wh: '28533.0'
+    initial-produced-wh: '25667.0'
+- class: circuit
+  id: circuit-1
+  name: Kitchen-Outlets-1 & Outlets-2
+  metadata:
+    tab-numbers: 1,3
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'true'
+    default-priority: NEVER
+    relay-behavior: controllable
+    pcs-priority: '10'
+    initial-consumed-wh: '129126.7'
+    initial-produced-wh: '11355.6'
+- class: circuit
+  id: circuit-10
+  name: Studio-HVAC
+  metadata:
+    tab-numbers: 17,19
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    pcs-priority: '1'
+    initial-consumed-wh: '872104.9'
+    initial-produced-wh: '1431.4'
+- class: circuit
+  id: circuit-16
+  name: Commissioned PV System
+  metadata:
+    tab-numbers: 29,31
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'true'
+    default-priority: NEVER
+    relay-behavior: non-controllable
+    commissioned-system: pv
+    initial-consumed-wh: '45779.2'
+    initial-produced-wh: '17468878.0'
+- class: circuit
+  id: circuit-3
+  name: Attic-Back-Outlet
+  metadata:
+    tab-numbers: '5'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    pcs-priority: '14'
+    initial-consumed-wh: '686928.8'
+    initial-produced-wh: '33914.3'
+- class: circuit
+  id: circuit-11
+  name: Cooktop/Stove
+  metadata:
+    tab-numbers: 18,20
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'true'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    pcs-priority: '11'
+    initial-consumed-wh: '411437.7'
+    initial-produced-wh: '7127.1'
+- class: mid
+  id: mid-1
+  name: mid-1
+  metadata:
+    vendor-name: Tesla
+    serial-number: MASKED-MID-1
+bess:
+- instance_id: bess-1
+  nameplate_capacity_kwh: 81.0
+  max_charge_w: 5000.0
+  max_discharge_w: 5000.0
+  charge_efficiency: 0.95
+  discharge_efficiency: 0.95
+  backup_reserve_pct: 20.0
+  charge_mode: self-consumption
+  charge_hours: []
+  discharge_hours: []
+  initial_soc_pct: 100.0
+load_shedding:
+  soc_threshold_pct: 49.0
