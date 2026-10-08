@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- spanos3/r202639/03 batch 2: reference captures and the variant that reproduces them.
+
 ## [0.9.0] - 2026-10-06
 
 **BREAKING (wire).** The BESS child's `meter/active-power` changes sign, unless the span variant's panel reports SPAN firmware before release 202639. A panel with no commissioned BESS no longer publishes `shed` or `shed-forecast`.
