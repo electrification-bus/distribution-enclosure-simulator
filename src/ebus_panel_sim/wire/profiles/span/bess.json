@@ -1,0 +1,33 @@
+{
+  "$version": 1,
+  "type": "energy.ebus.device.bess",
+  "capabilities": {
+    "info": {
+      "type": "energy.ebus.capability.info",
+      "properties": {
+        "nameplate-capacity": {
+          "literal": "shortest"
+        }
+      }
+    },
+    "soc": {
+      "type": "energy.ebus.capability.soc",
+      "properties": {
+        "soc": {
+          "literal": "1dp"
+        },
+        "soe": {
+          "literal": "1dp"
+        }
+      }
+    },
+    "meter": {
+      "type": "energy.ebus.capability.meter",
+      "properties": {
+        "active-power": {
+          "literal": "1dp"
+        }
+      }
+    }
+  }
+}

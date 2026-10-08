@@ -42,10 +42,17 @@ _TICK = TickInputs(
 )
 
 
+# The example's battery charge in tenths of a kWh, as the panel writes it (the
+# example's 6.75 would come back as 6.8), so the charge a capture reads back is
+# the one the source started from.
+_BESS_CHARGE = {"initial-soe-kwh": "6.8"}
+
+
 def _source() -> PanelDefinition:
     """The shipped example, with what a tree cannot carry set to capture's defaults:
     branch circuits in the panel, and default BESS dispatch. Load shedding uses the
-    threshold the emitter's default shed policy publishes, which capture reads back."""
+    threshold the emitter's default shed policy publishes, which capture reads back.
+    The battery starts at ``_BESS_CHARGE``."""
     example = load_definition(_EXAMPLES / "forty_tab_minimal.yaml")
     instances = tuple(
         DeviceInstance(
@@ -54,6 +61,8 @@ def _source() -> PanelDefinition:
             i.display_name,
             {**i.metadata, "placement": "upstream-of-lugs"}
             if i.entity_class == "circuit"
+            else {**i.metadata, **_BESS_CHARGE}
+            if i.entity_class == "bess"
             else i.metadata,
         )
         for i in example.manifest.instances
@@ -553,7 +562,8 @@ def test_capture_live_refuses_a_username_without_a_password() -> None:
 
 def _variant_source() -> PanelDefinition:
     """The span-alpha-test-b2 example with its circuits in the panel (placement is not
-    published, and capture places circuits upstream-of-lugs)."""
+    published, and capture places circuits upstream-of-lugs), and its battery
+    starting at ``_BESS_CHARGE``."""
     example = load_definition(_EXAMPLES / "span_alpha_test_b2_minimal.yaml")
     return dataclasses.replace(
         example,
@@ -565,6 +575,8 @@ def _variant_source() -> PanelDefinition:
                     i.display_name,
                     {**i.metadata, "placement": "upstream-of-lugs"}
                     if i.entity_class == "circuit"
+                    else {**i.metadata, **_BESS_CHARGE}
+                    if i.entity_class == "bess"
                     else i.metadata,
                 )
                 for i in example.manifest.instances

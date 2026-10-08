@@ -107,6 +107,9 @@ def test_before_202639_the_bess_meter_equals_power_flows_battery(rec: PahoRecord
     # Pinned absolutely too: the panel's frame is negative while discharging, and
     # the snapshot keeps the battery's own frame.
     assert wire == pytest.approx(-device_frame)
+    # Written as power-flows/battery is, an integer, whatever the reading.
+    assert rec.retained[_BESS_METER] == rec.retained[_POWER_FLOWS_BATTERY]
+    assert "." not in rec.retained[_BESS_METER]
 
 
 @pytest.mark.parametrize("firmware", [_CURRENT, _UNVERSIONED])
@@ -366,6 +369,8 @@ def test_the_bess_frame_overrides_its_resolver_beside_the_wire_values(
 
     device_frame = snapshot.battery["bess"].active_power_w
     assert device_frame != 0.0
-    assert bag.get(("bess", "bess", "meter/active-power")) == pytest.approx(sign * device_frame)
+    # The bag holds the reading as written, at one decimal.
+    wire = float(str(bag.get(("bess", "bess", "meter/active-power"))))
+    assert wire == pytest.approx(sign * device_frame, abs=0.05)
     assert bag.get(("panel", "example-b2-001", "info/name")) == "Example Home"
     assert bag.get(("circuit", "circuit-4", "connection/feeds-role")) == "SOLAR"

@@ -18,10 +18,15 @@ Two-purpose design:
    loud build failure rather than a silent missing topic.
 
 Property values that resolve to ``None`` are skipped (Homie 5 allows missing
-properties — the property's retained topic just isn't updated this tick)."""
+properties — the property's retained topic just isn't updated this tick).
+
+A number whose profile property carries a ``literal`` form goes into the bag
+already written in it (``ebus_panel_sim.wire.literal``), so the diff and the
+wire see the panel's text, not the physics model's full-precision float."""
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -32,6 +37,7 @@ from ebus_panel_sim.firmware import BessMeterFrame
 from ebus_panel_sim.manifest_physics import WIRE_VALUE_PATHS
 from ebus_panel_sim.snapshot import EbusPanelSnapshot
 from ebus_panel_sim.wire.graph_builder import BuiltGraph
+from ebus_panel_sim.wire.literal import LiteralForm, format_literal
 from ebus_panel_sim.wire.mapping_loader import MappingTable
 from ebus_panel_sim.wire.profile_loader import ProfileTable
 from ebus_panel_sim.wire.property_bag import PropertyBag
@@ -210,7 +216,8 @@ def _bess_wire_active_power(snapshot: EbusPanelSnapshot, instance_id: str) -> ob
     discharging, as ``devices/bess.md`` defines it. That makes it the negative
     of the panel's ``power-flows/battery`` (positive = toward the battery), and
     ``test_bess_meter_active_power_is_the_negative_of_power_flows_battery``
-    pins the pair. ``-0.0`` is normalized so an idle battery publishes ``0``.
+    pins the pair. ``-0.0`` is normalized so an idle battery never publishes a
+    negative zero.
 
     The default: the span-alpha-test-b2 and reference variants always publish it,
     and the span variant does unless its panel reports a SPAN release before 202639 (see
@@ -438,6 +445,7 @@ class _BoundProperty:
     instance_id: str
     property_path: str
     resolver: Resolver
+    literal: LiteralForm | None
 
 
 class BagBuilder:
@@ -464,7 +472,9 @@ class BagBuilder:
         ``meter/active-power`` in, fixed for the emitter's life by the panel's
         firmware (``ebus_panel_sim.firmware``). It overrides that one entry in
         this instance's copy of the resolver table; the coverage check and the
-        binding below read only that copy, never ``_RESOLVERS`` itself."""
+        binding below read only that copy, never ``_RESOLVERS`` itself. In the
+        enclosure frame it is also written in ``power-flows/battery``'s literal
+        form, as that firmware did."""
         del mapping  # accepted for API symmetry; not consulted today.
         constants = wire_values or {}
         self._bound: list[_BoundProperty] = []
@@ -492,6 +502,21 @@ class BagBuilder:
                 f"out of sync.",
             )
 
+        # Each property's literal form, from its profile declaration.
+        literals = {
+            (entity_class, f"{cap_name}/{prop_key}"): prop.literal
+            for entity_class, profile in profiles.items()
+            for cap_name, cap in profile.capabilities.items()
+            for prop_key, prop in cap.properties.items()
+        }
+        if bess_meter_frame == "enclosure":
+            # The panel's own reading of the battery, equal to power-flows/battery,
+            # and written as that is. The public r202633 capture's only sample is an
+            # idle battery's integer 0.
+            literals[("bess", "meter/active-power")] = literals.get(
+                ("panel", "power-flows/battery")
+            )
+
         # Second pass: bind resolvers to the (entity_class, instance_id,
         # property_path) keys actually present in the graph. The graph already
         # encodes which instances exist for each entity_class.
@@ -508,6 +533,7 @@ class BagBuilder:
                     instance_id=instance_id,
                     property_path=property_path,
                     resolver=resolver,
+                    literal=literals[(entity_class, property_path)],
                 ),
             )
 
@@ -520,5 +546,12 @@ class BagBuilder:
             value = bound.resolver(snapshot, bound.instance_id)
             if value is None:
                 continue
+            if (
+                bound.literal is not None
+                and isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(value)
+            ):
+                value = format_literal(value, bound.literal)
             bag.set(bound.entity_class, bound.instance_id, bound.property_path, value)
         return bag

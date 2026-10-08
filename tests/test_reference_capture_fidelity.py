@@ -37,11 +37,11 @@ _HANDLES = sorted(
 # The differences each capture still shows, exactly; a capture absent here must
 # show none.
 _RESIDUAL: dict[str, int] = {
-    "r202639-a": 30,
-    "r202639-b": 77,
-    "r202639-c": 42,
-    "r202639-d": 58,
-    "r202639-e": 168,
+    "r202639-a": 20,
+    "r202639-b": 20,
+    "r202639-c": 21,
+    "r202639-d": 32,
+    "r202639-e": 20,
 }
 _NOT_COMPARED = frozenset({"connection/count"})
 _ATTRIBUTES = ("datatype", "settable", "unit", "format", "name")
