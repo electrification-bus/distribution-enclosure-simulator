@@ -10,7 +10,7 @@
           "datatype": "string"
         },
         "spaces": {
-          "name": "Circuit breaker space number(s) within the load center (comma-separated for multi-pole)",
+          "name": "Physical panel position(s) the circuit occupies",
           "datatype": "string"
         }
       }

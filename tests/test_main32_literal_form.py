@@ -110,3 +110,12 @@ def test_no_number_is_negative_zero_or_an_exponent(published: Tree) -> None:
         for value in values.values():
             assert _NUMBER.match(value), value
             assert not (value.startswith("-") and float(value) == 0), value
+
+
+def test_every_circuit_names_info_spaces_as_the_panel_does(published: Tree) -> None:
+    circuits = [d for d in published.values() if d.type == "circuit"]
+    assert len(circuits) == 16
+    for circuit in circuits:
+        declaration = circuit.declaration("info/spaces")
+        assert declaration is not None
+        assert declaration["name"] == "Physical panel position(s) the circuit occupies"
