@@ -52,6 +52,26 @@
           "name": "Line frequency"
         }
       }
+    },
+    "pcs": {
+      "properties": {
+        "off-grid-import-limit": {
+          "literal": "1dp"
+        }
+      }
+    },
+    "power-flows": {
+      "properties": {
+        "pv": {
+          "literal": "1dp"
+        },
+        "battery": {
+          "literal": "1dp"
+        },
+        "grid": {
+          "literal": "1dp"
+        }
+      }
     }
   }
 }

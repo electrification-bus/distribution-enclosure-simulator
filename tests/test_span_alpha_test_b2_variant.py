@@ -21,6 +21,7 @@ from ebus_panel_sim import (
     TickInputs,
     Variant,
 )
+from ebus_panel_sim.wire.literal import LiteralForm
 from ebus_panel_sim.wire.profile_loader import load_profiles
 
 from .conftest import PahoRecorder
@@ -66,6 +67,26 @@ def test_the_variant_redeclares_the_span_properties_it_changes() -> None:
     assert profiles["evse"].capabilities["switch"].properties["lock-state"].settable is True
     assert "meter" not in profiles["evse"].capabilities
     assert "meter" in load_profiles(variant="span")["evse"].capabilities
+
+
+def test_the_variant_writes_power_flows_and_the_meter_only_circuit_with_one_decimal() -> None:
+    """As every reference capture shows, where it values them: power-flows pv,
+    battery and grid, the off-grid import limit, and the meter-only circuit's
+    readings."""
+    one = LiteralForm("fixed", 1)
+    profiles = load_profiles(variant="span-alpha-test-b2")
+    for cap, key in (
+        ("power-flows", "pv"),
+        ("power-flows", "battery"),
+        ("power-flows", "grid"),
+        ("pcs", "off-grid-import-limit"),
+    ):
+        assert profiles["panel"].capabilities[cap].properties[key].literal == one, key
+    for key, prop in profiles["remote-ct"].capabilities["meter"].properties.items():
+        if prop.datatype == "float":
+            assert prop.literal == one, key
+    span = load_profiles(variant="span")["panel"].capabilities["power-flows"].properties
+    assert span["grid"].literal == LiteralForm("integer")
 
 
 def _variant_manifest() -> DeviceManifest:

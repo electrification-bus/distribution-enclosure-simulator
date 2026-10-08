@@ -1,0 +1,20 @@
+{
+  "capabilities": {
+    "meter": {
+      "properties": {
+        "current": {
+          "literal": "1dp"
+        },
+        "active-power": {
+          "literal": "1dp"
+        },
+        "imported-energy": {
+          "literal": "1dp"
+        },
+        "exported-energy": {
+          "literal": "1dp"
+        }
+      }
+    }
+  }
+}
