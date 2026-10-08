@@ -72,6 +72,79 @@
           }
         }
       }
+    },
+    "meter": {
+      "type": "energy.ebus.capability.meter",
+      "properties": {
+        "voltage-a": {
+          "literal": "1dp"
+        },
+        "voltage-b": {
+          "literal": "1dp"
+        }
+      }
+    },
+    "breaker": {
+      "type": "energy.ebus.capability.breaker",
+      "properties": {
+        "rating": {
+          "literal": "integer"
+        }
+      }
+    },
+    "pcs": {
+      "type": "energy.ebus.capability.pcs",
+      "properties": {
+        "import-limit": {
+          "literal": "1dp"
+        },
+        "feed-import-limit": {
+          "literal": "1dp"
+        },
+        "operator-import-limit": {
+          "literal": "1dp"
+        },
+        "off-grid-import-limit": {
+          "literal": "shortest"
+        },
+        "requested-import-limit": {
+          "literal": "1dp"
+        }
+      }
+    },
+    "shed-forecast": {
+      "type": "energy.ebus.capability.shed-forecast",
+      "properties": {
+        "total-time-remaining": {
+          "literal": "integer"
+        },
+        "time-to-priority-shed": {
+          "literal": "integer"
+        },
+        "full-charge-total-time-remaining": {
+          "literal": "integer"
+        },
+        "full-charge-time-to-priority-shed": {
+          "literal": "integer"
+        }
+      }
+    },
+    "power-flows": {
+      "type": "energy.ebus.capability.power-flows",
+      "properties": {
+        "pv": {
+          "literal": "integer"
+        },
+        "battery": {
+          "literal": "integer"
+        },
+        "grid": {
+          "literal": "integer"
+        },
+        "site": {
+          "literal": "1dp"
+        }
+      }
     }
   }
 }

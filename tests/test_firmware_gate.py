@@ -101,6 +101,9 @@ def test_before_202639_the_bess_meter_equals_power_flows_battery(rec: PahoRecord
     # Pinned absolutely too: the panel's frame is negative while discharging, and
     # the snapshot keeps the battery's own frame.
     assert wire == pytest.approx(-device_frame)
+    # Written as power-flows/battery is, an integer, whatever the reading.
+    assert rec.retained[_BESS_METER] == rec.retained[_POWER_FLOWS_BATTERY]
+    assert "." not in rec.retained[_BESS_METER]
 
 
 @pytest.mark.parametrize("firmware", [_CURRENT, _UNVERSIONED])

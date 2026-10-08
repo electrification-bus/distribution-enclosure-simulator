@@ -1,0 +1,14 @@
+{
+  "$version": 1,
+  "type": "energy.ebus.device.pv",
+  "capabilities": {
+    "info": {
+      "type": "energy.ebus.capability.info",
+      "properties": {
+        "nominal-power": {
+          "literal": "shortest"
+        }
+      }
+    }
+  }
+}
