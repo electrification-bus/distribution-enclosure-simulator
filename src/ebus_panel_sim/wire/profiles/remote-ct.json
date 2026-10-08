@@ -1,0 +1,26 @@
+{
+  "$version": 1,
+  "type": "energy.ebus.device.circuit",
+  "capabilities": {
+    "meter": {
+      "type": "energy.ebus.capability.meter",
+      "properties": {
+        "current": {
+          "name": "Measured current"
+        },
+        "active-power": {
+          "name": "Measured active power"
+        },
+        "imported-energy": {
+          "name": "Measured energy imported"
+        },
+        "exported-energy": {
+          "name": "Measured energy exported"
+        },
+        "shared-with-device-ids": {
+          "name": "Other circuits this meter's hardware also measures"
+        }
+      }
+    }
+  }
+}

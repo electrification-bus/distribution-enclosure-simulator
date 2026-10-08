@@ -29,6 +29,7 @@ from ebus_panel_sim.exceptions import ManifestValidationError, ProfileValidation
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
 from ebus_panel_sim.manifest_physics import (
     EVSE_MIN_CHARGE_CURRENT_A,
+    main_breaker_rating,
     priority_locked,
     relay_locked,
 )
@@ -88,8 +89,13 @@ def build_graph(
     *,
     mqtt_cfg: dict[str, Any] | None = None,
     mqttc: MqttDeviceTransport | None = None,
+    priority_locked_by_relay: bool = False,
 ) -> BuiltGraph:
     """Build the SDK device tree. No socket opens here.
+
+    ``priority_locked_by_relay`` also removes ``$settable`` from
+    ``load-shed/priority`` on a circuit whose relay is locked, as the
+    span-alpha-test-b2 variant does.
 
     Exactly one of ``mqtt_cfg`` or ``mqttc`` names the root's connection, and
     children share whichever it is:
@@ -108,6 +114,9 @@ def build_graph(
         )
 
     graph = BuiltGraph()
+    locks: InstanceLocks = dict(_INSTANCE_LOCKS)
+    if priority_locked_by_relay:
+        locks[("load-shed", "priority")] = lambda md: priority_locked(md) or relay_locked(md)
 
     root_class = root_entity_class(mapping)
     root_instance = root_instance_of(manifest, mapping)
@@ -140,7 +149,8 @@ def build_graph(
         entity_class=root_class,
         parent_for_path=None,
         node_id_template=None,
-        omit=frozenset() if manifest.of_class("bess") else _BESS_ONLY_CAPABILITIES,
+        omit=_omitted_root_capabilities(manifest, root_instance),
+        locks=locks,
     )
 
     # Topologically order non-root descriptors so a descriptor whose
@@ -162,6 +172,7 @@ def build_graph(
                     entity_class=ec,
                     parent_for_path=root_instance,
                     node_id_template=descriptor.placement.node_id_template,
+                    locks=locks,
                 )
             elif descriptor.placement.kind == "child-of-parent":
                 parent_ec = descriptor.placement.parent_entity_class
@@ -213,6 +224,7 @@ def build_graph(
                     entity_class=ec,
                     parent_for_path=None,
                     node_id_template=descriptor.placement.node_id_template,
+                    locks=locks,
                 )
 
     return graph
@@ -288,6 +300,7 @@ def _attach_profile(
     parent_for_path: DeviceInstance | None,
     node_id_template: str | None,
     omit: frozenset[str] = frozenset(),
+    locks: InstanceLocks | None = None,
 ) -> None:
     """Attach the profile's capabilities + properties to the given device,
     skipping the capabilities named in ``omit``.
@@ -325,7 +338,9 @@ def _attach_profile(
                     ),
                     unit=_to_sdk_unit(prop.unit),
                     format_str=_format_for(prop.format, instance, cap_name, prop_key),
-                    settable=_settable_for(prop.settable, instance, cap_name, prop_key),
+                    settable=_settable_for(
+                        prop.settable, instance, cap_name, prop_key, locks or _INSTANCE_LOCKS
+                    ),
                 )
                 graph.properties[
                     (entity_class, instance.instance_id, f"{cap_name}/{prop_key}")
@@ -335,6 +350,15 @@ def _attach_profile(
 # Enclosure capabilities published only when at least one BESS is commissioned
 # (``devices/distribution-enclosure.md`` §"shed" and §"shed-forecast").
 _BESS_ONLY_CAPABILITIES = frozenset({"shed", "shed-forecast"})
+
+
+def _omitted_root_capabilities(
+    manifest: DeviceManifest, root_instance: DeviceInstance
+) -> frozenset[str]:
+    omit = frozenset() if manifest.of_class("bess") else _BESS_ONLY_CAPABILITIES
+    if main_breaker_rating(root_instance.metadata) is None:
+        omit |= {"breaker"}
+    return omit
 
 
 # The properties whose settability is commissioned per circuit rather than
@@ -355,7 +379,9 @@ _BESS_ONLY_CAPABILITIES = frozenset({"shed", "shed-forecast"})
 # publisher-level conformance latitude, without saying a publisher may vary
 # that per circuit. Only the migration guide makes it per-circuit, so this
 # entry rests on the guide, not on ``capabilities/load-shed.md``.
-_INSTANCE_LOCKS: dict[tuple[str, str], Callable[[dict[str, str]], bool]] = {
+InstanceLocks = dict[tuple[str, str], Callable[[dict[str, str]], bool]]
+
+_INSTANCE_LOCKS: InstanceLocks = {
     ("switch", "relay"): relay_locked,
     ("load-shed", "priority"): priority_locked,
 }
@@ -366,6 +392,7 @@ def _settable_for(
     instance: DeviceInstance,
     cap_name: str,
     prop_key: str,
+    locks: InstanceLocks,
 ) -> bool:
     """Narrow a profile's class-level ``settable`` to this instance.
 
@@ -375,7 +402,7 @@ def _settable_for(
     installer commissioning flag, so a panel publishes a mix of both: see
     ``_INSTANCE_LOCKS``. Nothing else here varies that way.
     """
-    locked_by = _INSTANCE_LOCKS.get((cap_name, prop_key))
+    locked_by = locks.get((cap_name, prop_key))
     if not declared or locked_by is None:
         return declared
     return not locked_by(instance.metadata)

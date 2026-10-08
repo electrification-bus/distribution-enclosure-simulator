@@ -11,7 +11,9 @@ carries a full inline definition instead, which hydration uses as-is.
 
 ``variant='span'`` (the default) deep-merges the ``profiles/span/*.json`` overlay (the
 SPAN-vendor-specific surface + conformance-latitude overrides) onto the base, where an
-overlay ``null`` removes a base capability or property; ``variant='reference'`` loads the
+overlay ``null`` removes a base capability or property. ``variant='span-alpha-test-b2'`` then
+merges ``profiles/span-alpha-test-b2/*.json`` on top: site, busbar and frequency properties and
+the commissioning facts a circuit or lugs can carry. ``variant='reference'`` loads the
 spec-conformant base only.
 """
 
@@ -26,9 +28,14 @@ from ebus_panel_sim.exceptions import ProfileValidationError
 
 _DEFAULT_DIR = Path(__file__).parent / "profiles"
 _CATALOG_DIR = Path(__file__).parent / "catalogs"
-_OVERLAY_SUBDIR = "span"
+Variant = Literal["span", "span-alpha-test-b2", "reference"]
 
-Variant = Literal["span", "reference"]
+# The overlay subdirectories each variant merges onto the base, in order.
+_OVERLAYS: dict[str, tuple[str, ...]] = {
+    "span": ("span",),
+    "span-alpha-test-b2": ("span", "span-alpha-test-b2"),
+    "reference": (),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,16 +80,15 @@ def load_profiles(
     variant: Variant = "span",
     catalog_dir: Path = _CATALOG_DIR,
 ) -> ProfileTable:
-    """Hydrate the base selections against the vendored catalogs, merging the SPAN
-    overlay when ``variant='span'``."""
+    """Hydrate the base selections against the vendored catalogs, merging the
+    variant's overlays in order."""
     catalogs = _load_catalogs(catalog_dir)
-    overlay_dir = directory / _OVERLAY_SUBDIR
     table = ProfileTable()
-    for path in sorted(directory.glob("*.json")):  # base only; the span/ subdir is not matched
+    for path in sorted(directory.glob("*.json")):  # base only; overlay subdirs are not matched
         entity_class = path.stem
         raw = json.loads(path.read_text())
-        if variant == "span":
-            overlay_path = overlay_dir / f"{entity_class}.json"
+        for subdir in _OVERLAYS[variant]:
+            overlay_path = directory / subdir / f"{entity_class}.json"
             if overlay_path.exists():
                 raw = _merge_overlay(raw, json.loads(overlay_path.read_text()), overlay_path)
         table[entity_class] = _hydrate_profile(entity_class, path, raw, catalogs)

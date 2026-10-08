@@ -1,0 +1,20 @@
+{
+  "capabilities": {
+    "connection": {
+      "properties": {
+        "backed-up": {
+          "name": "Whether the downstream path is on the backup (island) side of a microgrid interconnect device"
+        },
+        "feeds-role": {
+          "name": "Coarse role of a downstream node not published as its own eBus device"
+        },
+        "service-rating": {
+          "name": "Utility service rating (service size) at a service-entrance connection point"
+        },
+        "overcurrent-protection": {
+          "name": "Overcurrent-protection rating at a connection point that is not itself a breaker-protected circuit"
+        }
+      }
+    }
+  }
+}

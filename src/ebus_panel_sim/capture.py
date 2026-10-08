@@ -31,6 +31,11 @@ from typing import Any, cast, get_args
 
 from ebus_panel_sim.definition import PanelDefinition, dump_definition, dump_ticks
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
+from ebus_panel_sim.manifest_physics import (
+    _circuit_wire_values,
+    _lugs_wire_values,
+    _panel_wire_values,
+)
 from ebus_panel_sim.native_devices import BESSConfig, LoadSheddingConfig
 from ebus_panel_sim.tick_inputs import BESSCommunication, TickInputs
 from ebus_panel_sim.wire.profile_loader import Variant
@@ -40,6 +45,18 @@ _LINK_STATES = frozenset(get_args(BESSCommunication))
 _TYPE_PREFIX = "energy.ebus.device."
 # The circuits a SPAN panel adds for a commissioned PV or battery system.
 _COMMISSIONED_NAMES = {"Commissioned PV System": "pv", "Commissioned Backup System": "backup"}
+# Site facts dropped when masking.
+_SITE_KEYS = frozenset(
+    {
+        "site-name",
+        "address-lines",
+        "locality",
+        "region",
+        "latitude",
+        "longitude",
+        "utility-meter-serial-number",
+    }
+)
 # A shorter original ID masks a display name only when it is the whole name, so
 # an ID such as ``bess`` does not rename "Example BESS".
 _MIN_EMBEDDED = 6
@@ -272,9 +289,11 @@ def definition_from_tree(
     """Map a published tree onto a panel definition.
 
     ``root`` names the distribution enclosure when the tree holds more than one;
-    only that enclosure's device tree is read. ``variant`` defaults to ``span``
-    for a SPAN panel and ``reference`` otherwise. ``generic_names`` replaces each
-    circuit's name with ``Circuit <n>``, numbered in tab order."""
+    only that enclosure's device tree is read. ``variant`` defaults to
+    ``span-alpha-test-b2`` for a panel whose hardware version string selects it,
+    ``span`` for any other SPAN panel, and ``reference`` otherwise.
+    ``generic_names`` replaces each circuit's name with ``Circuit <n>``, numbered
+    in tab order."""
     return _Mapper(tree, mask, root, generic_names).run(variant)
 
 
@@ -309,6 +328,7 @@ def ticks_from_samples(
             published = mapper.ids[device_id]
             if (
                 device.type == "circuit"
+                and device_id not in mapper.remote_cts
                 and power is not None
                 and published not in battery_circuits
             ):
@@ -373,12 +393,18 @@ class _Mapper:
         # Only the panel's own device tree; other publishers on the broker are
         # not part of it.
         self.tree = {i: tree[i] for i in _tree_order(tree, self.panel_id)}
+        # A circuit device with only a meter is a remote-ct, not a branch circuit.
+        self.remote_cts = {i for i, d in self.tree.items() if _is_remote_ct(d)}
         self.ids = self._id_map()
         self.circuit_numbers = {
             cid: n
             for n, cid in enumerate(
                 sorted(
-                    (i for i, d in self.tree.items() if d.type == "circuit"),
+                    (
+                        i
+                        for i, d in self.tree.items()
+                        if d.type == "circuit" and i not in self.remote_cts
+                    ),
                     key=lambda i: (_first_tab(self.tree[i].value("info/spaces")), i),
                 ),
                 start=1,
@@ -403,11 +429,13 @@ class _Mapper:
         out: dict[str, str] = {self.panel_id: "masked-panel"}
         counters: dict[str, int] = {}
         circuits = sorted(
-            (i for i, d in self.tree.items() if d.type == "circuit"),
+            (i for i, d in self.tree.items() if d.type == "circuit" and i not in self.remote_cts),
             key=lambda i: (_first_tab(self.tree[i].value("info/spaces")), i),
         )
         for n, cid in enumerate(circuits, start=1):
             out[cid] = f"circuit-{n}"
+        for n, rid in enumerate(sorted(self.remote_cts), start=1):
+            out[rid] = rid if rid.startswith("remote-ct-") else f"remote-ct-{n}"
         for device_id, device in sorted(self.tree.items()):
             if device_id in out:
                 continue
@@ -451,7 +479,11 @@ class _Mapper:
         for device_id in self.tree:
             device = self.tree[device_id]
             kind = device.type
-            if kind == "circuit":
+            if kind == "circuit" and device_id in self.remote_cts:
+                instances.append(
+                    DeviceInstance("remote-ct", self.ids[device_id], "Service CT", {})
+                )
+            elif kind == "circuit":
                 instances.append(self._circuit(device_id, device))
             elif kind == "lugs":
                 instances.append(self._lugs(device_id, device))
@@ -552,6 +584,7 @@ class _Mapper:
             md["service-voltage-v"] = str(2 * float(voltage))
         if any(dev.type == "mid" for dev in self.tree.values()):
             md["islandable"] = "true"
+        md.update(self._wire_values(d, _panel_wire_values))
         return DeviceInstance(
             "panel", self.ids[pid], self._name(pid, str(d.description.get("name", pid))), md
         )
@@ -602,6 +635,11 @@ class _Mapper:
             and not priority_settable
         ):
             md["never-backup"] = "true"
+        md.update(self._wire_values(d, _circuit_wire_values))
+        if shared := md.get("shared-with-device-ids"):
+            md["shared-with-device-ids"] = ",".join(
+                self.ids.get(s, s) for s in shared.split(",") if s
+            )
         pcs = d.value("pcs/priority")
         if pcs is not None:
             md["pcs-priority"] = _int_str(pcs)
@@ -620,7 +658,7 @@ class _Mapper:
         if direction not in ("upstream", "downstream"):
             direction = "downstream" if "down" in device_id else "upstream"
             self.note(device_id, "direction", f"not published; using {direction}")
-        md = {"direction": direction}
+        md = {"direction": direction, **self._wire_values(d, _lugs_wire_values)}
         if d.value("connection/fed-by-device-type") == _TYPE_PREFIX + "distribution-enclosure":
             self.note(
                 device_id,
@@ -732,6 +770,17 @@ class _Mapper:
 
     # -- helpers ---------------------------------------------------------
 
+    def _wire_values(self, d: Device, table: Any) -> dict[str, str]:
+        """The verbatim commissioning keys, read back from the paths they feed;
+        site address fields are dropped when masking."""
+        out: dict[str, str] = {}
+        for path, key in table(_EchoKeys()).items():
+            if key is None or (self.mask and key in _SITE_KEYS):
+                continue
+            if (value := d.value(path)) is not None:
+                out[key] = _int_str(value) if key.endswith("-a") else value
+        return out
+
     def _put(
         self, md: dict[str, str], device_id: str, key: str, value: str | None, default: str
     ) -> None:
@@ -756,7 +805,22 @@ def _tree_order(tree: Tree, root: str) -> list[str]:
     return order
 
 
+class _EchoKeys(dict[str, str]):
+    """Metadata whose every key reads back as its own name, so a wire-value table
+    called on it maps each property path to the metadata key it reads."""
+
+    def get(self, key: str, default: object = None) -> str:
+        del default
+        return key
+
+
+def _is_remote_ct(device: Device) -> bool:
+    return device.type == "circuit" and set(device.description.get("nodes", {})) == {"meter"}
+
+
 def _infer_variant(panel: Device) -> Variant:
+    if panel.value("info/hardware-version") == "3.0":
+        return "span-alpha-test-b2"
     if "span" in (panel.value("info/vendor-name") or "").lower():
         return "span"
     return "reference"
