@@ -5,7 +5,8 @@
 definition and ticks recorded with it. The panel writes ``power-flows/grid``,
 ``pv`` and ``battery`` as integers and ``site`` with one decimal, every reading
 with one decimal, the BESS nameplate capacity and the PV nominal power (both
-integral here) without a point, and never ``-0.0`` or an exponent."""
+integral here) without a point, and never ``-0.0`` or an exponent. Every
+non-root device's ``$description.name`` is its device id."""
 
 from __future__ import annotations
 
@@ -119,3 +120,11 @@ def test_every_circuit_names_info_spaces_as_the_panel_does(published: Tree) -> N
         declaration = circuit.declaration("info/spaces")
         assert declaration is not None
         assert declaration["name"] == "Physical panel position(s) the circuit occupies"
+
+
+def test_every_device_but_the_panel_is_named_by_its_id(published: Tree) -> None:
+    assert published[_PANEL].description["name"] == "SPAN Panel eBus Adapter"
+    for device_id, device in published.items():
+        if device_id != _PANEL:
+            assert device.description["name"] == device_id
+    assert published["circuit-2"].properties["info/name"] == "Clothes-Dryer"

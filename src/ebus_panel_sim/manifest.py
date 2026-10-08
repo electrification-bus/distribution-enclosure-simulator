@@ -17,6 +17,15 @@ class DeviceInstance:
     instance_id: str
     display_name: str
     metadata: dict[str, str] = field(default_factory=dict)
+    # The device's ``$description.name`` where it differs from ``display_name``,
+    # which a circuit also publishes as ``info/name``. The MAIN 32 capture on
+    # release 202639 has each child device's id there.
+    description_name: str | None = None
+
+    @property
+    def published_name(self) -> str:
+        """The ``$description.name`` the device publishes."""
+        return self.display_name if self.description_name is None else self.description_name
 
 
 @dataclass(frozen=True, slots=True)

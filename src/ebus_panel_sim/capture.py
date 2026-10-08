@@ -20,6 +20,7 @@ replaced. ``--no-mask`` keeps them.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import re
 import sys
@@ -445,27 +446,27 @@ class _Mapper:
         chosen = variant or _infer_variant(panel)
         feeds = self.feeds()
         self._note_dangling_feeds()
-        instances = [self._panel()]
+        instances = [self._described(self.panel_id, self._panel())]
         bess_configs: list[BESSConfig] = []
         batteries = sum(d.type == "bess" for d in self.tree.values())
         for device_id in self.tree:
             device = self.tree[device_id]
             kind = device.type
             if kind == "circuit":
-                instances.append(self._circuit(device_id, device))
+                instances.append(self._described(device_id, self._circuit(device_id, device)))
             elif kind == "lugs":
-                instances.append(self._lugs(device_id, device))
+                instances.append(self._described(device_id, self._lugs(device_id, device)))
             elif kind == "bess":
                 inst, cfg = self._bess(device_id, device, feeds)
-                instances.append(inst)
+                instances.append(self._described(device_id, inst))
                 bess_configs.append(cfg)
             elif kind == "pv":
-                instances.append(self._pv(device_id, device, feeds))
+                instances.append(self._described(device_id, self._pv(device_id, device, feeds)))
             elif kind == "evse":
-                instances.append(self._evse(device_id, device, feeds))
+                instances.append(self._described(device_id, self._evse(device_id, device, feeds)))
             elif kind == "mid":
                 if batteries == 1:
-                    instances.append(self._mid(device_id, device))
+                    instances.append(self._described(device_id, self._mid(device_id, device)))
                 else:
                     self.note(
                         device_id,
@@ -484,6 +485,20 @@ class _Mapper:
             ),
             self.notes,
         )
+
+    def _described(self, device_id: str, inst: DeviceInstance) -> DeviceInstance:
+        """``inst`` carrying the device's published ``$description.name`` where the
+        definition's name would not reproduce it. A device named by its own id
+        is named by its published (masked) id; one named as its ``info/name``
+        follows the definition's name."""
+        device = self.tree[device_id]
+        raw = device.description.get("name")
+        if not isinstance(raw, str) or not raw or raw == device.value("info/name"):
+            return inst
+        name = self.ids[device_id] if raw == device_id else self._name(device_id, raw)
+        if name == inst.display_name:
+            return inst
+        return dataclasses.replace(inst, description_name=name)
 
     def _load_shedding(self) -> LoadSheddingConfig | None:
         """The off-grid SOC shed threshold from the panel's published shed policy."""

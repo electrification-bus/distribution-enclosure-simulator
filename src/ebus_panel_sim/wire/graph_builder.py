@@ -117,14 +117,14 @@ def build_graph(
     root_device = (
         ebus_sdk.Device(
             root_instance.instance_id,
-            name=root_instance.display_name,
+            name=root_instance.published_name,
             type=profiles[root_class].type,
             mqttc=mqttc,
         )
         if mqttc is not None
         else ebus_sdk.Device(
             root_instance.instance_id,
-            name=root_instance.display_name,
+            name=root_instance.published_name,
             type=profiles[root_class].type,
             mqtt_cfg=mqtt_cfg,
         )
@@ -200,7 +200,7 @@ def build_graph(
                 # root/parent itself. No parent_id/root_id/add_child anymore.
                 child = ebus_sdk.Device(
                     inst.instance_id,
-                    name=inst.display_name,
+                    name=inst.published_name,
                     type=profiles[ec].type,
                     parent=parent_device,
                 )

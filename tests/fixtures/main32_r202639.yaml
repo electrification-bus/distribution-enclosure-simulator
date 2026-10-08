@@ -20,11 +20,13 @@ devices:
 - class: lugs
   id: lugs-upstream
   name: Upstream lugs
+  description_name: lugs-upstream
   metadata:
     direction: upstream
 - class: lugs
   id: lugs-downstream
   name: Downstream lugs
+  description_name: lugs-downstream
   metadata:
     direction: downstream
 - class: bess
@@ -52,6 +54,7 @@ devices:
 - class: circuit
   id: circuit-9
   name: Ovens
+  description_name: circuit-9
   metadata:
     tab-numbers: 14,16
     placement: upstream-of-lugs
@@ -65,6 +68,7 @@ devices:
 - class: circuit
   id: circuit-2
   name: Clothes-Dryer
+  description_name: circuit-2
   metadata:
     tab-numbers: 2,4
     placement: upstream-of-lugs
@@ -78,6 +82,7 @@ devices:
 - class: circuit
   id: circuit-8
   name: HVAC-Air-Handler
+  description_name: circuit-8
   metadata:
     tab-numbers: 13,15
     placement: upstream-of-lugs
@@ -91,6 +96,7 @@ devices:
 - class: circuit
   id: circuit-12
   name: Future-240VAC-1
+  description_name: circuit-12
   metadata:
     tab-numbers: 21,23
     placement: upstream-of-lugs
@@ -104,6 +110,7 @@ devices:
 - class: circuit
   id: circuit-7
   name: HVAC-Heat-Pump
+  description_name: circuit-7
   metadata:
     tab-numbers: 10,12
     placement: upstream-of-lugs
@@ -117,6 +124,7 @@ devices:
 - class: circuit
   id: circuit-13
   name: Espresso-Machine
+  description_name: circuit-13
   metadata:
     tab-numbers: 22,24
     placement: upstream-of-lugs
@@ -130,6 +138,7 @@ devices:
 - class: circuit
   id: circuit-15
   name: Shed-240VAC-Outlet
+  description_name: circuit-15
   metadata:
     tab-numbers: 26,28
     placement: upstream-of-lugs
@@ -143,6 +152,7 @@ devices:
 - class: circuit
   id: circuit-14
   name: Future-240VAC-2
+  description_name: circuit-14
   metadata:
     tab-numbers: 25,27
     placement: upstream-of-lugs
@@ -156,6 +166,7 @@ devices:
 - class: circuit
   id: circuit-6
   name: Water-Heater
+  description_name: circuit-6
   metadata:
     tab-numbers: 9,11
     placement: upstream-of-lugs
@@ -169,6 +180,7 @@ devices:
 - class: circuit
   id: circuit-5
   name: Wine Refrigerator
+  description_name: circuit-5
   metadata:
     tab-numbers: '7'
     placement: upstream-of-lugs
@@ -182,6 +194,7 @@ devices:
 - class: circuit
   id: circuit-4
   name: HVAC-Heating-Coil
+  description_name: circuit-4
   metadata:
     tab-numbers: 6,8
     placement: upstream-of-lugs
@@ -195,6 +208,7 @@ devices:
 - class: circuit
   id: circuit-1
   name: Kitchen-Outlets-1 & Outlets-2
+  description_name: circuit-1
   metadata:
     tab-numbers: 1,3
     placement: upstream-of-lugs
@@ -208,6 +222,7 @@ devices:
 - class: circuit
   id: circuit-10
   name: Studio-HVAC
+  description_name: circuit-10
   metadata:
     tab-numbers: 17,19
     placement: upstream-of-lugs
@@ -221,6 +236,7 @@ devices:
 - class: circuit
   id: circuit-16
   name: Commissioned PV System
+  description_name: circuit-16
   metadata:
     tab-numbers: 29,31
     placement: upstream-of-lugs
@@ -234,6 +250,7 @@ devices:
 - class: circuit
   id: circuit-3
   name: Attic-Back-Outlet
+  description_name: circuit-3
   metadata:
     tab-numbers: '5'
     placement: upstream-of-lugs
@@ -247,6 +264,7 @@ devices:
 - class: circuit
   id: circuit-11
   name: Cooktop/Stove
+  description_name: circuit-11
   metadata:
     tab-numbers: 18,20
     placement: upstream-of-lugs
