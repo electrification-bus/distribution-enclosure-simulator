@@ -1,0 +1,362 @@
+schema: panel-sim-ticks/1
+ticks:
+- current_time: 1791423085.2498162
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423086.250027
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423087.253577
+  grid_online: true
+  circuits:
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423088.258646
+  grid_online: true
+  circuits:
+    circuit-1: 0.1
+    circuit-2: 0.1
+  evse: {}
+- current_time: 1791423089.260791
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423090.262112
+  grid_online: true
+  circuits:
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423091.265949
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.2
+  evse: {}
+- current_time: 1791423092.2661388
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423093.266819
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423094.270139
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423095.270738
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423096.275816
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423097.280928
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+- current_time: 1791423098.281139
+  grid_online: true
+  circuits:
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423099.286203
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423100.2912772
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423101.294915
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423102.300001
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: -0.1
+  evse: {}
+- current_time: 1791423103.302191
+  grid_online: true
+  circuits:
+    circuit-1: -0.1
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423104.3072782
+  grid_online: true
+  circuits:
+    circuit-1: 0.1
+    circuit-2: 0.1
+  evse: {}
+- current_time: 1791423105.310688
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423106.314332
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+- current_time: 1791423107.319398
+  grid_online: true
+  circuits:
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423108.324477
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423109.325386
+  grid_online: true
+  circuits:
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423110.3304782
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423111.331572
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423112.336648
+  grid_online: true
+  circuits:
+    circuit-1: -0.1
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423113.337711
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423114.340616
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423115.345698
+  grid_online: true
+  circuits:
+    circuit-1: 0.1
+    circuit-2: 0.1
+  evse: {}
+- current_time: 1791423116.34741
+  grid_online: true
+  circuits:
+    circuit-1: -0.1
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423117.3475058
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+- current_time: 1791423118.35261
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423119.3576908
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: -0.1
+  evse: {}
+- current_time: 1791423120.359742
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423121.364816
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423122.3662999
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423123.371379
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423124.3764532
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423125.381523
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+- current_time: 1791423126.386601
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+- current_time: 1791423127.391683
+  grid_online: true
+  circuits:
+    circuit-1: 0.1
+    circuit-2: 0.1
+  evse: {}
+- current_time: 1791423128.3930051
+  grid_online: true
+  circuits:
+    circuit-1: 0.1
+    circuit-2: -0.1
+  evse: {}
+- current_time: 1791423129.3980858
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: -0.1
+  evse: {}
+- current_time: 1791423130.403166
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423131.4036858
+  grid_online: true
+  circuits:
+    circuit-1: -0.1
+    circuit-2: -0.1
+  evse: {}
+- current_time: 1791423132.404712
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423133.4097862
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+- current_time: 1791423134.414861
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423135.419935
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423136.42501
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423137.4300852
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423138.4320052
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423139.437094
+  grid_online: true
+  circuits:
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423140.4421692
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423141.443739
+  grid_online: true
+  circuits:
+    circuit-1: -0.1
+    circuit-2: -0.1
+  evse: {}
+- current_time: 1791423142.443838
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423143.448925
+  grid_online: true
+  circuits:
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+- current_time: 1791423144.451731
+  grid_online: true
+  circuits:
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}

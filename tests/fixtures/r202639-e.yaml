@@ -1,0 +1,810 @@
+schema: panel-sim-definition/1
+variant: span-alpha-test-b2
+devices:
+- class: panel
+  id: masked-panel
+  name: SPAN Panel eBus Adapter
+  metadata:
+    vendor-name: SPAN
+    serial-number: MASKED-PANEL
+    firmware-version: spanos3/r202639/03
+    hardware-version: '3.0'
+    panel-model: MLO_48
+    panel-size: '48'
+    postal-code: '00000'
+    time-zone: America/New_York
+    line-voltage-v: '121.9'
+    service-voltage-v: '243.8'
+- class: lugs
+  id: lugs-upstream
+  name: Upstream lugs
+  metadata:
+    direction: upstream
+    service-rating-a: '200'
+    overcurrent-protection-a: '200'
+- class: lugs
+  id: lugs-downstream
+  name: Downstream lugs
+  metadata:
+    direction: downstream
+    feeds-role: UNUSED
+- class: evse
+  id: evse-1
+  name: evse-1
+  metadata:
+    vendor-name: SPAN
+    part-number: 1-01400-04
+    serial-number: MASKED-EVSE-1
+    model: unknown
+    firmware-version: unknown
+    max-current-a: '48'
+    feed: circuit-15
+- class: circuit
+  id: circuit-1
+  name: HVAC
+  metadata:
+    tab-numbers: 1,3
+    placement: upstream-of-lugs
+    breaker-rating-a: '35'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    tags: HVAC
+    dedicated: 'true'
+    nominal-voltage: '240.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '40'
+    initial-consumed-wh: '60911.5'
+    initial-produced-wh: '373.3'
+- class: circuit
+  id: circuit-3
+  name: Heat Pump Water Heater
+  metadata:
+    tab-numbers: 5,7
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    tags: WATER_HEATER_HEAT_PUMP
+    dedicated: 'true'
+    nominal-voltage: '240.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '9'
+    initial-consumed-wh: '1012.5'
+    initial-produced-wh: '19111749.6'
+- class: circuit
+  id: circuit-2
+  name: Electric Double-Oven
+  metadata:
+    tab-numbers: 2,4
+    placement: upstream-of-lugs
+    breaker-rating-a: '40'
+    dipole: 'true'
+    default-priority: NEVER
+    relay-behavior: controllable
+    tags: OVEN
+    dedicated: 'true'
+    nominal-voltage: '240.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '30'
+    initial-consumed-wh: '88644.1'
+    initial-produced-wh: '2504911685498.9'
+- class: circuit
+  id: circuit-4
+  name: Laundry Room
+  metadata:
+    tab-numbers: 6,8
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    tags: DRYER
+    dedicated: 'true'
+    nominal-voltage: '240.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '24'
+    initial-consumed-wh: '86490.0'
+    initial-produced-wh: '766.5'
+- class: circuit
+  id: circuit-5
+  name: Electric range
+  metadata:
+    tab-numbers: '9'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    tags: RANGE
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '31'
+    initial-consumed-wh: '8385.6'
+    initial-produced-wh: '404.4'
+- class: circuit
+  id: circuit-7
+  name: Microwave
+  metadata:
+    tab-numbers: '11'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    tags: MICROWAVE
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '48'
+    initial-consumed-wh: '5934.2'
+    initial-produced-wh: '245.0'
+- class: circuit
+  id: circuit-9
+  name: Primary Bath Outlets
+  metadata:
+    tab-numbers: '13'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BATHROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '37343.3'
+    initial-produced-wh: '546.9'
+- class: circuit
+  id: circuit-11
+  name: Kitchen / Outlets
+  metadata:
+    tab-numbers: '15'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: KITCHEN
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '536.0'
+    initial-produced-wh: '403.7'
+- class: circuit
+  id: circuit-13
+  name: Family Room
+  metadata:
+    tab-numbers: '17'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '15724.0'
+    initial-produced-wh: '374.5'
+- class: circuit
+  id: circuit-18
+  name: Kitchen Sink Garbage Disposal
+  metadata:
+    tab-numbers: '23'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    tags: DISPOSAL
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '47'
+    initial-consumed-wh: '726.9'
+    initial-produced-wh: '546.7'
+- class: circuit
+  id: circuit-20
+  name: Dishwasher
+  metadata:
+    tab-numbers: '25'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    tags: DISHWASHER
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '46'
+    initial-consumed-wh: '677.1'
+    initial-produced-wh: '509.7'
+- class: circuit
+  id: circuit-22
+  name: Main Office & Fam TV
+  metadata:
+    tab-numbers: '27'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: OFFICE
+    dedicated: 'false'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '671.9'
+    initial-produced-wh: '504.2'
+- class: circuit
+  id: circuit-24
+  name: Basement Outlets French Door Wall
+  metadata:
+    tab-numbers: '29'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BASEMENT
+    dedicated: 'false'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '717.4'
+    initial-produced-wh: '549.8'
+- class: circuit
+  id: circuit-26
+  name: Basement / Lights & Outlets
+  metadata:
+    tab-numbers: '31'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BASEMENT
+    dedicated: 'false'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '712.7'
+    initial-produced-wh: '548.5'
+- class: circuit
+  id: circuit-28
+  name: Utility Room
+  metadata:
+    tab-numbers: '33'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BATHROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '678.9'
+    initial-produced-wh: '522.7'
+- class: circuit
+  id: circuit-30
+  name: Hood
+  metadata:
+    tab-numbers: '35'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    tags: HOOD
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '44'
+    initial-consumed-wh: '664.0'
+    initial-produced-wh: '495.1'
+- class: circuit
+  id: circuit-32
+  name: Basement / Lights & Outlets
+  metadata:
+    tab-numbers: '37'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BASEMENT
+    dedicated: 'false'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '726.3'
+    initial-produced-wh: '555.1'
+- class: circuit
+  id: circuit-38
+  name: Electric Infared Sauna
+  metadata:
+    tab-numbers: '43'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    tags: SAUNA_HEATER
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '17'
+    initial-consumed-wh: '485.9'
+    initial-produced-wh: '375.2'
+- class: circuit
+  id: circuit-41
+  name: Main Office Dedicated Outlets
+  metadata:
+    tab-numbers: '45'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: OFFICE
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '709.6'
+    initial-produced-wh: '547.7'
+- class: circuit
+  id: circuit-44
+  name: Bidet Outlets Basement & Main Floor
+  metadata:
+    tab-numbers: '47'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    tags: MACHINERY
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '5'
+    initial-consumed-wh: '720.5'
+    initial-produced-wh: '554.7'
+- class: circuit
+  id: circuit-6
+  name: Dining room / Lights & Outlets
+  metadata:
+    tab-numbers: '10'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: DINING_ROOM
+    dedicated: 'false'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '520.7'
+    initial-produced-wh: '414.4'
+- class: circuit
+  id: circuit-8
+  name: Kitchen fr. door & Isle Alt. Outlets
+  metadata:
+    tab-numbers: '12'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: KITCHEN
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '527.5'
+    initial-produced-wh: '420.5'
+- class: circuit
+  id: circuit-10
+  name: Furnace
+  metadata:
+    tab-numbers: '14'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    tags: FURNACE
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '20'
+    initial-consumed-wh: '426.4'
+    initial-produced-wh: '339.8'
+- class: circuit
+  id: circuit-12
+  name: Bed 2 & Shared Bath Lights & Outlets
+  metadata:
+    tab-numbers: '16'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BEDROOM
+    dedicated: 'false'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '513.3'
+    initial-produced-wh: '408.9'
+- class: circuit
+  id: circuit-14
+  name: Primary bedroom / Lights & Outlets
+  metadata:
+    tab-numbers: '18'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: MASTER_BEDROOM
+    dedicated: 'false'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '664.0'
+    initial-produced-wh: '505.6'
+- class: circuit
+  id: circuit-17
+  name: Primary Bath & Closets
+  metadata:
+    tab-numbers: '22'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BATHROOM
+    dedicated: 'false'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '743.2'
+    initial-produced-wh: '569.4'
+- class: circuit
+  id: circuit-19
+  name: Smoke/CO Detectors
+  metadata:
+    tab-numbers: '24'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    tags: SMOKE_CO_DETECTOR
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '51'
+    initial-consumed-wh: '700.8'
+    initial-produced-wh: '549.7'
+- class: circuit
+  id: circuit-21
+  name: Basement Outlets exit door wall
+  metadata:
+    tab-numbers: '26'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BASEMENT
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '667.0'
+    initial-produced-wh: '181.2'
+- class: circuit
+  id: circuit-23
+  name: Living room / Lights & Outlets
+  metadata:
+    tab-numbers: '28'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: LIVING_ROOM
+    dedicated: 'false'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '664.9'
+    initial-produced-wh: '532.6'
+- class: circuit
+  id: circuit-25
+  name: Sump Pump
+  metadata:
+    tab-numbers: '30'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    tags: PUMP
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '23'
+    initial-consumed-wh: '721.4'
+    initial-produced-wh: '569.1'
+- class: circuit
+  id: circuit-27
+  name: Kitchen / Lights
+  metadata:
+    tab-numbers: '32'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: KITCHEN
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '709.2'
+    initial-produced-wh: '561.4'
+- class: circuit
+  id: circuit-29
+  name: Security system
+  metadata:
+    tab-numbers: '34'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    tags: SECURITY_SYSTEM
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '53'
+    initial-consumed-wh: '677.3'
+    initial-produced-wh: '529.0'
+- class: circuit
+  id: circuit-33
+  name: Refrigerator
+  metadata:
+    tab-numbers: '38'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    tags: FRIDGE
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '38'
+    initial-consumed-wh: '728.1'
+    initial-produced-wh: '557.5'
+- class: circuit
+  id: circuit-35
+  name: Freezer
+  metadata:
+    tab-numbers: '40'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    tags: FREEZER
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '38'
+    initial-consumed-wh: '714.3'
+    initial-produced-wh: '567.8'
+- class: circuit
+  id: circuit-31
+  name: Utility Room Dedicated
+  metadata:
+    tab-numbers: '36'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    tags: OTHER
+    dedicated: 'true'
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '32'
+    initial-consumed-wh: '662.7'
+    initial-produced-wh: '519.8'
+- class: circuit
+  id: circuit-16
+  name: Bedroom / Outlets
+  metadata:
+    tab-numbers: '20'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BEDROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '666.5'
+    initial-produced-wh: '508.8'
+- class: circuit
+  id: circuit-34
+  name: Bathroom / Outlets
+  metadata:
+    tab-numbers: '39'
+    placement: upstream-of-lugs
+    breaker-rating-a: '10'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BATHROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '734.1'
+    initial-produced-wh: '569.5'
+- class: circuit
+  id: circuit-36
+  name: Kitchen / Outlets
+  metadata:
+    tab-numbers: '41'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: KITCHEN
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '152888357.7'
+    initial-produced-wh: '507.5'
+- class: circuit
+  id: circuit-37
+  name: Kitchen / Lights
+  metadata:
+    tab-numbers: '42'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: KITCHEN
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '1223102142.9'
+    initial-produced-wh: '543.2'
+- class: circuit
+  id: circuit-39
+  name: Bedroom / Lights
+  metadata:
+    tab-numbers: '44'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BEDROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    shared-with-device-ids: circuit-40
+    pcs-priority: '43'
+    initial-consumed-wh: '494.8'
+    initial-produced-wh: '387.5'
+- class: circuit
+  id: circuit-40
+  name: Bedroom / Outlets
+  metadata:
+    tab-numbers: '44'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BEDROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    shared-with-device-ids: circuit-39
+    pcs-priority: '43'
+    initial-consumed-wh: '494.8'
+    initial-produced-wh: '387.5'
+- class: circuit
+  id: circuit-42
+  name: Living room / Outlets
+  metadata:
+    tab-numbers: '46'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: LIVING_ROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    shared-with-device-ids: circuit-43
+    pcs-priority: '43'
+    initial-consumed-wh: '735.9'
+    initial-produced-wh: '586.6'
+- class: circuit
+  id: circuit-43
+  name: Living room / Lights
+  metadata:
+    tab-numbers: '46'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: LIVING_ROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    shared-with-device-ids: circuit-42
+    pcs-priority: '43'
+    initial-consumed-wh: '735.9'
+    initial-produced-wh: '586.6'
+- class: circuit
+  id: circuit-46
+  name: Dining room / Lights
+  metadata:
+    tab-numbers: '48'
+    placement: upstream-of-lugs
+    breaker-rating-a: '10'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: DINING_ROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    shared-with-device-ids: circuit-45
+    pcs-priority: '43'
+    initial-consumed-wh: '715.0'
+    initial-produced-wh: '570.3'
+- class: circuit
+  id: circuit-45
+  name: Dining room / Outlets
+  metadata:
+    tab-numbers: '48'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: DINING_ROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    shared-with-device-ids: circuit-46
+    pcs-priority: '43'
+    initial-consumed-wh: '715.0'
+    initial-produced-wh: '570.3'
+- class: circuit
+  id: circuit-15
+  name: SPAN Drive
+  metadata:
+    tab-numbers: 19,21
+    placement: upstream-of-lugs
+    breaker-rating-a: '60'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    tags: EVSE
+    dedicated: 'true'
+    nominal-voltage: '240.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '1'
+    initial-consumed-wh: '4770835.0'
+    initial-produced-wh: '174.7'
