@@ -19,7 +19,7 @@ Producer contract (v0.3.0): build a ``DeviceManifest`` once at startup, then cal
 ``Emitter.publish_tick(TickInputs)`` each tick with signed circuit/EVSE powers,
 ``current_time``, and ``grid_online``. The emitter does the rest."""
 
-from ebus_panel_sim.capture import Device, Tree
+from ebus_panel_sim.capture import CaptureNote, Device, Tree
 from ebus_panel_sim.conventions.tab_legs import Leg, legs_for_tabs
 from ebus_panel_sim.definition import (
     PanelDefinition,
@@ -105,6 +105,7 @@ __all__ = [
     "BESSConfig",
     "BESSDevice",
     "BessPhysics",
+    "CaptureNote",
     "ChargeMode",
     "CircuitPhysics",
     "Device",

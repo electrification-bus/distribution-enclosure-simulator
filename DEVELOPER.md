@@ -121,7 +121,7 @@ distribution-enclosure-simulator/
     panel_meter.py             # Panel-level aggregator (pure function)
     snapshot.py                # Per-tick snapshot dataclasses (internal model)
     exceptions.py              # Public exception hierarchy
-    reference_captures/        # Masked real-panel captures (tree, definition, ticks) and their accessor
+    reference_captures/        # Masked real-panel captures (tree, and a recorded definition and ticks where there are any) and their accessor
     conventions/
       tab_legs.py              # Tab-to-leg convention for split-phase panels
     native_devices/            # Emitter-native device behaviours

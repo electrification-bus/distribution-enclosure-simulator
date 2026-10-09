@@ -3,10 +3,10 @@
 Each ``r202639-<handle>`` reference capture (``load_reference_capture``) is a
 masked tree of a SPAN panel on ``spanos3/r202639/03`` with the definition and the
 60 one-second ticks recorded with it. The two MAIN 32 captures are held to the
-same bar: the reference capture ``main32_r202639`` with its definition and ticks,
-and the r202633 capture ``tests/fixtures/main32-tree-v1.json``, which has neither,
-through the definition ``panel-sim-capture`` writes from it and one tick sampled
-from it.
+same bar: ``main32_r202639`` with its definition and ticks, and the r202633
+capture ``main32_r202633``, which has neither, through the definition
+``panel-sim-capture`` writes from it and one tick sampled from it, as the
+accessor derives them.
 
 The emitter publishes the definition through every tick, and the retained tree
 is compared with the capture device by device: ``$description`` keys, type and
@@ -30,7 +30,6 @@ import json
 import re
 from collections import Counter
 from collections.abc import Sequence
-from pathlib import Path
 
 import pytest
 
@@ -46,18 +45,14 @@ from ebus_panel_sim import (
 from ebus_panel_sim.capture import (
     Device,
     Tree,
-    definition_from_tree,
-    ticks_from_samples,
     tree_from_retained,
-    tree_from_snapshot,
 )
 from ebus_panel_sim.manifest_physics import unvalued_paths
 
 from .conftest import PahoRecorder
 
 _MAIN32_R202639 = "main32_r202639"
-_MAIN32_R202633 = "main32-r202633"
-_R202633_TREE = Path(__file__).parent / "fixtures" / "main32-tree-v1.json"
+_MAIN32_R202633 = "main32_r202633"
 _FEEDTHROUGH = (
     "The panel feeds a sub-panel through its downstream lugs (2700.6 W in the "
     "capture), which a definition cannot express, so the emitter's site lacks that "
@@ -260,10 +255,6 @@ def _differences(captured: Tree, published: Tree) -> list[str]:
 
 def _reference(handle: str) -> tuple[Tree, PanelDefinition, Sequence[TickInputs]]:
     """A capture, and the definition and ticks it is republished from."""
-    if handle == _MAIN32_R202633:
-        captured = tree_from_snapshot(json.loads(_R202633_TREE.read_text(encoding="utf-8")))
-        definition, _ = definition_from_tree(captured, mask=False)
-        return captured, definition, ticks_from_samples(captured, [(0.0, captured)], mask=False)
     capture = load_reference_capture(handle)
     return capture.tree, capture.definition, capture.ticks
 
@@ -278,7 +269,7 @@ def _published(
     return tree_from_retained(rec.retained)
 
 
-@pytest.mark.parametrize("handle", [*reference_capture_names(), _MAIN32_R202633])
+@pytest.mark.parametrize("handle", reference_capture_names())
 def test_the_emitter_reproduces_the_capture_but_for_its_listed_exceptions(
     rec: PahoRecorder, handle: str
 ) -> None:
