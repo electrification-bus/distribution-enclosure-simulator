@@ -67,6 +67,9 @@ class EbusCircuitSnapshot:
     feeds_device_id: str | None = None
     feeds_device_type: str | None = None
     feeds_device_status: str | None = None
+    fed_by_device_id: str | None = None
+    fed_by_device_type: str | None = None
+    fed_by_device_status: str | None = None
 
 
 @dataclass(slots=True)
@@ -147,6 +150,20 @@ class EbusLugsSnapshot:
 
 
 @dataclass(slots=True)
+class EbusRemoteCtSnapshot:
+    """A meter on the service conductor, outside the panel.
+
+    Published as a meter-only circuit device. Positive ``active_power_w`` is
+    power into the panel (grid import), and ``imported_energy_wh`` grows on
+    import: no circuit load-negation or register swap applies."""
+
+    active_power_w: float
+    current_a: float
+    imported_energy_wh: float
+    exported_energy_wh: float
+
+
+@dataclass(slots=True)
 class EbusMidSnapshot:
     """Microgrid Interconnect Device (MID) — ``info`` + ``grid`` capabilities."""
 
@@ -206,6 +223,8 @@ class EbusPanelMeter:
     upstream_l2_current_a: float | None = None
     downstream_l1_current_a: float | None = None
     downstream_l2_current_a: float | None = None
+    busbar_current_a: float | None = None
+    frequency_hz: float | None = None
 
 
 @dataclass(slots=True)
@@ -248,7 +267,7 @@ class EbusPanelPcs:
     off_grid_import_limit_a: float = 0.0
     off_grid_import_limit_enablement: str = "UNCONFIGURED"
     off_grid_import_limit_active: bool = False
-    requested_import_limit_a: float = 0.0
+    requested_import_limit_a: float | None = 0.0
     requested_import_limit_enablement: str = "UNCONFIGURED"
     requested_import_limit_active: bool = False
 
@@ -308,3 +327,4 @@ class EbusPanelSnapshot:
     evse: dict[str, EbusEvseSnapshot] = field(default_factory=dict)
     lugs: dict[str, EbusLugsSnapshot] = field(default_factory=dict)
     mid: dict[str, EbusMidSnapshot] = field(default_factory=dict)
+    remote_ct: dict[str, EbusRemoteCtSnapshot] = field(default_factory=dict)

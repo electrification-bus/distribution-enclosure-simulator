@@ -25,12 +25,12 @@ That description assumes the emitter owns the connection. With an injected trans
 
 SPAN changed two conventions in release 202639, and the span variant publishes whichever side the panel's own `firmware-version` names, so one emitter can stand in for a panel on either. `ebus_panel_sim.firmware.release_build` reads the release out of the string: the first `/`-separated segment that is exactly `r` plus six digits (`spanos2/r202633/02` is 202633); anything else, such as the examples' `example/v0.1.0`, names none. `PanelPhysics.release_build` exposes it, and the emitter turns it and the variant into a `FirmwareConventions` once, at construction:
 
-| | span variant, release before 202639 | release 202639 or later, no release, or the reference variant |
-|---|---|---|
-| BESS `meter/active-power` | the panel's frame, equal to `power-flows/battery` (positive while charging) | the battery's own frame, as `devices/bess.md` defines it (positive while discharging) |
-| EVSE `config/user-max-charge-current` | `max-current-a` until a user sets it | unpublished until a user sets it |
+| | span variant, release before 202639 | span variant from release 202639 or naming no release; `span-alpha-test-b2` on any firmware | reference variant, any firmware |
+|---|---|---|---|
+| BESS `meter/active-power` | the panel's frame, equal to `power-flows/battery` (positive while charging) | the battery's own frame, as `devices/bess.md` defines it (positive while discharging) | the battery's own frame |
+| EVSE `config/user-max-charge-current` | `max-current-a` until a user sets it | unpublished until a user sets it | not declared (only the span overlay declares it) |
 
-The snapshot is device-frame either way: `EbusBatterySnapshot.active_power_w` is positive while discharging, and only `bag_builder`'s resolver for the BESS meter changes. A `/set` on the user limit is clamped the same way on both sides, and `$format` stays `6:<max-current-a>`. Only the span variant is firmware-keyed; the reference variant always publishes the specification's frame. A consumer is tested across the change by restarting the emitter on a definition reporting the other firmware.
+The snapshot is device-frame either way: `EbusBatterySnapshot.active_power_w` is positive while discharging, and only `bag_builder`'s resolver for the BESS meter changes. A `/set` on the user limit is clamped the same way on both sides, and `$format` stays `6:<max-current-a>`. Only the span variant is firmware-keyed: `span-alpha-test-b2` always publishes the current conventions, and the reference variant always publishes the specification's BESS frame, whatever firmware either reports. A consumer is tested across the change by restarting the emitter on a definition reporting the other firmware.
 
 ## Native devices
 
@@ -44,7 +44,7 @@ Per-tick inputs (from `TickInputs`): `current_time` (received but not consulted 
 
 Per-tick outputs (into `snapshot.battery`): `soe_percentage`, `soe_kwh`, and `active_power_w` (positive = discharging, negative = charging).
 
-Link health is not the battery's own state but the panel's view of it, so the producer supplies it per tick in `TickInputs.bess_communication` (`OK`, `DEGRADED`, `LOST` or `UNKNOWN`; a battery left out is `OK`) and dispatch does not consult it. It lands in `communication` and `connected` on the battery snapshot, is published as the battery's `status/communication-state`, and sets the connection status of the circuit or lugs that connects the battery. The span variant reports only `OK` or `LOST` there, mapping `DEGRADED` and `UNKNOWN` to `LOST`, as a SPAN panel does while its `$description` still declares the catalog's `OK,LOST,DEGRADED`; the reference variant publishes `DEGRADED` as is and maps only `UNKNOWN`, which no connection catalog declares.
+Link health is not the battery's own state but the panel's view of it, so the producer supplies it per tick in `TickInputs.bess_communication` (`OK`, `DEGRADED`, `LOST` or `UNKNOWN`; a battery left out is `OK`) and dispatch does not consult it. It lands in `communication` and `connected` on the battery snapshot, is published as the battery's `status/communication-state`, and sets the connection status of the circuit or lugs that connects the battery. The span variants (`span`, `span-alpha-test-b2`) report only `OK` or `LOST` there, mapping `DEGRADED` and `UNKNOWN` to `LOST`, as a SPAN panel does while its `$description` still declares the catalog's `OK,LOST,DEGRADED`; the reference variant publishes `DEGRADED` as is and maps only `UNKNOWN`, which no connection catalog declares.
 
 Mid-run config changes: `emitter.update_bess_config(new_config)` swaps the `BESSConfig` reference while SOC/SOE state persists (the path for dashboard edits to mode and max charge/discharge rates; the charge/discharge hour-window fields are carried but not yet applied by the dispatch logic). Persistence across restart: call `emitter.seed_bess_soe(instance_id, soe_kwh)` between `__init__` and `start()`, or declare `initial-soe-kwh` in the manifest. Subclassing `BESSDevice` is supported for vendor-variant behaviour without a plugin framework.
 
@@ -60,7 +60,7 @@ When the grid is offline the policy returns the circuit instance-ids whose prior
 |---|---|---|
 | circuit | `switch/relay` | Updates the `RelayResolver` user override |
 | circuit | `load-shed/priority` | Updates the emitter's per-circuit priority override (refused on a never-backup or commissioned-system circuit) |
-| panel | `shed/asserted-islanding-state` | Updates the consumer-asserted islanding override, accepted only while a battery link is not `OK` (see below) |
+| panel | `shed/asserted-islanding-state` | Updates the consumer-asserted islanding override, accepted only while a battery link is not `OK` (under `span-alpha-test-b2`, only while it is `LOST` or `DEGRADED`; see below) |
 | evse | `config/user-max-charge-current` | Sets the per-EVSE user charge-current ceiling, which is unpublished until first set (published at `max-current-a` from the start by the span variant under firmware before release 202639; see [Firmware-keyed conventions](#firmware-keyed-conventions)); an integer, clamped into `[6, max-charge-current]` (the advertised `$format`), anything else refused |
 
 ### Relay state precedence

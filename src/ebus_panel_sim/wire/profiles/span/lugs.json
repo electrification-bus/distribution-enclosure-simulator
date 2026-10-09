@@ -11,6 +11,26 @@
           "format": "UPSTREAM,DOWNSTREAM"
         }
       }
+    },
+    "meter": {
+      "type": "energy.ebus.capability.meter",
+      "properties": {
+        "current-a": {
+          "literal": "1dp"
+        },
+        "current-b": {
+          "literal": "1dp"
+        },
+        "active-power": {
+          "literal": "1dp"
+        },
+        "imported-energy": {
+          "literal": "1dp"
+        },
+        "exported-energy": {
+          "literal": "1dp"
+        }
+      }
     }
   }
 }

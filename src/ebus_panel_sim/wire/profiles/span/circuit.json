@@ -10,8 +10,44 @@
           "datatype": "string"
         },
         "spaces": {
-          "name": "Circuit breaker space number(s) within the load center (comma-separated for multi-pole)",
+          "name": "Physical panel position(s) the circuit occupies",
           "datatype": "string"
+        }
+      }
+    },
+    "breaker": {
+      "type": "energy.ebus.capability.breaker",
+      "properties": {
+        "rating": {
+          "literal": "integer"
+        },
+        "poles": {
+          "literal": "integer"
+        }
+      }
+    },
+    "meter": {
+      "type": "energy.ebus.capability.meter",
+      "properties": {
+        "current": {
+          "literal": "1dp"
+        },
+        "active-power": {
+          "literal": "1dp"
+        },
+        "imported-energy": {
+          "literal": "1dp"
+        },
+        "exported-energy": {
+          "literal": "1dp"
+        }
+      }
+    },
+    "pcs": {
+      "type": "energy.ebus.capability.pcs",
+      "properties": {
+        "priority": {
+          "literal": "integer"
         }
       }
     }

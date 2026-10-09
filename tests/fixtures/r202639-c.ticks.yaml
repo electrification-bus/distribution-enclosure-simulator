@@ -1,0 +1,602 @@
+schema: panel-sim-ticks/1
+ticks:
+- current_time: 1791422908.0768042
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.1
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422909.081881
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: -0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422910.085797
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.1
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422911.087745
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: -0.1
+    circuit-1: -0.1
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422912.090419
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422913.095511
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422914.100596
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422915.105678
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422916.110759
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422917.1158369
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422918.121153
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422919.126029
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422920.131163
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422921.132803
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.1
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422922.133142
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422923.135107
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.1
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422924.1358578
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422925.1413288
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422926.142011
+  grid_online: true
+  circuits:
+    circuit-4: 0.6
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422927.147138
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422928.15085
+  grid_online: true
+  circuits:
+    circuit-4: 0.6
+    circuit-3: -0.1
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422929.157415
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: -0.1
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422930.161494
+  grid_online: true
+  circuits:
+    circuit-4: 0.6
+    circuit-3: 0.0
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422931.166568
+  grid_online: true
+  circuits:
+    circuit-4: 0.6
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422932.171654
+  grid_online: true
+  circuits:
+    circuit-4: 0.6
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.2
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422933.172956
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422934.178035
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.2
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422935.1808178
+  grid_online: true
+  circuits:
+    circuit-4: 0.6
+    circuit-3: 0.0
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422936.183626
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422937.1871119
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: -0.1
+    circuit-1: 0.0
+    circuit-2: -0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422938.192209
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.1
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422939.193433
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.1
+    circuit-1: 0.0
+    circuit-2: -0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422940.19458
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422941.198275
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422942.202805
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: -0.1
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422943.207968
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.1
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422944.2112918
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.1
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422945.2127738
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: -0.1
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422946.214277
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422947.2191858
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.1
+    circuit-1: -0.1
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422948.224503
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.1
+    circuit-1: 0.1
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422949.227617
+  grid_online: true
+  circuits:
+    circuit-4: 0.6
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422950.231412
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422951.233143
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: -0.1
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422952.2344189
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: -0.1
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422953.239509
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.1
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422954.244255
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.1
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422955.2444649
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422956.249559
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.1
+    circuit-1: -0.1
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422957.2503219
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.1
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422958.255404
+  grid_online: true
+  circuits:
+    circuit-4: 0.4
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422959.256015
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.1
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422960.2610922
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: -0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422961.266168
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422962.2667048
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.2
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422963.2717912
+  grid_online: true
+  circuits:
+    circuit-4: 0.6
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: -0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422964.2763362
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422965.2814221
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.0
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422966.2865112
+  grid_online: true
+  circuits:
+    circuit-4: 0.5
+    circuit-3: 0.1
+    circuit-1: 0.0
+    circuit-2: 0.0
+  evse: {}
+  bess_communication:
+    bess-1: OK
+- current_time: 1791422967.291224
+  grid_online: true
+  circuits:
+    circuit-4: 0.6
+    circuit-3: 0.2
+    circuit-1: 0.0
+    circuit-2: -0.1
+  evse: {}
+  bess_communication:
+    bess-1: OK

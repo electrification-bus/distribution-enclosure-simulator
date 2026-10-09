@@ -18,10 +18,15 @@ Two-purpose design:
    loud build failure rather than a silent missing topic.
 
 Property values that resolve to ``None`` are skipped (Homie 5 allows missing
-properties — the property's retained topic just isn't updated this tick)."""
+properties — the property's retained topic just isn't updated this tick).
+
+A number whose profile property carries a ``literal`` form goes into the bag
+already written in it (``ebus_panel_sim.wire.literal``), so the diff and the
+wire see the panel's text, not the physics model's full-precision float."""
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -29,8 +34,10 @@ from typing import Final
 
 from ebus_panel_sim.exceptions import EmitterStateError
 from ebus_panel_sim.firmware import BessMeterFrame
+from ebus_panel_sim.manifest_physics import WIRE_VALUE_PATHS
 from ebus_panel_sim.snapshot import EbusPanelSnapshot
 from ebus_panel_sim.wire.graph_builder import BuiltGraph
+from ebus_panel_sim.wire.literal import LiteralForm, format_literal
 from ebus_panel_sim.wire.mapping_loader import MappingTable
 from ebus_panel_sim.wire.profile_loader import ProfileTable
 from ebus_panel_sim.wire.property_bag import PropertyBag
@@ -123,6 +130,16 @@ def _mid_field(field: str) -> Resolver:
     return _resolve
 
 
+def _remote_ct_field(field: str) -> Resolver:
+    def _resolve(snapshot: EbusPanelSnapshot, instance_id: str) -> object:
+        rct = snapshot.remote_ct.get(instance_id)
+        if rct is None:
+            return None
+        return getattr(rct, field)
+
+    return _resolve
+
+
 def _circuit_spaces(snapshot: EbusPanelSnapshot, instance_id: str) -> object:
     """``info/spaces`` — the position(s) the breaker occupies, as a comma list.
 
@@ -199,10 +216,11 @@ def _bess_wire_active_power(snapshot: EbusPanelSnapshot, instance_id: str) -> ob
     discharging, as ``devices/bess.md`` defines it. That makes it the negative
     of the panel's ``power-flows/battery`` (positive = toward the battery), and
     ``test_bess_meter_active_power_is_the_negative_of_power_flows_battery``
-    pins the pair. ``-0.0`` is normalized so an idle battery publishes ``0``.
+    pins the pair. ``-0.0`` is normalized so an idle battery never publishes a
+    negative zero.
 
-    The default: the reference variant always publishes it, and the span
-    variant does unless its panel reports a SPAN release before 202639 (see
+    The default: the span-alpha-test-b2 and reference variants always publish it,
+    and the span variant does unless its panel reports a SPAN release before 202639 (see
     :func:`_bess_enclosure_frame_active_power`)."""
     bess = snapshot.battery.get(instance_id)
     if bess is None:
@@ -235,6 +253,14 @@ _BESS_ACTIVE_POWER: Final[Mapping[BessMeterFrame, Resolver]] = MappingProxyType(
 )
 
 
+def _constant(value: object) -> Resolver:
+    def _resolve(snapshot: EbusPanelSnapshot, instance_id: str) -> object:
+        del snapshot, instance_id
+        return value
+
+    return _resolve
+
+
 def _upper_lugs_direction(snapshot: EbusPanelSnapshot, instance_id: str) -> object:
     lugs = snapshot.lugs.get(instance_id)
     if lugs is None:
@@ -254,6 +280,8 @@ _RESOLVERS: dict[tuple[str, str], Resolver] = {
     ("panel", "info/firmware-version"): _panel_resolver(lambda s: s.info.firmware_version),
     ("panel", "info/data-model-version"): _panel_resolver(lambda s: s.info.data_model_version),
     ("panel", "door/state"): _panel_resolver(lambda s: s.door.state),
+    ("panel", "meter/busbar-current"): _panel_resolver(lambda s: s.meter.busbar_current_a),
+    ("panel", "meter/frequency"): _panel_resolver(lambda s: s.meter.frequency_hz),
     ("panel", "meter/voltage-a"): _panel_resolver(lambda s: s.meter.l1_voltage),
     ("panel", "meter/voltage-b"): _panel_resolver(lambda s: s.meter.l2_voltage),
     ("panel", "breaker/rating"): _panel_resolver(lambda s: s.pcs.main_breaker_rating_a),
@@ -341,6 +369,9 @@ _RESOLVERS: dict[tuple[str, str], Resolver] = {
     ("circuit", "connection/feeds-device-id"): _circuit_field("feeds_device_id"),
     ("circuit", "connection/feeds-device-type"): _circuit_field("feeds_device_type"),
     ("circuit", "connection/feeds-device-status"): _circuit_field("feeds_device_status"),
+    ("circuit", "connection/fed-by-device-id"): _circuit_field("fed_by_device_id"),
+    ("circuit", "connection/fed-by-device-type"): _circuit_field("fed_by_device_type"),
+    ("circuit", "connection/fed-by-device-status"): _circuit_field("fed_by_device_status"),
     # ---- lugs -----------------------------------------------------------
     ("lugs", "info/direction"): _upper_lugs_direction,
     ("lugs", "meter/current-a"): _lugs_field("l1_current_a"),
@@ -383,6 +414,13 @@ _RESOLVERS: dict[tuple[str, str], Resolver] = {
     ("evse", "config/user-max-charge-current"): _evse_field("user_max_charge_current_a"),
     ("evse", "config/max-charge-current"): _evse_field("max_charge_current_a"),
     # ---- mid ------------------------------------------------------------
+    # ---- remote-ct ------------------------------------------------------
+    ("remote-ct", "meter/current"): _remote_ct_field("current_a"),
+    ("remote-ct", "meter/active-power"): _remote_ct_field("active_power_w"),
+    ("remote-ct", "meter/imported-energy"): _remote_ct_field("imported_energy_wh"),
+    ("remote-ct", "meter/exported-energy"): _remote_ct_field("exported_energy_wh"),
+    # Declared and left unpublished, as a SPAN panel's meter-only circuit does.
+    ("remote-ct", "meter/shared-with-device-ids"): lambda snapshot, instance_id: None,
     ("mid", "info/vendor-name"): _mid_field("vendor_name"),
     ("mid", "info/serial-number"): _mid_field("serial_number"),
     ("mid", "info/model"): _mid_field("model"),
@@ -407,6 +445,7 @@ class _BoundProperty:
     instance_id: str
     property_path: str
     resolver: Resolver
+    literal: LiteralForm | None
 
 
 class BagBuilder:
@@ -421,13 +460,23 @@ class BagBuilder:
         graph: BuiltGraph,
         mapping: MappingTable,
         profiles: ProfileTable,
+        wire_values: dict[tuple[str, str, str], object] | None = None,
         *,
         bess_meter_frame: BessMeterFrame = "device",
     ) -> None:
-        """``bess_meter_frame`` picks the frame a hosted BESS publishes
+        """``wire_values`` holds the constant commissioning values, keyed by
+        ``(entity_class, instance_id, property_path)``, for the paths in
+        ``WIRE_VALUE_PATHS``; such a path without an entry stays unpublished.
+
+        ``bess_meter_frame`` picks the frame a hosted BESS publishes
         ``meter/active-power`` in, fixed for the emitter's life by the panel's
-        firmware (``ebus_panel_sim.firmware``)."""
+        firmware (``ebus_panel_sim.firmware``). It overrides that one entry in
+        this instance's copy of the resolver table; the coverage check and the
+        binding below read only that copy, never ``_RESOLVERS`` itself. In the
+        enclosure frame it is also written in ``power-flows/battery``'s literal
+        form, as that firmware did."""
         del mapping  # accepted for API symmetry; not consulted today.
+        constants = wire_values or {}
         self._bound: list[_BoundProperty] = []
         resolvers = {
             **_RESOLVERS,
@@ -443,7 +492,7 @@ class BagBuilder:
             for cap_name, cap in profile.capabilities.items():
                 for prop_key in cap.properties:
                     full = f"{cap_name}/{prop_key}"
-                    if (ec, full) not in resolvers:
+                    if (ec, full) not in resolvers and full not in WIRE_VALUE_PATHS.get(ec, ()):
                         missing.append((ec, full))
         if missing:
             joined = ", ".join(f"{ec}.{p}" for ec, p in missing)
@@ -453,17 +502,38 @@ class BagBuilder:
                 f"out of sync.",
             )
 
+        # Each property's literal form, from its profile declaration.
+        literals = {
+            (entity_class, f"{cap_name}/{prop_key}"): prop.literal
+            for entity_class, profile in profiles.items()
+            for cap_name, cap in profile.capabilities.items()
+            for prop_key, prop in cap.properties.items()
+        }
+        if bess_meter_frame == "enclosure":
+            # The panel's own reading of the battery, equal to power-flows/battery,
+            # and written as that is. The public r202633 capture's only sample is an
+            # idle battery's integer 0.
+            literals[("bess", "meter/active-power")] = literals.get(
+                ("panel", "power-flows/battery")
+            )
+
         # Second pass: bind resolvers to the (entity_class, instance_id,
         # property_path) keys actually present in the graph. The graph already
         # encodes which instances exist for each entity_class.
         for entity_class, instance_id, property_path in graph.properties:
-            resolver = resolvers[(entity_class, property_path)]
+            key = (entity_class, instance_id, property_path)
+            resolver = (
+                _constant(constants.get(key))
+                if property_path in WIRE_VALUE_PATHS.get(entity_class, ())
+                else resolvers[(entity_class, property_path)]
+            )
             self._bound.append(
                 _BoundProperty(
                     entity_class=entity_class,
                     instance_id=instance_id,
                     property_path=property_path,
                     resolver=resolver,
+                    literal=literals[(entity_class, property_path)],
                 ),
             )
 
@@ -476,5 +546,12 @@ class BagBuilder:
             value = bound.resolver(snapshot, bound.instance_id)
             if value is None:
                 continue
+            if (
+                bound.literal is not None
+                and isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(value)
+            ):
+                value = format_literal(value, bound.literal)
             bag.set(bound.entity_class, bound.instance_id, bound.property_path, value)
         return bag

@@ -1,0 +1,16 @@
+entity_class: remote-ct
+profile: remote-ct.json
+profile_version: 1
+placement:
+  kind: child-of-parent
+  parent_entity_class: panel
+  node_id_template: "{instance_id}"
+wire:
+  device_id_source: self
+  property_path_template: "{capability}/{property_key}"
+display:
+  name_template: "{display_name}"
+  fallback_name_template: "Remote CT {instance_id_short}"
+discovery:
+  $description_owner: self
+  state_owner: self

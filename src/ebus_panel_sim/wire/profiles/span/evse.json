@@ -28,7 +28,8 @@
         "advertised-current": {
           "name": "Current EVSE is advertising to the EV",
           "datatype": "float",
-          "unit": "A"
+          "unit": "A",
+          "literal": "shortest"
         }
       }
     },
@@ -39,12 +40,14 @@
           "name": "User-configured maximum EVSE charge current (ceiling)",
           "datatype": "integer",
           "unit": "A",
-          "settable": true
+          "settable": true,
+          "literal": "integer"
         },
         "max-charge-current": {
           "name": "Commissioned maximum EVSE charge current (installer-configured)",
           "datatype": "integer",
-          "unit": "A"
+          "unit": "A",
+          "literal": "integer"
         }
       }
     }

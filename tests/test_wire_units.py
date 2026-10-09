@@ -46,7 +46,7 @@ def _shipped(attr: str) -> set[str]:
     a unit or datatype reachable from either reaches the wire.
     """
     out: set[str] = set()
-    for variant in ("span", "reference"):
+    for variant in ("span", "span-alpha-test-b2", "reference"):
         for profile in load_profiles(variant=variant).values():
             for cap in profile.capabilities.values():
                 for prop in cap.properties.values():
@@ -198,7 +198,7 @@ def test_published_description_datatypes_are_ones_a_profile_declares(rec: PahoRe
     Emitter(_manifest(), SetterRegistry(), bess_configs=(cfg,)).start()
 
     declared: set[tuple[str, str, str]] = set()
-    for variant in ("span", "reference"):
+    for variant in ("span", "span-alpha-test-b2", "reference"):
         for profile in load_profiles(variant=variant).values():
             for cap in profile.capabilities.values():
                 for key, prop in cap.properties.items():

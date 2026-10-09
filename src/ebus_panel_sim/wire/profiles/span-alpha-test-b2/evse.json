@@ -1,0 +1,12 @@
+{
+  "capabilities": {
+    "meter": null,
+    "switch": {
+      "properties": {
+        "lock-state": {
+          "settable": true
+        }
+      }
+    }
+  }
+}

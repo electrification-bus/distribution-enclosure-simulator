@@ -1,0 +1,66 @@
+schema: panel-sim-definition/1
+variant: span-alpha-test-b2
+devices:
+- class: panel
+  id: masked-panel
+  name: SPAN Panel eBus Adapter
+  metadata:
+    vendor-name: SPAN
+    serial-number: MASKED-PANEL
+    firmware-version: spanos3/r202639/03
+    hardware-version: '3.0'
+    panel-model: UNKNOWN
+    panel-size: '16'
+    main-breaker-rating-a: '125'
+    postal-code: '00000'
+    time-zone: America/Los_Angeles
+    line-voltage-v: '122.0'
+    service-voltage-v: '244.0'
+- class: lugs
+  id: lugs-upstream
+  name: Upstream lugs
+  metadata:
+    direction: upstream
+    service-rating-a: '100'
+    overcurrent-protection-a: '125'
+- class: lugs
+  id: lugs-downstream
+  name: Downstream lugs
+  metadata:
+    direction: downstream
+- class: circuit
+  id: circuit-1
+  name: 7 Bathroom / Outlets
+  metadata:
+    tab-numbers: '14'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BATHROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '4094.9'
+    initial-produced-wh: '274.2'
+- class: circuit
+  id: circuit-2
+  name: 6 Kitchen / Outlets
+  metadata:
+    tab-numbers: '16'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: KITCHEN
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '4153.5'
+    initial-produced-wh: '296.2'
+- class: remote-ct
+  id: remote-ct-3
+  name: Service CT
+  metadata: {}

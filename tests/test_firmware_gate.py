@@ -8,12 +8,15 @@ anyone set it. From 202639 the BESS meter is the battery's own frame
 (``devices/bess.md``: positive while discharging), the negative of
 ``power-flows/battery``, and the user limit is unpublished until a user sets it.
 A firmware string with no release build, as the examples carry, gets the
-current conventions; the reference variant always does."""
+current conventions, and so does span-alpha-test-b2 on any firmware; the reference
+variant always publishes the battery's own frame and declares no user limit."""
 
 from __future__ import annotations
 
 import dataclasses
 import json
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -21,6 +24,7 @@ import pytest
 from ebus_panel_sim import (
     BESSConfig,
     DeviceManifest,
+    EbusPanelSnapshot,
     Emitter,
     SetterRegistry,
     TickInputs,
@@ -28,6 +32,8 @@ from ebus_panel_sim import (
     load_definition,
     load_ticks,
 )
+from ebus_panel_sim.firmware import BessMeterFrame
+from ebus_panel_sim.wire.bag_builder import BagBuilder
 
 from .conftest import PahoRecorder
 from .test_connection import _manifest
@@ -101,6 +107,9 @@ def test_before_202639_the_bess_meter_equals_power_flows_battery(rec: PahoRecord
     # Pinned absolutely too: the panel's frame is negative while discharging, and
     # the snapshot keeps the battery's own frame.
     assert wire == pytest.approx(-device_frame)
+    # Written as power-flows/battery is, an integer, whatever the reading.
+    assert rec.retained[_BESS_METER] == rec.retained[_POWER_FLOWS_BATTERY]
+    assert "." not in rec.retained[_BESS_METER]
 
 
 @pytest.mark.parametrize("firmware", [_CURRENT, _UNVERSIONED])
@@ -176,29 +185,51 @@ def test_the_user_limit_format_is_the_same_on_every_firmware(
     assert declaration["format"] == "6:32"
 
 
-# ---- end to end: the shipped example on either firmware -----------------------
+# ---- end to end: the shipped examples on either firmware ----------------------
 
 
-def _run_example(rec: PahoRecorder, firmware: str | None) -> dict[str, object]:
-    """The shipped example's retained tree after its ticks, with the panel's
-    ``firmware-version`` replaced when ``firmware`` is given."""
-    definition = load_definition(_EXAMPLES / "forty_tab_minimal.yaml")
+@dataclass(frozen=True, slots=True)
+class _ExampleRun:
+    emitter: Emitter
+    snapshots: list[EbusPanelSnapshot]
+    tree: dict[str, object]
+
+
+def _run_example(
+    rec: PahoRecorder,
+    example: str,
+    firmware: str | None,
+    *,
+    sets: Mapping[tuple[str, str, str], str] | None = None,
+) -> _ExampleRun:
+    """Run ``examples/<example>.yaml`` through its ticks and stop it, with the
+    panel's ``firmware-version`` replaced when ``firmware`` is given. Each of
+    ``sets``, keyed ``(entity_class, instance_id, property_path)``, is written
+    through its ``/set`` handler after start and before the first tick. The tree
+    is the retained one after stop."""
+    definition = load_definition(_EXAMPLES / f"{example}.yaml")
     if firmware is not None:
         definition = dataclasses.replace(
             definition, manifest=with_panel_firmware(definition.manifest, firmware)
         )
     rec.reset()
-    emitter = Emitter.from_definition(definition, SetterRegistry())
+    setters = SetterRegistry()
+    emitter = Emitter.from_definition(definition, setters)
     emitter.start()
-    for tick in load_ticks(_EXAMPLES / "forty_tab_minimal.ticks.yaml"):
-        emitter.publish_tick(tick)
+    for (entity_class, instance_id, path), payload in (sets or {}).items():
+        handler = setters.get(entity_class, path)
+        assert handler is not None
+        handler(entity_class, instance_id, path, payload)
+    snapshots = [
+        emitter.publish_tick(tick) for tick in load_ticks(_EXAMPLES / f"{example}.ticks.yaml")
+    ]
     emitter.stop()
-    return _stable(rec.retained)
+    return _ExampleRun(emitter=emitter, snapshots=snapshots, tree=_stable(rec.retained))
 
 
 def test_the_example_before_202639_differs_only_in_the_gated_topics(rec: PahoRecorder) -> None:
-    shipped = _run_example(rec, None)
-    pre = _run_example(rec, _PRE)
+    shipped = _run_example(rec, "forty_tab_minimal", None).tree
+    pre = _run_example(rec, "forty_tab_minimal", _PRE).tree
 
     firmware = "ebus/5/example-40t-001/info/firmware-version"
     bess = "ebus/5/bess/meter/active-power"
@@ -267,3 +298,79 @@ def test_only_the_panels_firmware_selects(rec: PahoRecorder) -> None:
         snap.battery["abc-123-bess"].active_power_w
     )
     assert _USER_MAX not in rec.retained
+
+
+# ---- span-alpha-test-b2: always the current conventions --------------------------
+
+
+_B2 = "span_alpha_test_b2_minimal"
+_B2_FIRMWARE = "ebus/5/example-b2-001/info/firmware-version"
+_B2_BESS_METER = "ebus/5/bess/meter/active-power"
+_B2_POWER_FLOWS_BATTERY = "ebus/5/example-b2-001/power-flows/battery"
+_B2_USER_MAX = "ebus/5/evse/config/user-max-charge-current"
+
+
+def test_span_alpha_test_b2_before_202639_still_publishes_the_current_conventions(
+    rec: PahoRecorder,
+) -> None:
+    """The gate is the span variant's alone: the span-alpha-test-b2 example on a firmware
+    string from before release 202639 publishes the same tree as the shipped
+    one, the firmware topic aside."""
+    shipped = _run_example(rec, _B2, None).tree
+    run = _run_example(rec, _B2, _PRE)
+    pre = run.tree
+
+    assert shipped[_B2_FIRMWARE] == _UNVERSIONED
+    assert pre[_B2_FIRMWARE] == _PRE
+
+    # The BESS meter is the battery's own frame, the negative of power-flows/battery.
+    device_frame = run.snapshots[-1].battery["bess"].active_power_w
+    assert device_frame != 0.0, "the example's battery should be moving power"
+    wire = float(str(pre[_B2_BESS_METER]))
+    assert wire == pytest.approx(device_frame)
+    assert wire == pytest.approx(-float(str(pre[_B2_POWER_FLOWS_BATTERY])))
+
+    # The SPAN Drive's user limit is unpublished until a user sets one.
+    assert _B2_USER_MAX not in pre
+
+    changed = {t for t in shipped.keys() | pre.keys() if shipped.get(t) != pre.get(t)}
+    assert changed == {_B2_FIRMWARE}
+
+    # A user's set publishes, as on any firmware.
+    user_set = _run_example(
+        rec, _B2, _PRE, sets={("evse", "evse", "config/user-max-charge-current"): "24"}
+    )
+    assert user_set.tree[_B2_USER_MAX] == "24"
+
+
+@pytest.mark.parametrize(
+    ("frame", "sign"),
+    [("device", 1.0), ("enclosure", -1.0)],
+)
+def test_the_bess_frame_overrides_its_resolver_beside_the_wire_values(
+    rec: PahoRecorder, frame: BessMeterFrame, sign: float
+) -> None:
+    """``BagBuilder`` binds the hosted BESS's ``meter/active-power`` from its
+    own copy of the resolver table, with the frame override applied, while the
+    commissioning wire values still bind as constants. Binding from the module
+    table instead would publish the device frame for ``enclosure`` and silently
+    drop the span variant's firmware gate."""
+    run = _run_example(rec, _B2, None)
+    em = run.emitter
+    builder = BagBuilder(
+        em._graph,
+        em._mapping,
+        em._profiles,
+        em._typed_wire_values(),
+        bess_meter_frame=frame,
+    )
+    snapshot = run.snapshots[-1]
+    bag = builder.build(snapshot)
+
+    device_frame = snapshot.battery["bess"].active_power_w
+    assert device_frame != 0.0
+    # The bag holds the reading as written, at one decimal.
+    wire = float(str(bag.get(("bess", "bess", "meter/active-power"))))
+    assert wire == pytest.approx(sign * device_frame, abs=0.05)
+    assert bag.get(("panel", "example-b2-001", "info/name")) == "Example Home"
+    assert bag.get(("circuit", "circuit-4", "connection/feeds-role")) == "SOLAR"

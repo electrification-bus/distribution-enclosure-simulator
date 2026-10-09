@@ -1,0 +1,131 @@
+# A SPAN panel published with variant span-alpha-test-b2: circuit-<n> device IDs,
+# no pv device (the solar breaker is circuit-4, with feeds-role SOLAR and a
+# locked relay at NEVER), two circuits sharing one breaker, a meter-only circuit
+# device, and commissioning facts as metadata. Driven by
+# span_alpha_test_b2_minimal.ticks.yaml.
+schema: panel-sim-definition/1
+variant: span-alpha-test-b2
+devices:
+- class: panel
+  id: example-b2-001
+  name: Example Panel
+  metadata:
+    vendor-name: Span
+    serial-number: example-b2-001
+    firmware-version: example/v0.1.0
+    hardware-version: '3.0'
+    panel-size: '40'
+    main-breaker-rating-a: '200'
+    panel-model: MAIN_40
+    postal-code: '94103'
+    time-zone: America/Los_Angeles
+    service-voltage-v: '240.0'
+    line-voltage-v: '120.0'
+    islandable: 'true'
+    site-name: Example Home
+    address-lines: 1 Example Street
+    locality: San Francisco
+    region: CA
+    country-code: US
+    latitude: '37.7749'
+    longitude: '-122.4194'
+- class: lugs
+  id: lugs-upstream
+  name: Upstream lugs
+  metadata:
+    direction: upstream
+    backed-up: BACKED_UP
+    service-rating-a: '200'
+    overcurrent-protection-a: '200'
+- class: lugs
+  id: lugs-downstream
+  name: Downstream lugs
+  metadata:
+    direction: downstream
+    backed-up: BACKED_UP
+- class: circuit
+  id: circuit-1
+  name: Kitchen Lights
+  metadata:
+    tab-numbers: '1'
+    breaker-rating-a: '15.0'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    placement: downstream-of-lugs
+    pcs-priority: '1'
+    tags: LIGHTING
+    nominal-voltage: '120.0'
+    locations: KITCHEN
+    shared-with-device-ids: circuit-2
+- class: circuit
+  id: circuit-2
+  name: Hall Lights
+  metadata:
+    tab-numbers: '1'
+    breaker-rating-a: '15.0'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    placement: downstream-of-lugs
+    pcs-priority: '2'
+    tags: LIGHTING
+    nominal-voltage: '120.0'
+    shared-with-device-ids: circuit-1
+- class: circuit
+  id: circuit-3
+  name: SPAN Drive - Garage
+  metadata:
+    tab-numbers: 32,34
+    breaker-rating-a: '50.0'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    placement: downstream-of-lugs
+    pcs-priority: '3'
+    nominal-voltage: '240.0'
+- class: circuit
+  id: circuit-4
+  name: Solar Inverter
+  metadata:
+    tab-numbers: 36,38
+    breaker-rating-a: '30.0'
+    default-priority: NEVER
+    relay-behavior: non-controllable
+    placement: downstream-of-lugs
+    pcs-priority: '4'
+    feeds-role: SOLAR
+    nominal-voltage: '240.0'
+# A meter on the service conductor, outside the panel.
+- class: remote-ct
+  id: remote-ct-1
+  name: Service CT
+  metadata: {}
+- class: bess
+  id: bess
+  name: Battery
+  metadata:
+    vendor-name: Span
+    nameplate-capacity-kwh: '13.5'
+    relative-position: UPSTREAM
+    model: Example BESS
+    initial-soe-kwh: '6.75'
+- class: evse
+  id: evse
+  name: SPAN Drive - Garage
+  metadata:
+    vendor-name: SPAN
+    model: SPAN Drive
+    part-number: SPN-DRV-001
+    serial-number: SIM-EVSE-example-b2-001
+    firmware-version: example/v0.1.0
+    max-current-a: '32.0'
+    feed: circuit-3
+- class: mid
+  id: bess-mid
+  name: Microgrid Interconnect Device
+  metadata:
+    vendor-name: Span
+bess:
+- instance_id: bess
+  nameplate_capacity_kwh: 13.5
+  max_charge_w: 3500.0
+  max_discharge_w: 3500.0
+  charge_mode: backup-only

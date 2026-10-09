@@ -13,8 +13,9 @@ The span variant impersonates whichever side the panel's own
 ``firmware-version`` names, so one emitter can stand in for either and a
 consumer can be tested across the change. A firmware string with no release
 build in it, such as the examples' ``example/v0.1.0``, gets the current
-conventions, and so does every other variant: the reference variant publishes
-the specification's frame whatever firmware it reports.
+conventions, and so does every other variant: the span-alpha-test-b2 and
+reference variants publish the specification's frame whatever firmware they
+report.
 """
 
 from __future__ import annotations

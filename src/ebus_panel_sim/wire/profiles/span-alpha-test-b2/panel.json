@@ -1,0 +1,77 @@
+{
+  "capabilities": {
+    "info": {
+      "properties": {
+        "name": {
+          "name": "User-assigned name for the site",
+          "datatype": "string"
+        },
+        "address-lines": {
+          "name": "Street address lines as recorded at commissioning",
+          "datatype": "string"
+        },
+        "locality": {
+          "name": "City or locality",
+          "datatype": "string"
+        },
+        "region": {
+          "name": "State, province or region",
+          "datatype": "string"
+        },
+        "country-code": {
+          "name": "Country or locale code as recorded at commissioning",
+          "datatype": "string"
+        },
+        "latitude": {
+          "name": "Site latitude (WGS84 decimal degrees, positive north)",
+          "datatype": "float",
+          "unit": "°"
+        },
+        "longitude": {
+          "name": "Site longitude (WGS84 decimal degrees, positive east)",
+          "datatype": "float",
+          "unit": "°"
+        },
+        "utility-meter-serial-number": {
+          "name": "Serial number of the utility meter serving the site",
+          "datatype": "string"
+        },
+        "model": {
+          "format": "MAIN_16,MLO_24,MAIN_32,MAIN_40,MLO_48,UNKNOWN"
+        }
+      }
+    },
+    "meter": {
+      "properties": {
+        "busbar-current": {
+          "name": "Estimated busbar current",
+          "datatype": "float",
+          "unit": "A"
+        },
+        "frequency": {
+          "name": "Line frequency"
+        }
+      }
+    },
+    "pcs": {
+      "properties": {
+        "off-grid-import-limit": {
+          "literal": "1dp"
+        }
+      }
+    },
+    "power-flows": {
+      "properties": {
+        "pv": {
+          "literal": "1dp"
+        },
+        "battery": {
+          "literal": "1dp"
+        },
+        "grid": {
+          "literal": "1dp"
+        }
+      }
+    }
+  }
+}

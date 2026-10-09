@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from ebus_panel_sim import Emitter, SetterRegistry, TickInputs
 from ebus_panel_sim.capture import (
     Tree,
@@ -76,3 +78,22 @@ def test_a_sample_of_the_real_tree_becomes_a_replayable_tick(rec: PahoRecorder) 
     em = Emitter.from_definition(definition, SetterRegistry())
     em.start()
     em.publish_tick(tick)
+
+
+@pytest.mark.parametrize("mask", [False, True])
+def test_a_device_the_panel_names_by_its_id_keeps_that_name(rec: PahoRecorder, mask: bool) -> None:
+    """The panel names its battery, inverter, MID and lugs by their device ids. A
+    captured definition names each by its published id, so the rebuilt panel does
+    too; a circuit named as its ``info/name`` takes the definition's name."""
+    real = _tree()
+    named_by_id = {i for i, d in real.items() if d.description.get("name") == i}
+    assert {real[i].type for i in named_by_id} == {"bess", "pv", "mid", "lugs"}
+    definition, _ = definition_from_tree(real, mask=mask)
+    for inst in definition.manifest.of_class("circuit"):
+        assert inst.description_name is None
+    rebuilt = _rebuilt(rec, mask=mask)
+    named = [d for d in rebuilt.values() if d.type in ("bess", "pv", "mid", "lugs")]
+    assert len(named) == len(named_by_id)
+    for device_id, device in rebuilt.items():
+        if device.type in ("bess", "pv", "mid", "lugs"):
+            assert device.description["name"] == device_id

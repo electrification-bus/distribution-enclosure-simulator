@@ -42,10 +42,17 @@ _TICK = TickInputs(
 )
 
 
+# The example's battery charge in tenths of a kWh, as the panel writes it (the
+# example's 6.75 would come back as 6.8), so the charge a capture reads back is
+# the one the source started from.
+_BESS_CHARGE = {"initial-soe-kwh": "6.8"}
+
+
 def _source() -> PanelDefinition:
     """The shipped example, with what a tree cannot carry set to capture's defaults:
     branch circuits in the panel, and default BESS dispatch. Load shedding uses the
-    threshold the emitter's default shed policy publishes, which capture reads back."""
+    threshold the emitter's default shed policy publishes, which capture reads back.
+    The battery starts at ``_BESS_CHARGE``."""
     example = load_definition(_EXAMPLES / "forty_tab_minimal.yaml")
     instances = tuple(
         DeviceInstance(
@@ -54,6 +61,8 @@ def _source() -> PanelDefinition:
             i.display_name,
             {**i.metadata, "placement": "upstream-of-lugs"}
             if i.entity_class == "circuit"
+            else {**i.metadata, **_BESS_CHARGE}
+            if i.entity_class == "bess"
             else i.metadata,
         )
         for i in example.manifest.instances
@@ -549,3 +558,55 @@ def test_completeness_ignores_other_roots_on_the_broker(
 def test_capture_live_refuses_a_username_without_a_password() -> None:
     with pytest.raises(CaptureError, match="needs a password"):
         capture_live("h", 1883, use_tls=False, username="u")
+
+
+def _variant_source() -> PanelDefinition:
+    """The span-alpha-test-b2 example with its circuits in the panel (placement is not
+    published, and capture places circuits upstream-of-lugs), and its battery
+    starting at ``_BESS_CHARGE``."""
+    example = load_definition(_EXAMPLES / "span_alpha_test_b2_minimal.yaml")
+    return dataclasses.replace(
+        example,
+        manifest=DeviceManifest(
+            instances=tuple(
+                DeviceInstance(
+                    i.entity_class,
+                    i.instance_id,
+                    i.display_name,
+                    {**i.metadata, "placement": "upstream-of-lugs"}
+                    if i.entity_class == "circuit"
+                    else {**i.metadata, **_BESS_CHARGE}
+                    if i.entity_class == "bess"
+                    else i.metadata,
+                )
+                for i in example.manifest.instances
+            )
+        ),
+    )
+
+
+def test_a_span_alpha_test_b2_panel_captures_and_rebuilds(rec: PahoRecorder) -> None:
+    source = _variant_source()
+    original = _publish(rec, source)
+    captured, _ = definition_from_tree(tree_from_retained(original), mask=False)
+    assert captured.variant == "span-alpha-test-b2"
+    assert [i.instance_id for i in captured.manifest.of_class("remote-ct")] == ["remote-ct-1"]
+    circuit = next(
+        i for i in captured.manifest.of_class("circuit") if i.instance_id == "circuit-4"
+    )
+    assert circuit.metadata["feeds-role"] == "SOLAR"
+    assert _stable(_publish(rec, captured)) == _stable(original)
+
+
+def test_masking_a_span_alpha_test_b2_panel_drops_the_site_and_remaps_shared_breakers(
+    rec: PahoRecorder,
+) -> None:
+    original = _publish(rec, load_definition(_EXAMPLES / "span_alpha_test_b2_minimal.yaml"))
+    captured, _ = definition_from_tree(tree_from_retained(original))
+    panel = captured.manifest.of_class("panel")[0]
+    assert not {"site-name", "address-lines", "latitude", "longitude"} & set(panel.metadata)
+    ids = {i.instance_id for i in captured.manifest.instances}
+    for inst in captured.manifest.of_class("circuit"):
+        for shared in inst.metadata.get("shared-with-device-ids", "").split(","):
+            assert not shared or shared in ids
+    _publish(rec, captured)

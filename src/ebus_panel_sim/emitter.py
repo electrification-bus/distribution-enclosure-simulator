@@ -20,7 +20,11 @@ from typing import Any, Final, get_args
 
 from ebus_panel_sim.definition import PanelDefinition
 from ebus_panel_sim.energy_integrator import EnergyIntegrator
-from ebus_panel_sim.exceptions import EmitterStateError, ProfileValidationError
+from ebus_panel_sim.exceptions import (
+    EmitterStateError,
+    ManifestValidationError,
+    ProfileValidationError,
+)
 from ebus_panel_sim.firmware import firmware_conventions
 from ebus_panel_sim.manifest import DeviceManifest
 from ebus_panel_sim.manifest_physics import EVSE_MIN_CHARGE_CURRENT_A, ManifestPhysicsView
@@ -50,6 +54,7 @@ from ebus_panel_sim.snapshot import (
     EbusPanelSnapshot,
     EbusPanelStatus,
     EbusPvSnapshot,
+    EbusRemoteCtSnapshot,
 )
 from ebus_panel_sim.tick_inputs import BESSCommunication, TickInputs
 from ebus_panel_sim.wire._sdk_seam import (
@@ -80,6 +85,15 @@ _BESS_COMMUNICATION_STATES: Final[frozenset[str]] = frozenset(get_args(BESSCommu
 # A SPAN panel declares the catalog's full enum on a connection status but reports
 # only these values there (SPAN-API-Client-Docs specs/r202633/homie-schema.json).
 _SPAN_REPORTED_LINK_STATUSES: Final = frozenset({"OK", "LOST"})
+_NOMINAL_FREQUENCY_HZ = 60.0
+
+
+def _busbar_current(site_w: float, service_voltage_v: float) -> float | None:
+    """Estimated busbar current: the site's power over the service voltage, in A
+    to one decimal, unpublished when exactly 0. A SPAN panel estimates it from
+    apparent power; this model has active power only."""
+    amps = round(abs(site_w) / service_voltage_v, 1) if service_voltage_v > 0 else 0.0
+    return amps or None
 
 
 def _declared_enum(
@@ -100,9 +114,9 @@ def _reported_link_statuses(
     profiles: ProfileTable, variant: Variant, entity_class: str, prop: str
 ) -> frozenset[str]:
     """The values a connection status reports: what its profile declares, narrowed
-    to ``OK`` and ``LOST`` for the span variant, as a SPAN panel reports."""
+    to ``OK`` and ``LOST`` for the SPAN variants, as a SPAN panel reports."""
     declared = _declared_enum(profiles, entity_class, "connection", prop)
-    return declared & _SPAN_REPORTED_LINK_STATUSES if variant == "span" else declared
+    return declared & _SPAN_REPORTED_LINK_STATUSES if variant != "reference" else declared
 
 
 def _link_status(communication: BESSCommunication, reported: frozenset[str]) -> str:
@@ -110,6 +124,24 @@ def _link_status(communication: BESSCommunication, reported: frozenset[str]) -> 
     itself where the status reports it, and ``LOST`` otherwise. No connection catalog
     declares ``UNKNOWN``, and a SPAN panel reports ``DEGRADED`` as ``LOST`` too."""
     return communication if communication in reported else "LOST"
+
+
+def _typed(raw: str, datatype: str, fmt: str | None, *, where: str) -> object:
+    """A metadata string as a value of the property's Homie datatype."""
+    try:
+        if datatype == "float":
+            return float(raw)
+        if datatype == "integer":
+            return int(raw)
+    except ValueError as exc:
+        raise ManifestValidationError(f"{where}: not a {datatype} ({raw!r})") from exc
+    if datatype == "boolean":
+        if raw.lower() not in ("true", "false"):
+            raise ManifestValidationError(f"{where}: not a boolean ({raw!r})")
+        return raw.lower() == "true"
+    if datatype == "enum" and fmt is not None and raw not in fmt.split(","):
+        raise ManifestValidationError(f"{where}: must be one of {fmt}, got {raw!r}")
+    return raw
 
 
 class Emitter:
@@ -151,8 +183,32 @@ class Emitter:
             self._mqtt_cfg = dict(mqtt_cfg) if mqtt_cfg is not None else dict(_DEFAULT_MQTT_CFG)
 
         # variant="span" (default) publishes the SPAN-faithful surface (status
-        # diagnostics, read-only shed/policy, the legacy evse config); "reference"
-        # is the vendor-neutral spec-conformant tree.
+        # diagnostics, read-only shed/policy, the legacy evse config);
+        # "span-alpha-test-b2" layers on it site, busbar and frequency properties,
+        # commissioning facts and a meter-only circuit device; "reference" is the
+        # vendor-neutral spec-conformant tree.
+        self._variant = variant
+        if variant == "span-alpha-test-b2" and manifest.of_class("pv"):
+            raise ManifestValidationError(
+                "variant 'span-alpha-test-b2' publishes no pv device; mark the circuit that feeds "
+                "the inverter with feeds-role SOLAR instead"
+            )
+        remote_cts = manifest.of_class("remote-ct")
+        if remote_cts and variant != "span-alpha-test-b2":
+            raise ManifestValidationError(
+                "a remote-ct is published only by variant 'span-alpha-test-b2'"
+            )
+        if len(remote_cts) > 1:
+            raise ManifestValidationError(
+                f"at most one remote-ct per panel, got {len(remote_cts)}"
+            )
+        if variant == "span-alpha-test-b2" and any(
+            i.metadata.get("commissioned-system") for i in manifest.of_class("circuit")
+        ):
+            raise ManifestValidationError(
+                "variant 'span-alpha-test-b2' has no commissioned-system circuits; a PV or "
+                "battery breaker is an ordinary circuit with a locked relay at priority NEVER"
+            )
         self._profiles = load_profiles(variant=variant)
         self._mapping = load_mapping_table()
         self._mapping.validate_against(self._profiles)
@@ -162,7 +218,12 @@ class Emitter:
         # way. Construction opens no socket: an owned client connects in start(),
         # an injected one is already the caller's to connect.
         self._graph = build_graph(
-            manifest, self._mapping, self._profiles, mqtt_cfg=self._mqtt_cfg, mqttc=self._mqttc
+            manifest,
+            self._mapping,
+            self._profiles,
+            mqtt_cfg=self._mqtt_cfg,
+            mqttc=self._mqttc,
+            priority_locked_by_relay=variant == "span-alpha-test-b2",
         )
         self._root = self._graph.devices[self._graph.root_id]
 
@@ -196,7 +257,9 @@ class Emitter:
         # `RelayResolver` registers the relay lock once. An override never enters
         # the map above, so the published value stays the commissioned one.
         self._priority_locked: frozenset[str] = frozenset(
-            cid for cid, cphys in self._physics.all_circuits().items() if cphys.priority_locked
+            cid
+            for cid, cphys in self._physics.all_circuits().items()
+            if cphys.priority_locked or (variant == "span-alpha-test-b2" and cphys.always_on)
         )
         self._name_overrides: dict[str, str] = {}
         self._dominant_power_source_override: str | None = None
@@ -212,9 +275,19 @@ class Emitter:
         self._fed_by_status_values = _reported_link_statuses(
             self._profiles, variant, "lugs", "fed-by-device-status"
         )
+        # The link states that make an assertion acceptable once a link has been
+        # observed. Under span-alpha-test-b2 UNKNOWN does not count; otherwise any
+        # state but OK does.
+        self._assertion_link_states: frozenset[str] | None = (
+            frozenset({"LOST", "DEGRADED"}) if variant == "span-alpha-test-b2" else None
+        )
         self._shed_policy_override: str | None = None
         self._evse_user_max_override: dict[str, int] = {}
+        self._evse_lock_override: dict[str, str] = {}
 
+        self._remote_ct_ids = tuple(i.instance_id for i in manifest.of_class("remote-ct"))
+        for rct_id in self._remote_ct_ids:
+            self._energy.register(rct_id)
         for cid, cphys in self._physics.all_circuits().items():
             self._relays.register(cid, always_on=cphys.always_on)
             self._energy.register(cid)
@@ -265,10 +338,32 @@ class Emitter:
             self._graph,
             self._mapping,
             self._profiles,
+            self._typed_wire_values(),
             bess_meter_frame=self._conventions.bess_meter_frame,
         )
         self._last_snapshot: EbusPanelSnapshot | None = None
         self._started = False
+
+    def _typed_wire_values(self) -> dict[tuple[str, str, str], object]:
+        """The manifest's verbatim commissioning values, typed by the profile.
+
+        A value for a path the variant's profile does not declare is dropped."""
+        sources: list[tuple[str, str, dict[str, str]]] = [
+            ("panel", self._graph.root_id, self._physics.panel.wire_values),
+            *(("circuit", cid, c.wire_values) for cid, c in self._physics.all_circuits().items()),
+            *(("lugs", lid, lg.wire_values) for lid, lg in self._physics.all_lugs().items()),
+        ]
+        out: dict[tuple[str, str, str], object] = {}
+        for entity_class, instance_id, values in sources:
+            for path, raw in values.items():
+                cap_name, prop_key = path.split("/", 1)
+                cap = self._profiles[entity_class].capabilities.get(cap_name)
+                prop = cap.properties.get(prop_key) if cap is not None else None
+                if prop is not None:
+                    out[(entity_class, instance_id, path)] = _typed(
+                        raw, prop.datatype, prop.format, where=f"{instance_id} {path}"
+                    )
+        return out
 
     def _wire_set_callbacks(
         self,
@@ -665,6 +760,19 @@ class Emitter:
                 EVSE_MIN_CHARGE_CURRENT_A, min(requested, ceiling)
             )
 
+        def on_evse_lock(
+            entity_class: str,
+            instance_id: str,
+            prop_path: str,
+            value: object,
+        ) -> None:
+            del entity_class, prop_path
+            requested = str(value).upper()
+            if requested not in ("LOCKED", "UNLOCKED"):
+                _LOG.warning("evse %s: refusing lock-state %r", instance_id, value)
+                return
+            self._evse_lock_override[instance_id] = requested
+
         if registry.get("circuit", "switch/relay") is None:
             registry.register("circuit", "switch/relay", on_circuit_relay)
         if registry.get("circuit", "load-shed/priority") is None:
@@ -673,6 +781,8 @@ class Emitter:
             registry.register("panel", "shed/asserted-islanding-state", on_asserted_islanding)
         if registry.get("panel", "shed/policy") is None:
             registry.register("panel", "shed/policy", on_shed_policy)
+        if registry.get("evse", "switch/lock-state") is None:
+            registry.register("evse", "switch/lock-state", on_evse_lock)
         if registry.get("evse", "config/user-max-charge-current") is None:
             registry.register("evse", "config/user-max-charge-current", on_evse_user_max)
 
@@ -855,7 +965,13 @@ class Emitter:
                 always_on=cphys.always_on,
                 pcs_managed=not cphys.always_on,
                 pcs_priority=cphys.pcs_priority,
-                relay_requester=str(requester),
+                # CONFIGURATION is not in span-alpha-test-b2's format; a locked relay
+                # with no disconnect reason held reports NONE there.
+                relay_requester=(
+                    "NONE"
+                    if self._variant == "span-alpha-test-b2" and requester == "CONFIGURATION"
+                    else str(requester)
+                ),
                 energy_accum_update_time_s=int(tick.current_time),
                 instant_power_update_time_s=int(tick.current_time),
                 feeds_device_id=edge[0] if edge else None,
@@ -936,7 +1052,7 @@ class Emitter:
                 node_id=eid,
                 feed_circuit_id=ephys.feed,
                 status="CHARGING" if charging else "AVAILABLE",
-                lock_state="LOCKED" if charging else "UNLOCKED",
+                lock_state=self._evse_lock_override.get(eid, "LOCKED" if charging else "UNLOCKED"),
                 advertised_current_a=ephys.max_current_a,
                 max_charge_current_a=int(ephys.max_current_a),
                 user_max_charge_current_a=self._evse_user_max_override.get(eid, user_max_unset),
@@ -1008,6 +1124,8 @@ class Emitter:
             upstream_l2_current_a=meter.upstream_l2_current_a,
             downstream_l1_current_a=meter.downstream_l1_current_a,
             downstream_l2_current_a=meter.downstream_l2_current_a,
+            busbar_current_a=_busbar_current(meter.power_flow_site, panel_phys.service_voltage_v),
+            frequency_hz=_NOMINAL_FREQUENCY_HZ if meter.line_voltage_v > 0 else None,
         )
         status = EbusPanelStatus(
             main_relay_state=meter.main_relay_state,
@@ -1030,10 +1148,22 @@ class Emitter:
             grid_state=meter.grid_state,
             dsm_state=meter.dsm_state,
             current_run_config=meter.current_run_config,
+            # Never valued under span-alpha-test-b2.
+            requested_import_limit_a=None if self._variant == "span-alpha-test-b2" else 0.0,
+        )
+        # Under span-alpha-test-b2, a panel with neither a battery nor solar (a
+        # circuit commissioned feeds-role SOLAR) leaves pv and battery unset.
+        loads_only = (
+            self._variant == "span-alpha-test-b2"
+            and not has_battery
+            and not any(
+                c.wire_values.get("connection/feeds-role") == "SOLAR"
+                for c in circuits_phys.values()
+            )
         )
         power_flows = EbusPanelPowerFlows(
-            pv=meter.power_flow_pv,
-            battery=meter.power_flow_battery,
+            pv=None if loads_only else meter.power_flow_pv,
+            battery=None if loads_only else meter.power_flow_battery,
             grid=meter.power_flow_grid,
             site=meter.power_flow_site,
         )
@@ -1060,6 +1190,23 @@ class Emitter:
             else EbusPanelShedForecast()
         )
 
+        # A remote-ct meters the service conductor: utility-side grid power,
+        # positive on import.
+        remote_ct_snaps: dict[str, EbusRemoteCtSnapshot] = {}
+        for rct_id in self._remote_ct_ids:
+            self._energy.observe(rct_id, meter.instant_grid_power_w, tick.current_time)
+            estate = self._energy.state(rct_id)
+            remote_ct_snaps[rct_id] = EbusRemoteCtSnapshot(
+                active_power_w=meter.instant_grid_power_w,
+                current_a=(
+                    abs(meter.instant_grid_power_w) / panel_phys.service_voltage_v
+                    if panel_phys.service_voltage_v > 0
+                    else 0.0
+                ),
+                imported_energy_wh=estate.consumed_wh,
+                exported_energy_wh=estate.produced_wh,
+            )
+
         return EbusPanelSnapshot(
             info=info,
             door=door,
@@ -1075,6 +1222,7 @@ class Emitter:
             evse=evse_snaps,
             lugs=lugs_snaps,
             mid=mid_snaps,
+            remote_ct=remote_ct_snaps,
         )
 
     def _validate_bess_communication(self, links: Mapping[str, str]) -> None:
@@ -1100,13 +1248,15 @@ class Emitter:
         link to lose and never does."""
         if self._bess_links is None:
             return bool(self._bess)
+        if self._assertion_link_states is not None:
+            return any(link in self._assertion_link_states for link in self._bess_links.values())
         return any(link != "OK" for link in self._bess_links.values())
 
     def _expire_assertion(self, now: float) -> None:
         """Clear an active assertion once every battery link has been ``OK`` for
         ``ASSERTION_CLEAR_AFTER_S``, as the panel does when it reclaims authority.
         Any unhealthy tick restarts the wait, so a flapping link keeps it."""
-        if self._assertion_eligible():
+        if any(link != "OK" for link in (self._bess_links or {}).values()):
             self._links_healthy_since = None
             return
         if self._links_healthy_since is None:

@@ -1,0 +1,143 @@
+schema: panel-sim-definition/1
+variant: span-alpha-test-b2
+devices:
+- class: panel
+  id: masked-panel
+  name: SPAN Panel eBus Adapter
+  metadata:
+    vendor-name: SPAN
+    serial-number: MASKED-PANEL
+    firmware-version: spanos3/r202639/03
+    hardware-version: '3.0'
+    panel-model: MAIN_40
+    panel-size: '40'
+    main-breaker-rating-a: '90'
+    postal-code: '00000'
+    time-zone: America/Los_Angeles
+    line-voltage-v: '121.8'
+    service-voltage-v: '243.6'
+    islandable: 'true'
+- class: bess
+  id: bess-1
+  name: bess-1
+  metadata:
+    vendor-name: Tesla
+    model: Powerwall 3
+    part-number: 1707000-11-K
+    serial-number: MASKED-BESS-1
+    nameplate-capacity-kwh: '13.5'
+    relative-position: IN_PANEL
+    feed: circuit-5
+    initial-soe-kwh: '7.2'
+- class: lugs
+  id: lugs-upstream
+  name: Upstream lugs
+  metadata:
+    direction: upstream
+    service-rating-a: '90'
+- class: lugs
+  id: lugs-downstream
+  name: Downstream lugs
+  metadata:
+    direction: downstream
+    feeds-role: LOADS
+- class: circuit
+  id: circuit-1
+  name: Bedroom / Lights
+  metadata:
+    tab-numbers: '9'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BEDROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '184509.3'
+    initial-produced-wh: '427.2'
+- class: circuit
+  id: circuit-3
+  name: Bathroom / Outlets
+  metadata:
+    tab-numbers: '17'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BATHROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '4493.9'
+    initial-produced-wh: '108.1'
+- class: circuit
+  id: circuit-4
+  name: Living room / Lights
+  metadata:
+    tab-numbers: '19'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: LIVING_ROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '43'
+    initial-consumed-wh: '17866.6'
+    initial-produced-wh: '111.3'
+- class: circuit
+  id: circuit-2
+  name: Other
+  metadata:
+    tab-numbers: 10,12
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    never-backup: 'true'
+    tags: OTHER
+    nominal-voltage: '240.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '32'
+    initial-consumed-wh: '116241.8'
+    initial-produced-wh: '758.7'
+- class: circuit
+  id: circuit-5
+  name: Tesla
+  metadata:
+    tab-numbers: 43,45
+    placement: upstream-of-lugs
+    breaker-rating-a: '60'
+    dipole: 'true'
+    default-priority: NEVER
+    relay-behavior: non-controllable
+    nominal-voltage: '240.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '139893.5'
+    initial-produced-wh: '159710.3'
+- class: mid
+  id: mid-1
+  name: mid-1
+  metadata:
+    vendor-name: Tesla
+    serial-number: MASKED-MID-1
+bess:
+- instance_id: bess-1
+  nameplate_capacity_kwh: 13.5
+  max_charge_w: 5000.0
+  max_discharge_w: 5000.0
+  charge_efficiency: 0.95
+  discharge_efficiency: 0.95
+  backup_reserve_pct: 20.0
+  charge_mode: self-consumption
+  charge_hours: []
+  discharge_hours: []
+  initial_soc_pct: 53.4
+load_shedding:
+  soc_threshold_pct: 49.0

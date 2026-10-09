@@ -11,8 +11,15 @@ carries a full inline definition instead, which hydration uses as-is.
 
 ``variant='span'`` (the default) deep-merges the ``profiles/span/*.json`` overlay (the
 SPAN-vendor-specific surface + conformance-latitude overrides) onto the base, where an
-overlay ``null`` removes a base capability or property; ``variant='reference'`` loads the
+overlay ``null`` removes a base capability or property. ``variant='span-alpha-test-b2'`` then
+merges ``profiles/span-alpha-test-b2/*.json`` on top: site, busbar and frequency properties and
+the commissioning facts a circuit or lugs can carry. ``variant='reference'`` loads the
 spec-conformant base only.
+
+A numeric property may carry a ``literal`` entry, ``"integer"``, ``"<n>dp"`` or
+``"shortest"``: the form its numbers are written in on the wire
+(``ebus_panel_sim.wire.literal``). The span overlay gives one to every number the span
+variant publishes; a property without one is published as its value converts.
 """
 
 from __future__ import annotations
@@ -23,12 +30,18 @@ from pathlib import Path
 from typing import Any, Literal
 
 from ebus_panel_sim.exceptions import ProfileValidationError
+from ebus_panel_sim.wire.literal import LiteralForm, parse_literal_form
 
 _DEFAULT_DIR = Path(__file__).parent / "profiles"
 _CATALOG_DIR = Path(__file__).parent / "catalogs"
-_OVERLAY_SUBDIR = "span"
+Variant = Literal["span", "span-alpha-test-b2", "reference"]
 
-Variant = Literal["span", "reference"]
+# The overlay subdirectories each variant merges onto the base, in order.
+_OVERLAYS: dict[str, tuple[str, ...]] = {
+    "span": ("span",),
+    "span-alpha-test-b2": ("span", "span-alpha-test-b2"),
+    "reference": (),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +51,7 @@ class ProfileProperty:
     unit: str | None
     format: str | None
     settable: bool
+    literal: LiteralForm | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,16 +87,15 @@ def load_profiles(
     variant: Variant = "span",
     catalog_dir: Path = _CATALOG_DIR,
 ) -> ProfileTable:
-    """Hydrate the base selections against the vendored catalogs, merging the SPAN
-    overlay when ``variant='span'``."""
+    """Hydrate the base selections against the vendored catalogs, merging the
+    variant's overlays in order."""
     catalogs = _load_catalogs(catalog_dir)
-    overlay_dir = directory / _OVERLAY_SUBDIR
     table = ProfileTable()
-    for path in sorted(directory.glob("*.json")):  # base only; the span/ subdir is not matched
+    for path in sorted(directory.glob("*.json")):  # base only; overlay subdirs are not matched
         entity_class = path.stem
         raw = json.loads(path.read_text())
-        if variant == "span":
-            overlay_path = overlay_dir / f"{entity_class}.json"
+        for subdir in _OVERLAYS[variant]:
+            overlay_path = directory / subdir / f"{entity_class}.json"
             if overlay_path.exists():
                 raw = _merge_overlay(raw, json.loads(overlay_path.read_text()), overlay_path)
         table[entity_class] = _hydrate_profile(entity_class, path, raw, catalogs)
@@ -208,22 +221,47 @@ def _hydrate_property(
     with ``name`` (and any explicit ``settable`` override) taken from the selection.
     A selection with no catalog home is an error."""
     if "datatype" in sel:
+        datatype = sel["datatype"]
         return ProfileProperty(
             name=sel["name"],
-            datatype=sel["datatype"],
+            datatype=datatype,
             unit=sel.get("unit"),
             format=_resolve_format(sel, None),
             settable=bool(sel.get("settable", False)),
+            literal=_literal(path, cap_name, key, sel, datatype),
         )
     if catalog_def is None:
         raise ProfileValidationError(
             f"{path}: {cap_name}/{key} is selected but absent from the "
             "catalog and has no inline datatype"
         )
+    datatype = catalog_def["datatype"]
     return ProfileProperty(
         name=sel.get("name") or catalog_def.get("name") or key,
-        datatype=catalog_def["datatype"],
+        datatype=datatype,
         unit=sel.get("unit", catalog_def.get("unit")),
         format=_resolve_format(sel, catalog_def),
         settable=bool(sel.get("settable", catalog_def.get("settable", False))),
+        literal=_literal(path, cap_name, key, sel, datatype),
     )
+
+
+def _literal(
+    path: Path, cap_name: str, key: str, sel: dict[str, Any], datatype: str
+) -> LiteralForm | None:
+    """The selection's ``literal`` form, which only an integer or float property
+    may carry, and an integer property only as ``"integer"``."""
+    if "literal" not in sel:
+        return None
+    form = parse_literal_form(sel["literal"])
+    if form is None:
+        raise ProfileValidationError(
+            f"{path}: {cap_name}/{key} literal must be 'integer', '<n>dp' or 'shortest', "
+            f"got {sel['literal']!r}"
+        )
+    if datatype not in ("integer", "float") or (datatype == "integer" and form.kind != "integer"):
+        raise ProfileValidationError(
+            f"{path}: {cap_name}/{key} literal {sel['literal']!r} does not fit a "
+            f"{datatype} property"
+        )
+    return form

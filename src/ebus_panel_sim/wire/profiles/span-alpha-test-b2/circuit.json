@@ -1,0 +1,68 @@
+{
+  "capabilities": {
+    "info": {
+      "properties": {
+        "tags": {
+          "name": "Load-type tags for the circuit",
+          "datatype": "string"
+        },
+        "locations": {
+          "name": "Where in the home the circuit serves",
+          "datatype": "string"
+        },
+        "dedicated": {
+          "name": "Commissioned as serving a single load",
+          "datatype": "boolean"
+        },
+        "nominal-voltage": {
+          "name": "Nominal circuit voltage",
+          "datatype": "float",
+          "unit": "V"
+        }
+      }
+    },
+    "breaker": {
+      "properties": {
+        "protection-functions": {
+          "name": "Protections this breaker provides"
+        }
+      }
+    },
+    "meter": {
+      "properties": {
+        "shared-with-device-ids": {
+          "name": "Other circuits this meter's hardware also measures"
+        }
+      }
+    },
+    "switch": {
+      "properties": {
+        "shared-with-device-ids": {
+          "name": "Other circuits this relay also switches"
+        },
+        "relay-requester": {
+          "format": "UNKNOWN,NONE,LOAD_SHED,USER,PCS,FAULT,CIRCUIT_SCHEDULER,CONTROL_MANAGER,MID_CONTROL_DER,MODBUS_CONTROL_REQUEST,NFT_RELAY_CONTROL,BATTERY_SOLAR_MID_RELAY_CONTROL"
+        }
+      }
+    },
+    "connection": {
+      "properties": {
+        "fed-by-device-id": {
+          "name": "Homie device-id of the device wired upstream of this circuit"
+        },
+        "fed-by-device-type": {
+          "name": "Homie $type of the upstream device"
+        },
+        "fed-by-device-status": {
+          "name": "Panel's view of comm health to the upstream device"
+        },
+        "backed-up": {
+          "name": "Whether this circuit is on the backup (island) side of a microgrid interconnect device"
+        },
+        "feeds-role": {
+          "name": "Coarse role of a downstream node not published as its own eBus device"
+        }
+      }
+    }
+  }
+}

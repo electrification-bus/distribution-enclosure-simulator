@@ -74,6 +74,7 @@ from ebus_panel_sim.snapshot import (
     EbusPanelSnapshot,
     EbusPanelStatus,
     EbusPvSnapshot,
+    EbusRemoteCtSnapshot,
 )
 from ebus_panel_sim.tick_inputs import BESSCommunication, PanelEnvelopeTick, TickInputs
 
@@ -117,6 +118,7 @@ __all__ = [
     "EbusPanelSnapshot",
     "EbusPanelStatus",
     "EbusPvSnapshot",
+    "EbusRemoteCtSnapshot",
     "Emitter",
     "EmitterError",
     "EmitterStateError",

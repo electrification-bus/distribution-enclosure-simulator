@@ -11,6 +11,7 @@ import pytest
 import yaml
 
 from ebus_panel_sim import (
+    DeviceManifest,
     Emitter,
     LoadSheddingConfig,
     ManifestValidationError,
@@ -95,6 +96,10 @@ def _minimal(**overrides: Any) -> dict[str, Any]:
         (_minimal(devices=[]), "devices must be a non-empty list"),
         (_minimal(devices=[{"class": "panel", "id": "p1", "kind": "x"}]), "unknown keys"),
         (_minimal(devices=[{"class": "panel"}]), "'id' must be a non-empty string"),
+        (
+            _minimal(devices=[{"class": "panel", "id": "p1", "description_name": ""}]),
+            "'description_name' must be a non-empty string",
+        ),
         (_minimal(bess=[{"instance_id": "b"}]), "bess\\[0\\]"),
         (
             _minimal(
@@ -325,3 +330,33 @@ def test_the_shipped_example_sheds_when_the_grid_goes_down(rec: PahoRecorder) ->
     assert all(v is not None for v in values)
     # The four power flows balance (AGENTS.md); off-grid with shed loads too.
     assert sum(v for v in values if v is not None) == pytest.approx(0.0, abs=1e-6)
+
+
+def test_a_description_name_may_differ_from_the_name(tmp_path: Path, rec: PahoRecorder) -> None:
+    """A device publishes its ``description_name`` as ``$description.name`` and a
+    circuit its ``name`` as ``info/name``, each as given, and a file keeps both."""
+    example = load_definition(_EXAMPLES / "forty_tab_minimal.yaml")
+    definition = dataclasses.replace(
+        example,
+        manifest=DeviceManifest(
+            instances=tuple(
+                dataclasses.replace(i, description_name=i.instance_id)
+                if i.entity_class == "circuit"
+                else i
+                for i in example.manifest.instances
+            )
+        ),
+    )
+    path = tmp_path / "panel.yaml"
+    dump_definition(definition, path)
+    assert load_definition(path) == definition
+
+    emitter = Emitter.from_definition(definition, SetterRegistry())
+    emitter.start()
+    emitter.publish_tick(load_ticks(_EXAMPLES / "forty_tab_minimal.ticks.yaml")[0])
+    circuits = definition.manifest.of_class("circuit")
+    assert circuits
+    for inst in circuits:
+        description = json.loads(rec.retained[f"ebus/5/{inst.instance_id}/$description"])
+        assert description["name"] == inst.instance_id != inst.display_name
+        assert rec.retained[f"ebus/5/{inst.instance_id}/info/name"] == inst.display_name

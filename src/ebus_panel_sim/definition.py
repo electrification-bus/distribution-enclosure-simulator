@@ -48,7 +48,7 @@ TICKS_SCHEMA = "panel-sim-ticks/1"
 _Config = TypeVar("_Config", BESSConfig, LoadSheddingConfig)
 
 _TOP_KEYS = frozenset({"schema", "variant", "devices", "bess", "load_shedding"})
-_DEVICE_KEYS = frozenset({"class", "id", "name", "metadata"})
+_DEVICE_KEYS = frozenset({"class", "id", "name", "description_name", "metadata"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,21 +184,25 @@ def definition_to_dict(definition: PanelDefinition) -> dict[str, Any]:
     out: dict[str, Any] = {
         "schema": SCHEMA,
         "variant": definition.variant,
-        "devices": [
-            {
-                "class": inst.entity_class,
-                "id": inst.instance_id,
-                "name": inst.display_name,
-                "metadata": dict(inst.metadata),
-            }
-            for inst in definition.manifest.instances
-        ],
+        "devices": [_device_to_dict(inst) for inst in definition.manifest.instances],
     }
     if definition.bess_configs:
         out["bess"] = [_config_to_dict(cfg) for cfg in definition.bess_configs]
     if definition.load_shedding is not None:
         out["load_shedding"] = _config_to_dict(definition.load_shedding)
     return out
+
+
+def _device_to_dict(inst: DeviceInstance) -> dict[str, Any]:
+    """One device entry, with ``description_name`` only where the device has one."""
+    out: dict[str, Any] = {
+        "class": inst.entity_class,
+        "id": inst.instance_id,
+        "name": inst.display_name,
+    }
+    if inst.description_name is not None:
+        out["description_name"] = inst.description_name
+    return {**out, "metadata": dict(inst.metadata)}
 
 
 def definition_from_dict(raw: object, *, where: str = "definition") -> PanelDefinition:
@@ -249,11 +253,17 @@ def _device(raw: object, where: str) -> DeviceInstance:
     metadata = raw.get("metadata", {})
     if not isinstance(metadata, dict):
         raise ManifestValidationError(f"{where}: metadata must be a mapping")
+    description_name = raw.get("description_name")
+    if description_name is not None and (
+        not isinstance(description_name, str) or not description_name
+    ):
+        raise ManifestValidationError(f"{where}: 'description_name' must be a non-empty string")
     return DeviceInstance(
         entity_class=raw["class"],
         instance_id=raw["id"],
         display_name=str(raw.get("name", raw["id"])),
         metadata={str(k): _metadata_str(v, where, str(k)) for k, v in metadata.items()},
+        description_name=description_name,
     )
 
 

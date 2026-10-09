@@ -13,7 +13,7 @@ physics (e.g. ``dipole`` flag inconsistent with ``tab-numbers`` count) raise
 from __future__ import annotations
 
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
 from ebus_panel_sim.conventions.tab_legs import Leg, legs_for_tabs
@@ -36,7 +36,7 @@ class PanelPhysics:
     firmware_version: str
     hardware_version: str
     panel_size: int
-    main_breaker_rating_a: int
+    main_breaker_rating_a: int | None
     panel_model: str
     postal_code: str
     time_zone: str
@@ -47,6 +47,8 @@ class PanelPhysics:
     # ``parent-child`` = post-migration shape where children become separate
     # Homie devices. Producer-overridable via metadata key ``schema-topology``.
     topology: Literal["flat", "parent-child"] = "flat"
+    # From `_panel_wire_values`; see `WIRE_VALUE_PATHS`.
+    wire_values: dict[str, str] = field(default_factory=dict)
 
     @property
     def release_build(self) -> int | None:
@@ -59,6 +61,8 @@ class PanelPhysics:
 @dataclass(frozen=True, slots=True)
 class LugsPhysics:
     direction: str  # "upstream" | "downstream"
+    # From `_lugs_wire_values`; see `WIRE_VALUE_PATHS`.
+    wire_values: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,6 +94,8 @@ class CircuitPhysics:
     # From `commissioned_system`: the circuit the panel adds for a commissioned
     # PV (``"pv"``) or battery (``"backup"``) system, or None.
     commissioned_system: str | None = None
+    # From `_circuit_wire_values`; see `WIRE_VALUE_PATHS`.
+    wire_values: dict[str, str] = field(default_factory=dict)
 
     @property
     def priority_locked(self) -> bool:
@@ -361,6 +367,21 @@ def never_backup(md: dict[str, str]) -> bool:
     return _opt_bool(md, "never-backup", default=False)
 
 
+def main_breaker_rating(md: dict[str, str]) -> int | None:
+    """The panel's main-breaker rating in amps, from its raw metadata, or None
+    when commissioning records none (absent, empty or 0). Without one the panel
+    publishes no ``breaker`` capability."""
+    raw = _opt_str(md, "main-breaker-rating-a")
+    if raw is None:
+        return None
+    try:
+        return int(raw) or None
+    except ValueError as exc:
+        raise ManifestValidationError(
+            f"key 'main-breaker-rating-a': not an int ({raw!r})"
+        ) from exc
+
+
 def commissioned_system(md: dict[str, str]) -> str | None:
     """Which commissioned system this circuit is the panel's entry for, if any.
 
@@ -375,6 +396,52 @@ def priority_locked(md: dict[str, str]) -> bool:
     """Whether ``load-shed/priority`` is not settable, from raw metadata: the
     circuit is commissioned never-backup or is a commissioned-system circuit."""
     return never_backup(md) or commissioned_system(md) is not None
+
+
+# Commissioning facts published verbatim, keyed by wire property path. Each
+# value is published only where the variant's profile declares that path, so a
+# variant that does not publish a property ignores its key.
+
+
+def _panel_wire_values(md: dict[str, str]) -> dict[str, str | None]:
+    return {
+        "info/name": _opt_str(md, "site-name"),
+        "info/address-lines": _opt_str(md, "address-lines"),
+        "info/locality": _opt_str(md, "locality"),
+        "info/region": _opt_str(md, "region"),
+        "info/country-code": _opt_str(md, "country-code"),
+        "info/latitude": _opt_str(md, "latitude"),
+        "info/longitude": _opt_str(md, "longitude"),
+        "info/utility-meter-serial-number": _opt_str(md, "utility-meter-serial-number"),
+    }
+
+
+def _circuit_wire_values(md: dict[str, str]) -> dict[str, str | None]:
+    shared = _opt_str(md, "shared-with-device-ids")
+    return {
+        "info/tags": _opt_str(md, "tags"),
+        "info/locations": _opt_str(md, "locations"),
+        "info/dedicated": _opt_str(md, "dedicated"),
+        "info/nominal-voltage": _opt_str(md, "nominal-voltage"),
+        "breaker/protection-functions": _opt_str(md, "protection-functions"),
+        "meter/shared-with-device-ids": shared,
+        "switch/shared-with-device-ids": shared,
+        "connection/feeds-role": _opt_str(md, "feeds-role"),
+        "connection/backed-up": _opt_str(md, "backed-up"),
+    }
+
+
+def _lugs_wire_values(md: dict[str, str]) -> dict[str, str | None]:
+    return {
+        "connection/feeds-role": _opt_str(md, "feeds-role"),
+        "connection/backed-up": _opt_str(md, "backed-up"),
+        "connection/service-rating": _opt_str(md, "service-rating-a"),
+        "connection/overcurrent-protection": _opt_str(md, "overcurrent-protection-a"),
+    }
+
+
+def _present(values: dict[str, str | None]) -> dict[str, str]:
+    return {path: value for path, value in values.items() if value is not None}
 
 
 def _require(md: dict[str, str], key: str) -> str:
@@ -452,7 +519,7 @@ def _parse_panel(inst: DeviceInstance) -> PanelPhysics:
         firmware_version=_opt_str(md, "firmware-version") or _require(md, "software-version"),
         hardware_version=_require(md, "hardware-version"),
         panel_size=_req_int(md, "panel-size"),
-        main_breaker_rating_a=_req_int(md, "main-breaker-rating-a"),
+        main_breaker_rating_a=main_breaker_rating(md),
         panel_model=_require(md, "panel-model"),
         postal_code=_require(md, "postal-code"),
         time_zone=_require(md, "time-zone"),
@@ -460,6 +527,7 @@ def _parse_panel(inst: DeviceInstance) -> PanelPhysics:
         line_voltage_v=_opt_float(md, "line-voltage-v", 120.0),
         islandable=_opt_bool(md, "islandable", False),
         topology=topology,
+        wire_values=_present(_panel_wire_values(md)),
     )
 
 
@@ -469,7 +537,7 @@ def _parse_lugs(inst: DeviceInstance) -> LugsPhysics:
         raise ManifestValidationError(
             f"key 'direction': must be one of {sorted(_VALID_LUGS_DIRECTIONS)}, got {direction!r}"
         )
-    return LugsPhysics(direction=direction)
+    return LugsPhysics(direction=direction, wire_values=_present(_lugs_wire_values(inst.metadata)))
 
 
 def _parse_circuit(inst: DeviceInstance) -> CircuitPhysics:
@@ -558,6 +626,7 @@ def _parse_circuit(inst: DeviceInstance) -> CircuitPhysics:
         always_on=always_on,
         never_backup=is_never_backup,
         commissioned_system=system,
+        wire_values=_present(_circuit_wire_values(md)),
         pcs_priority=_opt_int(md, "pcs-priority", 0),
         initial_consumed_wh=_opt_float(md, "initial-consumed-wh", 0.0),
         initial_produced_wh=_opt_float(md, "initial-produced-wh", 0.0),
@@ -637,3 +706,11 @@ def _parse_mid(inst: DeviceInstance) -> MidPhysics:
         firmware_version=_opt_str(md, "firmware-version") or _opt_str(md, "software-version"),
         hardware_version=_opt_str(md, "hardware-version"),
     )
+
+
+# The property paths each entity class can take from its metadata verbatim.
+WIRE_VALUE_PATHS: dict[str, frozenset[str]] = {
+    "panel": frozenset(_panel_wire_values({})),
+    "circuit": frozenset(_circuit_wire_values({})),
+    "lugs": frozenset(_lugs_wire_values({})),
+}

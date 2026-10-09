@@ -1,0 +1,21 @@
+# Ticks for span_alpha_test_b2_minimal.yaml (load_ticks).
+schema: panel-sim-ticks/1
+ticks:
+- current_time: 0.0
+  grid_online: true
+  circuits:
+    circuit-1: 121.0
+    circuit-2: 60.0
+    circuit-3: 2410.0
+    circuit-4: -2430.0
+  evse:
+    evse: 2410.0
+- current_time: 60.0
+  grid_online: true
+  circuits:
+    circuit-1: 121.0
+    circuit-2: 60.0
+    circuit-3: 0.0
+    circuit-4: -6500.0
+  evse:
+    evse: 0.0
