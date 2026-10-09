@@ -23,6 +23,7 @@ devices:
     latitude: '0.0'
     longitude: '0.0'
     unvalued: 'pcs/off-grid-import-limit,pcs/operator-import-limit,power-flows/battery,power-flows/pv,status/wifi-ssid'
+    off-grid-import-limit-enablement: 'UNCONFIGURED'
 - class: lugs
   id: lugs-upstream
   name: Upstream lugs

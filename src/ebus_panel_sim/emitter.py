@@ -1197,6 +1197,19 @@ class Emitter:
             grid_state=meter.grid_state,
             dsm_state=meter.dsm_state,
             current_run_config=meter.current_run_config,
+            off_grid_import_limit_enablement=panel_phys.off_grid_import_limit_enablement,
+            off_grid_import_limit_a=(
+                panel_phys.off_grid_import_limit_a
+                if panel_phys.off_grid_import_limit_enablement == "ENABLED"
+                else None
+            ),
+            # Enforced only while ENABLED and islanded.
+            off_grid_import_limit_active=(
+                None
+                if panel_phys.off_grid_import_limit_enablement is None
+                else panel_phys.off_grid_import_limit_enablement == "ENABLED"
+                and not tick.grid_online
+            ),
         )
         # Under span-alpha-test-b2, a panel with neither a battery nor solar (a
         # circuit commissioned feeds-role SOLAR) leaves pv and battery unset.

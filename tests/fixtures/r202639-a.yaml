@@ -25,6 +25,7 @@ devices:
     longitude: '0.0'
     utility-meter-serial-number: 'MASKED-METER'
     unvalued: 'pcs/off-grid-import-limit,power-flows/battery,power-flows/pv'
+    off-grid-import-limit-enablement: 'UNCONFIGURED'
 - class: lugs
   id: lugs-upstream
   name: Upstream lugs

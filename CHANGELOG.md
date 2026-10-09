@@ -11,6 +11,7 @@
 
 - **Published numbers use the panel's literal form** (integer or fixed places, never `-0.0`). Each number the span variant publishes takes the form its profile property declares as `literal` (`integer` or `<n>dp`, rounded half away from zero, or `shortest`, unrounded): readings with one decimal and `power-flows/grid`, `pv` and `battery` as integers, as the MAIN 32 capture on release 202639 shows, and unrounded the numbers that capture shows no rounding rule for: the BESS `nameplate-capacity` and the PV `nominal-power` (integral samples only), the EVSE `meter/advertised-current` and `pcs/off-grid-import-limit` (no samples). A BESS `meter/active-power` published in the panel's frame is written as `power-flows/battery` is. The reference variant publishes numbers as before.
 - **The span variant names a circuit's `info/spaces` property "Physical panel position(s) the circuit occupies"**, as a SPAN panel does.
+- **The off-grid import limit is published only as a definition commissions it**: its enablement from `off-grid-import-limit-enablement`, and the limit from `off-grid-import-limit-a` only while `ENABLED`, never a constant `0.0` with `UNCONFIGURED`.
 
 ## [0.9.0] - 2026-10-06
 

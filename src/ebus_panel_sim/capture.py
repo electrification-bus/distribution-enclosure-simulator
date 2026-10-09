@@ -634,6 +634,10 @@ class _Mapper:
         self._put(md, pid, "time-zone", d.value("status/time-zone"), "UTC")
         if (ssid := d.value("status/wifi-ssid")) is not None:
             md["wifi-ssid"] = _MASKED_SSID if self.mask else ssid
+        if (enablement := d.value("pcs/off-grid-import-limit-enablement")) is not None:
+            md["off-grid-import-limit-enablement"] = enablement
+            if (limit := d.value("pcs/off-grid-import-limit")) is not None:
+                md["off-grid-import-limit-a"] = limit
         voltage = d.value("meter/voltage-a")
         if voltage is not None and float(voltage) > 0:
             md["line-voltage-v"] = voltage

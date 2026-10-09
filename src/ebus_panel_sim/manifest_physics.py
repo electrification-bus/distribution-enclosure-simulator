@@ -12,6 +12,7 @@ physics (e.g. ``dipole`` flag inconsistent with ``tab-numbers`` count) raise
 
 from __future__ import annotations
 
+import math
 import warnings
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
@@ -51,6 +52,11 @@ class PanelPhysics:
     wire_values: dict[str, str] = field(default_factory=dict)
     # The Wi-Fi SSID the panel reports when a tick's envelope gives none.
     wifi_ssid: str | None = None
+    # The off-grid import limit as commissioned: its enablement, and the limit,
+    # published only while ENABLED. Without an enablement none of the three
+    # off-grid properties is published.
+    off_grid_import_limit_enablement: str | None = None
+    off_grid_import_limit_a: float | None = None
 
     @property
     def release_build(self) -> int | None:
@@ -458,6 +464,25 @@ def _present(values: dict[str, str | None]) -> dict[str, str]:
     return {path: value for path, value in values.items() if value is not None}
 
 
+_OFF_GRID_ENABLEMENTS = frozenset({"UNSPECIFIED", "UNCONFIGURED", "DISABLED", "ENABLED"})
+
+
+def _off_grid_import_limit(md: dict[str, str]) -> tuple[str | None, float | None]:
+    """The commissioned off-grid import limit. An ENABLED limit needs its value."""
+    enablement = _opt_str(md, "off-grid-import-limit-enablement")
+    if enablement is not None and enablement not in _OFF_GRID_ENABLEMENTS:
+        raise ManifestValidationError(
+            f"key 'off-grid-import-limit-enablement': must be one of "
+            f"{sorted(_OFF_GRID_ENABLEMENTS)}, got {enablement!r}"
+        )
+    limit = _opt_float(md, "off-grid-import-limit-a", math.nan)
+    if enablement == "ENABLED" and math.isnan(limit):
+        raise ManifestValidationError(
+            "key 'off-grid-import-limit-a': required while the limit is ENABLED"
+        )
+    return enablement, None if math.isnan(limit) else limit
+
+
 def _require(md: dict[str, str], key: str) -> str:
     if key not in md:
         raise ManifestValidationError(f"missing required metadata key {key!r}")
@@ -527,6 +552,7 @@ def _parse_panel(inst: DeviceInstance) -> PanelPhysics:
     topology: Literal["flat", "parent-child"] = (
         "parent-child" if topology_raw == "parent-child" else "flat"
     )
+    off_grid_enablement, off_grid_limit = _off_grid_import_limit(md)
     return PanelPhysics(
         serial_number=_require(md, "serial-number"),
         vendor_name=_require(md, "vendor-name"),
@@ -538,6 +564,8 @@ def _parse_panel(inst: DeviceInstance) -> PanelPhysics:
         postal_code=_require(md, "postal-code"),
         time_zone=_require(md, "time-zone"),
         wifi_ssid=_opt_str(md, "wifi-ssid"),
+        off_grid_import_limit_enablement=off_grid_enablement,
+        off_grid_import_limit_a=off_grid_limit,
         service_voltage_v=_opt_float(md, "service-voltage-v", 240.0),
         line_voltage_v=_opt_float(md, "line-voltage-v", 120.0),
         islandable=_opt_bool(md, "islandable", False),
