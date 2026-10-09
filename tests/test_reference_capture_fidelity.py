@@ -17,9 +17,9 @@ Devices are aligned by role, not id: a branch circuit by its spaces and name, a
 circuit device without ``info/spaces`` by its ordinal, lugs by direction, and any
 other device by its type's ordinal.
 
-A capture the emitter does not reproduce yet is held to the exact number of
-differences it still shows, so a change in either direction fails until the
-count is updated, and a capture reproduced in full drops out of the table."""
+Every capture must reproduce in full, but for the exceptions listed below, each
+with the reason the emitter cannot close it. A listed exception that no longer
+occurs fails too, so the list never outlives its reason."""
 
 from __future__ import annotations
 
@@ -57,10 +57,36 @@ _MAIN32_R202639 = "main32_r202639"
 _MAIN32_R202633 = "main32-r202633"
 # The differences each capture still shows, exactly; a capture absent here must
 # show none.
-_RESIDUAL: dict[str, int] = {
-    "r202639-b": 1,
-    _MAIN32_R202639: 2,
-    _MAIN32_R202633: 3,
+_FEEDTHROUGH = (
+    "The panel feeds a sub-panel through its downstream lugs (2700.6 W in the "
+    "capture), which a definition cannot express, so the emitter's site lacks that "
+    "load and its grid and upstream lugs run the other way."
+)
+_FED_BY_ENCLOSURE = (
+    "The upstream lugs are fed by another enclosure, which a definition cannot "
+    "express; panel-sim-capture reports it as a note."
+)
+# Differences a capture may still show, by prefix (the device role, the path and the
+# kind of difference, without values), each with the reason the emitter cannot
+# close it.
+_EXCEPTIONS: dict[str, dict[str, str]] = {
+    "r202639-b": {
+        "distribution-enclosure #1: power-flows/site sign": (
+            "The panel published site -8.8 W beside grid -0.2 W and no other flow, so "
+            "its own flows do not balance; the emitter's do, and its site follows the "
+            "circuits' small positive load."
+        ),
+    },
+    _MAIN32_R202639: {
+        "distribution-enclosure #1: power-flows/grid sign": _FEEDTHROUGH,
+        "lugs UPSTREAM: meter/active-power sign": _FEEDTHROUGH,
+    },
+    _MAIN32_R202633: {
+        f"lugs UPSTREAM: connection/fed-by-device-{key}: valued only by the capture": (
+            _FED_BY_ENCLOSURE
+        )
+        for key in ("id", "status", "type")
+    },
 }
 _NOT_COMPARED = frozenset({"connection/count"})
 _ATTRIBUTES = ("datatype", "settable", "unit", "format", "name")
@@ -234,12 +260,14 @@ def test_every_reference_capture_is_found() -> None:
 
 
 @pytest.mark.parametrize("handle", [*_HANDLES, _MAIN32_R202639, _MAIN32_R202633])
-def test_the_emitter_differs_from_the_capture_by_its_residual(
+def test_the_emitter_reproduces_the_capture_but_for_its_listed_exceptions(
     rec: PahoRecorder, handle: str
 ) -> None:
     captured = _capture(handle)
     differences = _differences(captured, _published(rec, *_inputs(handle, captured)))
-    expected = _RESIDUAL.get(handle, 0)
-    assert len(differences) == expected, (
-        f"{len(differences)} differences, expected {expected}:\n" + "\n".join(differences)
-    )
+    exceptions = _EXCEPTIONS.get(handle, {})
+    unexplained = [d for d in differences if not any(d.startswith(e) for e in exceptions)]
+    assert not unexplained, f"{len(unexplained)} differences:\n" + "\n".join(unexplained)
+    stale = [e for e in exceptions if not any(d.startswith(e) for d in differences)]
+    assert not stale, "exceptions that no longer occur:\n" + "\n".join(stale)
+    assert len(differences) == len(exceptions), differences
