@@ -165,12 +165,45 @@ def test_the_span_variant_ignores_the_commissioning_keys(rec: PahoRecorder) -> N
 
 
 @pytest.mark.parametrize(
-    ("key", "raw"), [("latitude", "north"), ("latitude", "nan"), ("latitude", "inf")]
+    ("instance", "key", "raw"),
+    [
+        *(
+            ("abc-123", "latitude", raw)
+            for raw in (
+                "north",
+                "nan",
+                "inf",
+                "1e3",
+                "-0.0",
+                "1_000.5",
+                " 120.0",
+                "+5",
+                "12.",
+                ".5",
+            )
+        ),
+        *(
+            ("lugs-upstream", "service-rating-a", raw)
+            for raw in ("1e3", "1_000", " 7", "+5", "-0", "200.0")
+        ),
+    ],
 )
-def test_a_commissioning_number_that_is_not_one_is_rejected(key: str, raw: str) -> None:
-    manifest = _with(_variant_manifest(), "abc-123", **{key: raw})
-    with pytest.raises(ManifestValidationError, match=key):
+def test_a_commissioning_number_not_in_a_wire_literal_shape_is_rejected(
+    instance: str, key: str, raw: str
+) -> None:
+    """A panel never writes an exponent, a plus sign, a digit separator, padding,
+    a bare point or negative zero, so a definition may not either."""
+    manifest = _with(_variant_manifest(), instance, **{key: raw})
+    with pytest.raises(ManifestValidationError, match=key.removesuffix("-a")):
         Emitter(manifest, SetterRegistry(), variant="span-alpha-test-b2")
+
+
+@pytest.mark.parametrize("raw", ["0.0", "-122.4194", "37.77490", "-3"])
+def test_a_commissioning_number_in_a_wire_shape_is_published_as_written(
+    rec: PahoRecorder, raw: str
+) -> None:
+    _started(rec, _with(_variant_manifest(), "abc-123", latitude=raw))
+    assert rec.retained["ebus/5/abc-123/info/latitude"] == raw
 
 
 def test_an_enum_value_outside_the_format_is_rejected() -> None:
