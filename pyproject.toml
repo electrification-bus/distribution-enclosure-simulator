@@ -106,6 +106,8 @@ ignore = ["TC001", "TC002", "TC003"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# A misspelt or unregistered marker is an error, not a warning.
+strict_markers = true
 markers = [
     "spec_only: behaviour taken from the public eBus specification that no reference capture shows",
 ]
