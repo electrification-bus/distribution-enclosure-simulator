@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, cast, get_args
 
 from ebus_panel_sim.definition import PanelDefinition, dump_definition, dump_ticks
-from ebus_panel_sim.emitter import Emitter
+from ebus_panel_sim.emitter import Emitter, unbooked_circuit_roles
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
 from ebus_panel_sim.manifest_physics import (
     _circuit_wire_values,
@@ -304,6 +304,24 @@ def definition_from_tree(
     without the lists, driven by one tick sampled from the tree, and a path the
     emitter leaves unvalued anyway is implied and dropped."""
     definition, notes = _Mapper(tree, mask, root, generic_names).run(variant)
+    if definition.variant == "span-alpha-test-b2" and (
+        unbooked := unbooked_circuit_roles(definition.manifest)
+    ):
+        # The definition keeps the role the panel published, so it records the
+        # panel faithfully, but it cannot be republished to trim the lists.
+        return definition, [
+            *notes,
+            *(
+                CaptureNote(
+                    circuit_id,
+                    "feeds-role",
+                    f"{role}: variant 'span-alpha-test-b2' cannot book this role's power "
+                    "yet, so the definition will not load under it; its unvalued lists "
+                    "are left untrimmed",
+                )
+                for circuit_id, role in unbooked
+            ),
+        ]
     (tick,) = ticks_from_samples(tree, [(0.0, tree)], mask=mask, root=root)
     return _minimal_unvalued(definition, tick), notes
 

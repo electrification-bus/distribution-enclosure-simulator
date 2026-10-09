@@ -670,9 +670,11 @@ def _role_flows(manifest: DeviceManifest) -> EbusPanelPowerFlows:
 
 
 @pytest.mark.spec_only
-@pytest.mark.parametrize("role", [None, "LOADS"])
+@pytest.mark.parametrize("role", [None, "LOADS", "UNUSED"])
 def test_a_load_circuit_counts_toward_site(rec: PahoRecorder, role: str | None) -> None:
-    """r202639 firmware books a circuit with no role or the LOADS role to site."""
+    """r202639 firmware books a circuit with no role or the LOADS role to site. An
+    UNUSED breaker is surveyed and empty, about 0 W, so any reading it shows is
+    load-side and goes to site too."""
     flows = _role_flows(_role_site(role))
     assert flows.site == pytest.approx(1300.0)
     assert flows.pv == pytest.approx(-2000.0)
@@ -696,7 +698,7 @@ def test_a_circuit_feeding_the_span_drive_counts_toward_site_whatever_its_role(
     manifest = DeviceManifest(
         instances=tuple(
             i
-            for i in _with(_variant_manifest(), "ev", **{"feeds-role": "UNUSED"}).instances
+            for i in _with(_variant_manifest(), "ev", **{"feeds-role": "GENERATOR"}).instances
             if i.entity_class != "pv"
         )
     )
@@ -708,7 +710,7 @@ def test_a_circuit_feeding_the_span_drive_counts_toward_site_whatever_its_role(
     assert flows.site == pytest.approx(1500.0)
 
 
-@pytest.mark.parametrize("role", ["GENERATOR", "SUBPANEL", "MIXED", "UNUSED"])
+@pytest.mark.parametrize("role", ["GENERATOR", "SUBPANEL", "MIXED"])
 def test_a_circuit_role_with_no_known_booking_is_rejected(role: str) -> None:
     """No firmware rule says how these roles are booked, so the variant refuses
     them rather than guessing a flow. The span variant does not book by role."""

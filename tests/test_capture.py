@@ -15,6 +15,7 @@ from ebus_panel_sim import (
     DeviceManifest,
     Emitter,
     LoadSheddingConfig,
+    ManifestValidationError,
     PanelDefinition,
     SetterRegistry,
     TickInputs,
@@ -638,3 +639,30 @@ def test_a_reported_wifi_ssid_is_captured_and_masked(rec: PahoRecorder) -> None:
     masked, _ = definition_from_tree(tree_from_retained(original))
     assert unmasked.manifest.of_class("panel")[0].metadata["wifi-ssid"] == "Home Network"
     assert masked.manifest.of_class("panel")[0].metadata["wifi-ssid"] == "masked-ssid"
+
+
+@pytest.mark.parametrize("role", ["GENERATOR", "SUBPANEL", "MIXED"])
+def test_a_role_the_variant_cannot_book_is_captured_with_a_note(role: str) -> None:
+    """A panel with such a breaker is still captured: the definition keeps the role
+    the panel published, and a note names the circuit and says the variant cannot
+    book it yet, which is also why the definition will not load under it."""
+    raw = json.loads(
+        (Path(__file__).parent / "fixtures" / "r202639-b-tree-v1.json").read_text(encoding="utf-8")
+    )
+    tree = tree_from_snapshot(raw)
+    branch = next(
+        device_id
+        for device_id, device in sorted(tree.items())
+        if device.type == "circuit" and device.declares("info/spaces")
+    )
+    tree[branch].properties["connection/feeds-role"] = role
+
+    definition, notes = definition_from_tree(tree)
+
+    circuits = [i for i in definition.manifest.of_class("circuit") if "feeds-role" in i.metadata]
+    assert [i.metadata["feeds-role"] for i in circuits] == [role]
+    (note,) = [n for n in notes if n.key == "feeds-role"]
+    assert note.device == circuits[0].instance_id
+    assert role in note.note and "cannot book" in note.note
+    with pytest.raises(ManifestValidationError, match=f"{circuits[0].instance_id}.*{role}"):
+        Emitter.from_definition(definition, SetterRegistry())

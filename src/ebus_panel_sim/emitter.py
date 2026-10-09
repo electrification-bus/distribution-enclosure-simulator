@@ -198,27 +198,33 @@ def _declared_unvalued(
 # circuit feeding an EVSE is site whatever its role.
 _SOLAR_ROLE: Final = "SOLAR"
 _STORAGE_ROLE: Final = "STORAGE"
-_SITE_ROLES: Final = frozenset({"LOADS"})
+# UNUSED is a surveyed, empty breaker: about 0 W, and any reading it does show is
+# load-side, so site is where it belongs.
+_SITE_ROLES: Final = frozenset({"LOADS", "UNUSED"})
+_BOOKED_ROLES: Final = _SITE_ROLES | {_SOLAR_ROLE, _STORAGE_ROLE}
+
+
+def unbooked_circuit_roles(manifest: DeviceManifest) -> list[tuple[str, str]]:
+    """``(circuit id, role)`` for each circuit whose feeds-role span-alpha-test-b2
+    has no known power-flow booking for: GENERATOR, SUBPANEL and MIXED. A circuit
+    feeding an EVSE is site whatever its role, so it never appears."""
+    evse_feeds = {i.metadata.get("feed") for i in manifest.of_class("evse")}
+    return [
+        (inst.instance_id, role)
+        for inst in manifest.of_class("circuit")
+        if (role := inst.metadata.get("feeds-role")) is not None
+        and role not in _BOOKED_ROLES
+        and inst.instance_id not in evse_feeds
+    ]
 
 
 def _check_flow_roles(manifest: DeviceManifest) -> None:
-    """Reject a circuit role whose power-flow booking is not known.
-
-    GENERATOR, SUBPANEL, MIXED and UNUSED have no known booking under the
-    variant, so a definition using one is refused rather than guessed at."""
-    evse_feeds = {i.metadata.get("feed") for i in manifest.of_class("evse")}
-    for inst in manifest.of_class("circuit"):
-        role = inst.metadata.get("feeds-role")
-        if (
-            role is None
-            or role in _SITE_ROLES
-            or role in (_SOLAR_ROLE, _STORAGE_ROLE)
-            or inst.instance_id in evse_feeds
-        ):
-            continue
+    """Refuse a circuit role whose booking is not known, rather than guess a flow."""
+    if unbooked := unbooked_circuit_roles(manifest):
+        circuit_id, role = unbooked[0]
         raise ManifestValidationError(
-            f"{inst.instance_id} key 'feeds-role': variant 'span-alpha-test-b2' does not "
-            f"know how to book a {role} circuit's power; use LOADS, SOLAR or STORAGE"
+            f"{circuit_id} key 'feeds-role': variant 'span-alpha-test-b2' does not "
+            f"know how to book a {role} circuit's power; use LOADS, SOLAR, STORAGE or UNUSED"
         )
 
 
