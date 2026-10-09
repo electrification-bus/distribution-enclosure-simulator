@@ -1,10 +1,11 @@
 # Changelog
 
-## [Unreleased]
+## [0.10.0b1] - 2026-10-08
 
 ### Added
 
 - spanos3/r202639/03 batch 2: reference captures and the variant that reproduces them.
+- spanos3/r202639/03 batch 2: `span-alpha-test-b2` books each circuit's power by its feeds role, with solar as a circuit with the `SOLAR` role instead of a `pv` device.
 - **A device's `$description.name` can differ from its name.** A definition device's optional `description_name` (`DeviceInstance.description_name`) is published as its `$description.name`, while a circuit keeps publishing its `name` as `info/name`. `panel-sim-capture` writes it for a device the panel names by its own ID, and `tests/fixtures/main32_r202639.yaml` now carries each child device's ID there, as that capture does.
 
 ### Changed
