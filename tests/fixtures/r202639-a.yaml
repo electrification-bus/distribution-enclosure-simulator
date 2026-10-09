@@ -16,6 +16,15 @@ devices:
     time-zone: America/Los_Angeles
     line-voltage-v: '122.0'
     service-voltage-v: '244.0'
+    wifi-ssid: 'masked-ssid'
+    site-name: 'Masked Panel'
+    address-lines: 'Masked Address'
+    locality: 'Masked City'
+    region: 'Masked Region'
+    latitude: '0.0'
+    longitude: '0.0'
+    utility-meter-serial-number: 'MASKED-METER'
+    unvalued: 'pcs/off-grid-import-limit,power-flows/battery,power-flows/pv'
 - class: lugs
   id: lugs-upstream
   name: Upstream lugs
@@ -28,6 +37,7 @@ devices:
   name: Downstream lugs
   metadata:
     direction: downstream
+    unvalued: 'meter/active-power,meter/exported-energy,meter/imported-energy'
 - class: circuit
   id: circuit-1
   name: 7 Bathroom / Outlets
@@ -63,4 +73,5 @@ devices:
 - class: remote-ct
   id: remote-ct-3
   name: Service CT
-  metadata: {}
+  metadata:
+    unvalued: 'meter/shared-with-device-ids'

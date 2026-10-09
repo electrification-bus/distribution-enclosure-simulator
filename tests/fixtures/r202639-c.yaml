@@ -17,6 +17,13 @@ devices:
     line-voltage-v: '121.8'
     service-voltage-v: '243.6'
     islandable: 'true'
+    wifi-ssid: 'masked-ssid'
+    site-name: 'Masked Panel'
+    address-lines: 'Masked Address'
+    locality: 'Masked City'
+    region: 'Masked Region'
+    latitude: '0.0'
+    longitude: '0.0'
 - class: bess
   id: bess-1
   name: bess-1
@@ -29,6 +36,7 @@ devices:
     relative-position: IN_PANEL
     feed: circuit-5
     initial-soe-kwh: '7.2'
+    unvalued: 'info/firmware-version'
 - class: lugs
   id: lugs-upstream
   name: Upstream lugs
@@ -127,6 +135,7 @@ devices:
   metadata:
     vendor-name: Tesla
     serial-number: MASKED-MID-1
+    unvalued: 'info/firmware-version,info/hardware-version,info/model'
 bess:
 - instance_id: bess-1
   nameplate_capacity_kwh: 13.5

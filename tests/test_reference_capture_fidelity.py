@@ -58,12 +58,8 @@ _MAIN32_R202633 = "main32-r202633"
 # The differences each capture still shows, exactly; a capture absent here must
 # show none.
 _RESIDUAL: dict[str, int] = {
-    "r202639-a": 12,
-    "r202639-b": 12,
-    "r202639-c": 7,
-    "r202639-d": 19,
-    "r202639-e": 13,
-    _MAIN32_R202639: 7,
+    "r202639-b": 1,
+    _MAIN32_R202639: 2,
     _MAIN32_R202633: 3,
 }
 _NOT_COMPARED = frozenset({"connection/count"})
