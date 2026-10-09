@@ -72,7 +72,7 @@ requires-dist = [
 dev = [
     { name = "mypy", specifier = ">=1.10" },
     { name = "pre-commit", specifier = ">=4.0" },
-    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest", specifier = ">=9.0" },
     { name = "ruff", specifier = ">=0.15.0" },
     { name = "types-pyyaml", specifier = ">=6.0" },
 ]

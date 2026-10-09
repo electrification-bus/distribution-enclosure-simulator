@@ -59,7 +59,7 @@ panel-sim-capture = "ebus_panel_sim.capture:main"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0",
+    "pytest>=9.0",
     "ruff>=0.15.0",
     "mypy>=1.10",
     "types-pyyaml>=6.0",
