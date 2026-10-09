@@ -37,7 +37,7 @@
           "datatype": "string"
         },
         "model": {
-          "format": "MAIN_16,MLO_24,MAIN_32,MAIN_40,MLO_48,UNKNOWN"
+          "format": "UNKNOWN,MAIN_16,MLO_24,MAIN_32,MAIN_40,MLO_48"
         }
       }
     },
@@ -46,10 +46,12 @@
         "busbar-current": {
           "name": "Estimated busbar current",
           "datatype": "float",
-          "unit": "A"
+          "unit": "A",
+          "literal": "1dp"
         },
         "frequency": {
-          "name": "Line frequency"
+          "name": "Line frequency",
+          "literal": "2dp"
         }
       }
     },

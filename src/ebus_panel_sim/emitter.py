@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import time
 from collections.abc import Mapping
 from typing import Any, Final, get_args
@@ -127,14 +128,21 @@ def _link_status(communication: BESSCommunication, reported: frozenset[str]) -> 
 
 
 def _typed(raw: str, datatype: str, fmt: str | None, *, where: str) -> object:
-    """A metadata string as a value of the property's Homie datatype."""
+    """A metadata string checked against the property's Homie datatype.
+
+    A number is published exactly as written: a commissioning fact keeps the
+    digits it was recorded with (``120.0`` stays ``120.0``), so no literal form
+    applies to it. A boolean is published in lower case."""
     try:
-        if datatype == "float":
-            return float(raw)
+        if datatype == "float" and math.isfinite(float(raw)):
+            return raw
         if datatype == "integer":
-            return int(raw)
+            int(raw)
+            return raw
     except ValueError as exc:
         raise ManifestValidationError(f"{where}: not a {datatype} ({raw!r})") from exc
+    if datatype == "float":
+        raise ManifestValidationError(f"{where}: not a finite {datatype} ({raw!r})")
     if datatype == "boolean":
         if raw.lower() not in ("true", "false"):
             raise ManifestValidationError(f"{where}: not a boolean ({raw!r})")
@@ -345,7 +353,7 @@ class Emitter:
         self._started = False
 
     def _typed_wire_values(self) -> dict[tuple[str, str, str], object]:
-        """The manifest's verbatim commissioning values, typed by the profile.
+        """The manifest's verbatim commissioning values, checked against the profile.
 
         A value for a path the variant's profile does not declare is dropped."""
         sources: list[tuple[str, str, dict[str, str]]] = [
