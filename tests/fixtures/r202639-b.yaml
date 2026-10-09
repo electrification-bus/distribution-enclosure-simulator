@@ -24,6 +24,7 @@ devices:
     longitude: '0.0'
     off-grid-import-limit-enablement: 'UNCONFIGURED'
     unvalued: 'pcs/operator-import-limit'
+    operator-import-limit-enablement: 'UNCONFIGURED'
 - class: lugs
   id: lugs-upstream
   name: Upstream lugs

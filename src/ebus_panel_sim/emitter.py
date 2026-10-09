@@ -131,11 +131,11 @@ def _link_status(communication: BESSCommunication, reported: frozenset[str]) -> 
     return communication if communication in reported else "LOST"
 
 
-# The literal shapes a panel writes numbers in: no exponent, sign other than a
-# leading minus, separator, padding or bare point.
+# The literal shapes a panel writes numbers in: ASCII digits only, and no exponent,
+# sign other than a leading minus, separator, padding or bare point.
 _WIRE_LITERAL: Final[dict[str, re.Pattern[str]]] = {
-    "float": re.compile(r"-?\d+(\.\d+)?"),
-    "integer": re.compile(r"-?\d+"),
+    "float": re.compile(r"-?[0-9]+(\.[0-9]+)?"),
+    "integer": re.compile(r"-?[0-9]+"),
 }
 
 
@@ -1206,6 +1206,7 @@ class Emitter:
             grid_state=meter.grid_state,
             dsm_state=meter.dsm_state,
             current_run_config=meter.current_run_config,
+            operator_import_limit_enablement=panel_phys.operator_import_limit_enablement,
             off_grid_import_limit_enablement=panel_phys.off_grid_import_limit_enablement,
             off_grid_import_limit_a=(
                 panel_phys.off_grid_import_limit_a

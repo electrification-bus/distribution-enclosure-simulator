@@ -9,7 +9,7 @@
 
 ### Changed
 
-- **`panel-sim-capture` writes more of what a panel published**: masking replaces the site's name, address, coordinates and utility meter serial with placeholders instead of dropping them and writes a reported Wi-Fi SSID as `masked-ssid`, each device gets a minimal `unvalued` list, and the off-grid import limit and an EVSE's user limit are captured as `off-grid-import-limit-enablement`/`off-grid-import-limit-a` and `user-max-charge-current-a`.
+- **`panel-sim-capture` writes more of what a panel published**: masking replaces the site's name, address, coordinates and utility meter serial with placeholders instead of dropping them and writes a reported Wi-Fi SSID as `masked-ssid`, each device gets a minimal `unvalued` list, and the off-grid import limit, the operator import limit's enablement and an EVSE's user limit are captured as `off-grid-import-limit-enablement`/`off-grid-import-limit-a`, `operator-import-limit-enablement` and `user-max-charge-current-a`.
 
 ### Fixed
 

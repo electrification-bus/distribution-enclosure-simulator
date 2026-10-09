@@ -696,6 +696,8 @@ class _Mapper:
         self._put(md, pid, "time-zone", d.value("status/time-zone"), "UTC")
         if (ssid := d.value("status/wifi-ssid")) is not None:
             md["wifi-ssid"] = _MASKED_SSID if self.mask else ssid
+        if (operator := d.value("pcs/operator-import-limit-enablement")) is not None:
+            md["operator-import-limit-enablement"] = operator
         if (enablement := d.value("pcs/off-grid-import-limit-enablement")) is not None:
             md["off-grid-import-limit-enablement"] = enablement
             if (limit := d.value("pcs/off-grid-import-limit")) is not None:
