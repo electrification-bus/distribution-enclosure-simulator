@@ -123,10 +123,11 @@ def resolve(
     ``solar_circuits`` names the circuits the panel takes solar from by their role
     (eBus connection/feeds-role SOLAR), as r202639 firmware computes the flows:
     ``pv`` is those circuits' readings summed, negative while producing and a
-    standby draw included, and ``site`` is every other circuit but one feeding a
-    battery (``battery_circuits``), whose power is the battery's and is booked by
-    its dispatch, not counted again. Without it every negative reading counts as
-    solar and every positive one as site."""
+    standby draw included; ``battery`` adds the readings of ``battery_circuits``
+    (a STORAGE role, or a battery's own breaker) to the battery's dispatch; and
+    ``site`` is every other circuit, which the caller has checked is a load.
+    Without it every negative reading counts as solar and every positive one as
+    site. The upstream flow, and so the grid, is every circuit either way."""
 
     if solar_circuits is None:
         load_demand_w = sum(p for p in gated_powers.values() if p > 0)
@@ -138,8 +139,10 @@ def resolve(
             for cid, p in gated_powers.items()
             if cid not in solar_circuits and cid not in battery_circuits
         )
+    # Node frame: a battery breaker drawing power is the battery charging.
+    battery_circuits_w = sum(p for cid, p in gated_powers.items() if cid in battery_circuits)
 
-    upstream_active_w = load_demand_w - pv_available_w
+    upstream_active_w = load_demand_w - pv_available_w + battery_circuits_w
 
     if grid_online:
         # Upstream lugs see the panel-side net flow. Utility grid flow is on the
@@ -207,7 +210,7 @@ def resolve(
         # quantity above it, restated as "power leaving the panel node", which is
         # what makes the four sum to zero.
         power_flow_pv=-pv_available_w,
-        power_flow_battery=-battery_w,
+        power_flow_battery=battery_circuits_w - battery_w,
         power_flow_grid=-grid_w,
         power_flow_site=load_demand_w,
     )

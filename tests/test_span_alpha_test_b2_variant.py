@@ -15,6 +15,7 @@ from ebus_panel_sim import (
     BESSConfig,
     DeviceInstance,
     DeviceManifest,
+    EbusPanelPowerFlows,
     Emitter,
     ManifestValidationError,
     SetterRegistry,
@@ -642,3 +643,76 @@ def test_with_neither_solar_nor_a_battery_pv_is_unset_not_zero(rec: PahoRecorder
     assert em.last_snapshot.power_flows.pv is None
     assert em.last_snapshot.power_flows.battery is None
     assert "ebus/5/abc-123/power-flows/pv" not in rec.retained
+
+
+def _role_site(role: str | None) -> DeviceManifest:
+    """The loads-only site with its SOLAR circuit, and the kitchen given ``role``
+    (none when ``None``)."""
+    manifest = _loads_only(solar=True)
+    if role is None:
+        return manifest
+    return _with(manifest, "kitchen", **{"feeds-role": role})
+
+
+def _role_flows(manifest: DeviceManifest) -> EbusPanelPowerFlows:
+    em = Emitter(manifest, SetterRegistry(), variant="span-alpha-test-b2")
+    em.start()
+    flows = em.publish_tick(
+        TickInputs(
+            current_time=0.0,
+            grid_online=True,
+            circuits={"solar": -2000.0, "kitchen": 800.0, "ev": 500.0},
+        )
+    ).power_flows
+    values = [flows.pv, flows.battery, flows.grid, flows.site]
+    assert sum(v for v in values if v is not None) == pytest.approx(0.0)
+    return flows
+
+
+@pytest.mark.spec_only
+@pytest.mark.parametrize("role", [None, "LOADS"])
+def test_a_load_circuit_counts_toward_site(rec: PahoRecorder, role: str | None) -> None:
+    """r202639 firmware books a circuit with no role or the LOADS role to site."""
+    flows = _role_flows(_role_site(role))
+    assert flows.site == pytest.approx(1300.0)
+    assert flows.pv == pytest.approx(-2000.0)
+
+
+@pytest.mark.spec_only
+def test_a_storage_circuit_counts_toward_battery_not_site(rec: PahoRecorder) -> None:
+    """A STORAGE circuit is the battery: its draw is the battery charging, so the
+    battery flow is valued even without a BESS device, and site leaves it out."""
+    flows = _role_flows(_role_site("STORAGE"))
+    assert flows.site == pytest.approx(500.0)
+    assert flows.battery == pytest.approx(800.0)
+
+
+@pytest.mark.spec_only
+def test_a_circuit_feeding_the_span_drive_counts_toward_site_whatever_its_role(
+    rec: PahoRecorder,
+) -> None:
+    """Site takes the SPAN Drive's circuit, as firmware books it, even one whose
+    role would otherwise be refused."""
+    manifest = DeviceManifest(
+        instances=tuple(
+            i
+            for i in _with(_variant_manifest(), "ev", **{"feeds-role": "UNUSED"}).instances
+            if i.entity_class != "pv"
+        )
+    )
+    em = Emitter(manifest, SetterRegistry(), variant="span-alpha-test-b2")
+    em.start()
+    flows = em.publish_tick(
+        TickInputs(current_time=0.0, grid_online=True, circuits={"ev": 1500.0, "kitchen": 0.0})
+    ).power_flows
+    assert flows.site == pytest.approx(1500.0)
+
+
+@pytest.mark.parametrize("role", ["GENERATOR", "SUBPANEL", "MIXED", "UNUSED"])
+def test_a_circuit_role_with_no_known_booking_is_rejected(role: str) -> None:
+    """No firmware rule says how these roles are booked, so the variant refuses
+    them rather than guessing a flow. The span variant does not book by role."""
+    manifest = _role_site(role)
+    with pytest.raises(ManifestValidationError, match=f"feeds-role.*{role}"):
+        Emitter(manifest, SetterRegistry(), variant="span-alpha-test-b2")
+    Emitter(manifest, SetterRegistry(), variant="span")
