@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
-import math
+import re
 import time
 from collections.abc import Mapping
 from typing import Any, Final, get_args
@@ -131,22 +131,27 @@ def _link_status(communication: BESSCommunication, reported: frozenset[str]) -> 
     return communication if communication in reported else "LOST"
 
 
+# The literal shapes a panel writes numbers in: no exponent, sign other than a
+# leading minus, separator, padding or bare point.
+_WIRE_LITERAL: Final[dict[str, re.Pattern[str]]] = {
+    "float": re.compile(r"-?\d+(\.\d+)?"),
+    "integer": re.compile(r"-?\d+"),
+}
+
+
 def _typed(raw: str, datatype: str, fmt: str | None, *, where: str) -> object:
     """A metadata string checked against the property's Homie datatype.
 
-    A number is published exactly as written: a commissioning fact keeps the
-    digits it was recorded with (``120.0`` stays ``120.0``), so no literal form
-    applies to it. A boolean is published in lower case."""
-    try:
-        if datatype == "float" and math.isfinite(float(raw)):
-            return raw
-        if datatype == "integer":
-            int(raw)
-            return raw
-    except ValueError as exc:
-        raise ManifestValidationError(f"{where}: not a {datatype} ({raw!r})") from exc
-    if datatype == "float":
-        raise ManifestValidationError(f"{where}: not a finite {datatype} ({raw!r})")
+    A number must already be in a literal shape the panel writes (``120.0``,
+    ``-3``; never ``1e3``, ``+5``, ``1_000``, a padded string or negative zero),
+    and is then published exactly as written: a commissioning fact keeps the
+    digits it was recorded with, so no literal form applies to it. A boolean is
+    published in lower case."""
+    shape = _WIRE_LITERAL.get(datatype)
+    if shape is not None:
+        if shape.fullmatch(raw) is None or (raw.startswith("-") and float(raw) == 0):
+            raise ManifestValidationError(f"{where}: not a {datatype} literal ({raw!r})")
+        return raw
     if datatype == "boolean":
         if raw.lower() not in ("true", "false"):
             raise ManifestValidationError(f"{where}: not a boolean ({raw!r})")
@@ -321,7 +326,16 @@ class Emitter:
             frozenset({"LOST", "DEGRADED"}) if variant == "span-alpha-test-b2" else None
         )
         self._shed_policy_override: str | None = None
-        self._evse_user_max_override: dict[str, int] = {}
+        # An EVSE whose definition gives a user limit starts from it, clamped as a
+        # /set is.
+        self._evse_user_max_override: dict[str, int] = {
+            eid: max(
+                EVSE_MIN_CHARGE_CURRENT_A,
+                min(ephys.user_max_charge_current_a, int(ephys.max_current_a)),
+            )
+            for eid, ephys in self._physics.all_evse().items()
+            if ephys.user_max_charge_current_a is not None
+        }
         self._evse_lock_override: dict[str, str] = {}
 
         self._remote_ct_ids = tuple(i.instance_id for i in manifest.of_class("remote-ct"))
@@ -1204,6 +1218,19 @@ class Emitter:
             grid_state=meter.grid_state,
             dsm_state=meter.dsm_state,
             current_run_config=meter.current_run_config,
+            off_grid_import_limit_enablement=panel_phys.off_grid_import_limit_enablement,
+            off_grid_import_limit_a=(
+                panel_phys.off_grid_import_limit_a
+                if panel_phys.off_grid_import_limit_enablement == "ENABLED"
+                else None
+            ),
+            # Enforced only while ENABLED and islanded.
+            off_grid_import_limit_active=(
+                None
+                if panel_phys.off_grid_import_limit_enablement is None
+                else panel_phys.off_grid_import_limit_enablement == "ENABLED"
+                and not tick.grid_online
+            ),
         )
         # Under span-alpha-test-b2, a panel with neither a battery nor solar (a
         # circuit commissioned feeds-role SOLAR) leaves pv and battery unset.

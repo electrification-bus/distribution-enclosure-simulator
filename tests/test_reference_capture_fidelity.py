@@ -10,8 +10,9 @@ definition ``panel-sim-capture`` writes from it and one tick sampled from it.
 The emitter publishes the definition through every tick, and the retained tree
 is compared with the capture device by device: ``$description`` keys, type and
 children, nodes, declared properties and their datatype, settable, unit, format
-and name, valued versus unvalued, the literal form of each value, and the sign
-of each power.
+and name, valued versus unvalued, the literal form of each value, the value
+itself where the definition commissions it (``_COMPARED_BY_VALUE``), and the
+sign of each power.
 Masked identifiers, time-varying magnitudes and ``connection/count`` may differ.
 Devices are aligned by role, not id: a branch circuit by its spaces and name, a
 circuit device without ``info/spaces`` by its ordinal, lugs by direction, and any
@@ -23,6 +24,7 @@ occurs fails too, so the list never outlives its reason."""
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import re
 from collections import Counter
@@ -31,6 +33,7 @@ from pathlib import Path
 import pytest
 
 from ebus_panel_sim import (
+    DeviceManifest,
     Emitter,
     PanelDefinition,
     SetterRegistry,
@@ -46,6 +49,7 @@ from ebus_panel_sim.capture import (
     tree_from_retained,
     tree_from_snapshot,
 )
+from ebus_panel_sim.manifest_physics import unvalued_paths
 
 from .conftest import PahoRecorder
 
@@ -55,8 +59,6 @@ _HANDLES = sorted(
 )
 _MAIN32_R202639 = "main32_r202639"
 _MAIN32_R202633 = "main32-r202633"
-# The differences each capture still shows, exactly; a capture absent here must
-# show none.
 _FEEDTHROUGH = (
     "The panel feeds a sub-panel through its downstream lugs (2700.6 W in the "
     "capture), which a definition cannot express, so the emitter's site lacks that "
@@ -89,6 +91,28 @@ _EXCEPTIONS: dict[str, dict[str, str]] = {
     },
 }
 _NOT_COMPARED = frozenset({"connection/count"})
+# Values a definition carries as commissioned, which neither vary with time nor are
+# masked: compared exactly, not only by shape.
+_COMPARED_BY_VALUE = frozenset(
+    {
+        "breaker/poles",
+        "breaker/rating",
+        "config/max-charge-current",
+        "config/user-max-charge-current",
+        "connection/backed-up",
+        "connection/feeds-role",
+        "connection/overcurrent-protection",
+        "connection/service-rating",
+        "info/dedicated",
+        "info/locations",
+        "info/model",
+        "info/nominal-voltage",
+        "info/tags",
+        "pcs/off-grid-import-limit",
+        "pcs/off-grid-import-limit-enablement",
+        "pcs/priority",
+    }
+)
 _ATTRIBUTES = ("datatype", "settable", "unit", "format", "name")
 _SIGNED = re.compile(r"^(meter/active-power|power-flows/.+)$")
 _NUMBER = re.compile(r"^-?\d+(\.\d+)?([eE][-+]?\d+)?$")
@@ -211,6 +235,8 @@ def _device_differences(captured: Device, published: Device) -> list[str]:
                 shape_c, shape_p = _shape(value_c, decl_c[key]), _shape(value_p, decl_p[key])
                 if shape_c != shape_p:
                     out.append(f"{path} shape: {shape_c} ({value_c}) vs {shape_p} ({value_p})")
+                elif path in _COMPARED_BY_VALUE and value_c != value_p:
+                    out.append(f"{path} value: {value_c} vs {value_p}")
                 signs = (_sign(value_c), _sign(value_p))
                 if _SIGNED.match(path) and all(signs) and signs[0] != signs[1]:
                     out.append(f"{path} sign: {value_c} vs {value_p}")
@@ -271,3 +297,58 @@ def test_the_emitter_reproduces_the_capture_but_for_its_listed_exceptions(
     stale = [e for e in exceptions if not any(d.startswith(e) for d in differences)]
     assert not stale, "exceptions that no longer occur:\n" + "\n".join(stale)
     assert len(differences) == len(exceptions), differences
+
+
+@pytest.mark.parametrize("handle", [*_HANDLES, _MAIN32_R202639])
+def test_every_unvalued_path_is_one_the_emitter_would_otherwise_publish(
+    rec: PahoRecorder, handle: str
+) -> None:
+    """A definition's unvalued lists are minimal: republished without them, the
+    emitter values every listed path, so none is implied by the profile, the
+    variant's rules or an absent key."""
+    definition, ticks = _inputs(handle, _capture(handle))
+    listed = {
+        (inst.instance_id, path)
+        for inst in definition.manifest.instances
+        for path in unvalued_paths(inst.metadata)
+    }
+    bare = dataclasses.replace(
+        definition,
+        manifest=DeviceManifest(
+            instances=tuple(
+                dataclasses.replace(
+                    inst, metadata={k: v for k, v in inst.metadata.items() if k != "unvalued"}
+                )
+                for inst in definition.manifest.instances
+            )
+        ),
+    )
+    published = _published(rec, bare, ticks[:1])
+    implied = sorted(
+        (instance_id, path)
+        for instance_id, path in listed
+        if published[instance_id].properties.get(path) is None
+    )
+    assert not implied
+
+
+def test_a_commissioned_value_is_compared_exactly_and_a_reading_by_shape() -> None:
+    """Same shape, different values: a commissioned limit differs, a reading does not."""
+    declared = {"datatype": "float", "unit": "A"}
+    description = {
+        "type": "energy.ebus.device.distribution-enclosure",
+        "nodes": {
+            "pcs": {"properties": {"off-grid-import-limit": declared}},
+            "meter": {"properties": {"voltage-a": declared}},
+        },
+    }
+
+    def device(limit: str, voltage: str) -> Device:
+        return Device(
+            description=description,
+            properties={"pcs/off-grid-import-limit": limit, "meter/voltage-a": voltage},
+        )
+
+    assert _device_differences(device("47.9", "121.7"), device("48.0", "122.0")) == [
+        "pcs/off-grid-import-limit value: 47.9 vs 48.0"
+    ]

@@ -21,7 +21,8 @@ devices:
     region: 'Masked Region'
     latitude: '0.0'
     longitude: '0.0'
-    unvalued: 'pcs/off-grid-import-limit,pcs/operator-import-limit,power-flows/battery,power-flows/pv,status/wifi-ssid'
+    off-grid-import-limit-enablement: 'UNCONFIGURED'
+    unvalued: 'pcs/operator-import-limit'
 - class: lugs
   id: lugs-upstream
   name: Upstream lugs
@@ -47,6 +48,7 @@ devices:
     firmware-version: unknown
     max-current-a: '48'
     feed: circuit-15
+    user-max-charge-current-a: '48'
     unvalued: 'info/firmware-version,info/model'
 - class: circuit
   id: circuit-1

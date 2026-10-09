@@ -264,9 +264,11 @@ class EbusPanelPcs:
     operator_import_limit_a: float = 0.0
     operator_import_limit_enablement: str = "UNCONFIGURED"
     operator_import_limit_active: bool = False
-    off_grid_import_limit_a: float = 0.0
-    off_grid_import_limit_enablement: str = "UNCONFIGURED"
-    off_grid_import_limit_active: bool = False
+    # Published only as the definition commissions it: none of the three without an
+    # enablement, and the limit only while ENABLED.
+    off_grid_import_limit_a: float | None = None
+    off_grid_import_limit_enablement: str | None = None
+    off_grid_import_limit_active: bool | None = None
     # Every public and reference capture publishes 200.0 while the requested
     # limit is UNCONFIGURED.
     requested_import_limit_a: float | None = 200.0

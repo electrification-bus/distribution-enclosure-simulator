@@ -24,6 +24,8 @@ devices:
     region: 'Masked Region'
     latitude: '0.0'
     longitude: '0.0'
+    off-grid-import-limit-enablement: 'ENABLED'
+    off-grid-import-limit-a: '47.9'
 - class: bess
   id: bess-1
   name: bess-1
@@ -36,7 +38,6 @@ devices:
     relative-position: IN_PANEL
     feed: circuit-5
     initial-soe-kwh: '7.2'
-    unvalued: 'info/firmware-version'
 - class: lugs
   id: lugs-upstream
   name: Upstream lugs
@@ -135,7 +136,6 @@ devices:
   metadata:
     vendor-name: Tesla
     serial-number: MASKED-MID-1
-    unvalued: 'info/firmware-version,info/hardware-version,info/model'
 bess:
 - instance_id: bess-1
   nameplate_capacity_kwh: 13.5

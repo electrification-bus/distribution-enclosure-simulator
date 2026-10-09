@@ -6,14 +6,28 @@ unchanged. `$format` advertises that range per EVSE."""
 
 from __future__ import annotations
 
+import dataclasses
 import json
+from pathlib import Path
 
 import pytest
 
-from ebus_panel_sim import BESSConfig, Emitter, SetterRegistry, TickInputs
+from ebus_panel_sim import (
+    BESSConfig,
+    DeviceManifest,
+    Emitter,
+    PanelDefinition,
+    SetterRegistry,
+    TickInputs,
+    load_definition,
+    load_ticks,
+)
+from ebus_panel_sim.capture import definition_from_tree, tree_from_retained
 
 from .conftest import PahoRecorder
 from .test_connection import _manifest
+
+_EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
 
 _TOPIC = "ebus/5/evse/config/user-max-charge-current"
 
@@ -74,3 +88,42 @@ def test_format_advertises_the_range_up_to_the_commissioned_max(rec: PahoRecorde
     description = json.loads(rec.retained["ebus/5/evse/$description"])
     declaration = description["nodes"]["config"]["properties"]["user-max-charge-current"]
     assert declaration["format"] == "6:32"
+
+
+def _with_user_max(raw: str) -> PanelDefinition:
+    example = load_definition(_EXAMPLES / "forty_tab_minimal.yaml")
+    return dataclasses.replace(
+        example,
+        manifest=DeviceManifest(
+            instances=tuple(
+                dataclasses.replace(i, metadata={**i.metadata, "user-max-charge-current-a": raw})
+                if i.entity_class == "evse"
+                else i
+                for i in example.manifest.instances
+            )
+        ),
+    )
+
+
+@pytest.mark.parametrize(("raw", "published"), [("24", "24"), ("80", "32"), ("2", "6")])
+def test_a_definition_gives_the_user_limit_an_evse_starts_from(
+    rec: PahoRecorder, raw: str, published: str
+) -> None:
+    """Captured state, as a user's setting or a stale retained value would leave
+    it; clamped into the advertised range as a /set is."""
+    definition = _with_user_max(raw)
+    emitter = Emitter.from_definition(definition, SetterRegistry())
+    emitter.start()
+    emitter.publish_tick(load_ticks(_EXAMPLES / "forty_tab_minimal.ticks.yaml")[0])
+    evse = definition.manifest.of_class("evse")[0].instance_id
+    assert rec.retained[f"ebus/5/{evse}/config/user-max-charge-current"] == published
+
+
+def test_capture_reads_the_published_user_limit_back(rec: PahoRecorder) -> None:
+    definition = _with_user_max("24")
+    emitter = Emitter.from_definition(definition, SetterRegistry())
+    emitter.start()
+    emitter.publish_tick(load_ticks(_EXAMPLES / "forty_tab_minimal.ticks.yaml")[0])
+    captured, _ = definition_from_tree(tree_from_retained(rec.retained))
+    evse = captured.manifest.of_class("evse")[0]
+    assert evse.metadata["user-max-charge-current-a"] == "24"

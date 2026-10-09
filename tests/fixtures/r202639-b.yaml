@@ -22,7 +22,8 @@ devices:
     region: 'Masked Region'
     latitude: '0.0'
     longitude: '0.0'
-    unvalued: 'pcs/off-grid-import-limit,pcs/operator-import-limit,power-flows/battery,power-flows/pv,status/wifi-ssid'
+    off-grid-import-limit-enablement: 'UNCONFIGURED'
+    unvalued: 'pcs/operator-import-limit'
 - class: lugs
   id: lugs-upstream
   name: Upstream lugs
@@ -279,5 +280,4 @@ devices:
 - class: remote-ct
   id: remote-ct-3
   name: Service CT
-  metadata:
-    unvalued: 'meter/shared-with-device-ids'
+  metadata: {}
