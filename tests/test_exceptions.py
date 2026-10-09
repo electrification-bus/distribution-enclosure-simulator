@@ -5,6 +5,7 @@ from ebus_panel_sim.exceptions import (
     MissingSetterError,
     ProfileValidationError,
     RuntimeSpecValidationError,
+    UnknownReferenceCaptureError,
 )
 
 
@@ -15,6 +16,7 @@ def test_all_exceptions_subclass_emitter_error() -> None:
         MissingSetterError,
         ProfileValidationError,
         EmitterStateError,
+        UnknownReferenceCaptureError,
     ):
         assert issubclass(exc, EmitterError)
 

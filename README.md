@@ -162,6 +162,22 @@ for tick in load_ticks("ticks.yaml"):
 
 `ebus_panel_sim.capture` exposes the same steps as functions (`capture_live`, `tree_from_snapshot`, `tree_from_retained`, `definition_from_tree`, `ticks_from_samples`).
 
+### 5. Replay a reference capture
+
+The package ships masked captures of real SPAN panels as package data: `r202639-a` to `r202639-e` and `main32_r202639`, each a panel on `spanos3/r202639/03`. `reference_capture_names()` lists them, and `load_reference_capture(name)` reads one as a `ReferenceCapture`: its `definition` (a `PanelDefinition`), the `ticks` recorded with it, and the `tree` the panel published (a `Tree` of `Device`s, as `ebus_panel_sim.capture` reads one), to compare a replay with. Every call reads the files afresh, so the result is the caller's to change. Any other name raises `UnknownReferenceCaptureError`, a `LookupError`.
+
+```python
+from ebus_panel_sim import Emitter, SetterRegistry, load_reference_capture
+
+capture = load_reference_capture("r202639-a")
+emitter = Emitter.from_definition(capture.definition, SetterRegistry())
+emitter.start()
+for tick in capture.ticks:
+    emitter.publish_tick(tick)
+```
+
+The emitter reproduces each capture's tree but for the differences `tests/test_reference_capture_fidelity.py` lists, each with its reason.
+
 ## Usage (as a producer library)
 
 ```python
@@ -275,7 +291,7 @@ What each buys, and one obligation that is about timing rather than wiring. All 
 
 ## Layout
 
-- `src/ebus_panel_sim/` — the package (`emitter.py`, `manifest.py`, `wire/` profiles + publishing, `native_devices/`); see [DESIGN.md](https://github.com/electrification-bus/distribution-enclosure-simulator/blob/main/DESIGN.md).
+- `src/ebus_panel_sim/` — the package (`emitter.py`, `manifest.py`, `wire/` profiles + publishing, `native_devices/`, `reference_captures/`); see [DESIGN.md](https://github.com/electrification-bus/distribution-enclosure-simulator/blob/main/DESIGN.md).
 - `examples/` — the runnable example and its YAML definition.
 - `tests/` — the pytest suite.
 

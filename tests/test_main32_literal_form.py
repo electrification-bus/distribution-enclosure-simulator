@@ -1,37 +1,35 @@
 """The MAIN 32 r202639 capture's definition, published, writes numbers as the panel does.
 
-``tests/fixtures/main32_r202639-tree-v1.json`` is a masked MAIN 32 on
-``spanos3/r202639/03``; ``main32_r202639.yaml`` and ``.ticks.yaml`` are the
-definition and ticks recorded with it. The panel writes ``power-flows/grid``,
-``pv`` and ``battery`` as integers and ``site`` with one decimal, every reading
+The reference capture ``main32_r202639`` is a masked MAIN 32 on
+``spanos3/r202639/03`` with the definition and ticks recorded with it. The panel
+writes ``power-flows/grid``, ``pv`` and ``battery`` as integers and ``site`` with
+one decimal, every reading
 with one decimal, the BESS nameplate capacity and the PV nominal power (both
 integral here) without a point, and never ``-0.0`` or an exponent. Every
 non-root device's ``$description.name`` is its device id."""
 
 from __future__ import annotations
 
-import json
 import re
 from collections import defaultdict
-from pathlib import Path
 
 import pytest
 
-from ebus_panel_sim import Emitter, SetterRegistry, load_definition, load_ticks
-from ebus_panel_sim.capture import Tree, tree_from_retained, tree_from_snapshot
+from ebus_panel_sim import Emitter, SetterRegistry, Tree, load_reference_capture
+from ebus_panel_sim.capture import tree_from_retained
 
 from .conftest import PahoRecorder
 
-_FIXTURES = Path(__file__).parent / "fixtures"
+_CAPTURE = "main32_r202639"
 _PANEL = "masked-panel"
 _NUMBER = re.compile(r"^-?\d+(\.\d+)?$")
 
 
 def _published(rec: PahoRecorder) -> Tree:
-    definition = load_definition(_FIXTURES / "main32_r202639.yaml")
-    emitter = Emitter.from_definition(definition, SetterRegistry())
+    capture = load_reference_capture(_CAPTURE)
+    emitter = Emitter.from_definition(capture.definition, SetterRegistry())
     emitter.start()
-    for tick in load_ticks(_FIXTURES / "main32_r202639.ticks.yaml")[:5]:
+    for tick in capture.ticks[:5]:
         emitter.publish_tick(tick)
     return tree_from_retained(rec.retained)
 
@@ -58,9 +56,7 @@ def published(rec: PahoRecorder) -> Tree:
 
 
 def test_every_number_takes_the_form_the_capture_shows(published: Tree) -> None:
-    capture = tree_from_snapshot(
-        json.loads((_FIXTURES / "main32_r202639-tree-v1.json").read_text(encoding="utf-8"))
-    )
+    capture = load_reference_capture(_CAPTURE).tree
     in_capture = {
         key: {_form(v) for v in values.values()} for key, values in _numbers(capture).items()
     }
