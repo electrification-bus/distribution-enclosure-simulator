@@ -326,7 +326,16 @@ class Emitter:
             frozenset({"LOST", "DEGRADED"}) if variant == "span-alpha-test-b2" else None
         )
         self._shed_policy_override: str | None = None
-        self._evse_user_max_override: dict[str, int] = {}
+        # An EVSE whose definition gives a user limit starts from it, clamped as a
+        # /set is.
+        self._evse_user_max_override: dict[str, int] = {
+            eid: max(
+                EVSE_MIN_CHARGE_CURRENT_A,
+                min(ephys.user_max_charge_current_a, int(ephys.max_current_a)),
+            )
+            for eid, ephys in self._physics.all_evse().items()
+            if ephys.user_max_charge_current_a is not None
+        }
         self._evse_lock_override: dict[str, str] = {}
 
         self._remote_ct_ids = tuple(i.instance_id for i in manifest.of_class("remote-ct"))

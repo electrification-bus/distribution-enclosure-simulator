@@ -816,6 +816,8 @@ class _Mapper:
             current = "32"
             self.note(device_id, "max-current-a", "not published; using 32")
         md["max-current-a"] = current
+        if (user_max := d.value("config/user-max-charge-current")) is not None:
+            md["user-max-charge-current-a"] = user_max
         if device_id in feeds:
             md["feed"] = feeds[device_id]
         name = self._name(device_id, str(d.description.get("name", "EV Charger")))

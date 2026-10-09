@@ -300,7 +300,7 @@ def test_only_the_panels_firmware_selects(rec: PahoRecorder) -> None:
     assert _USER_MAX not in rec.retained
 
 
-# ---- span-alpha-test-b2: the same conventions on any firmware -------------------
+# ---- span-alpha-test-b2: always the current conventions --------------------------
 
 
 _B2 = "span_alpha_test_b2_minimal"
@@ -310,7 +310,7 @@ _B2_POWER_FLOWS_BATTERY = "ebus/5/example-b2-001/power-flows/battery"
 _B2_USER_MAX = "ebus/5/evse/config/user-max-charge-current"
 
 
-def test_span_alpha_test_b2_publishes_the_same_conventions_on_any_firmware(
+def test_span_alpha_test_b2_before_202639_still_publishes_the_current_conventions(
     rec: PahoRecorder,
 ) -> None:
     """The gate is the span variant's alone: the span-alpha-test-b2 example on a firmware
@@ -330,9 +330,8 @@ def test_span_alpha_test_b2_publishes_the_same_conventions_on_any_firmware(
     assert wire == pytest.approx(device_frame)
     assert wire == pytest.approx(-float(str(pre[_B2_POWER_FLOWS_BATTERY])))
 
-    # The SPAN Drive's user limit is published at its commissioned maximum until a
-    # user sets one, as both reference captures with an EVSE show.
-    assert pre[_B2_USER_MAX] == pre[_B2_USER_MAX.replace("user-max", "max")]
+    # The SPAN Drive's user limit is unpublished until a user sets one.
+    assert _B2_USER_MAX not in pre
 
     changed = {t for t in shipped.keys() | pre.keys() if shipped.get(t) != pre.get(t)}
     assert changed == {_B2_FIRMWARE}

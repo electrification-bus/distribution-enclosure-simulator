@@ -177,6 +177,7 @@ devices:
     max-current-a: '48'
     feed: circuit-7
     unvalued: 'info/model'
+    user-max-charge-current-a: '48'
 - class: mid
   id: mid-1
   name: mid-1

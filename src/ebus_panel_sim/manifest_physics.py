@@ -145,6 +145,10 @@ class EvsePhysics:
     firmware_version: str
     max_current_a: float
     feed: str | None
+    # The user limit a panel was publishing when captured: a user's setting, or a
+    # retained value from before release 202639, which SPAN's public changelog
+    # says may linger at the maximum. The EVSE starts from it, as if set.
+    user_max_charge_current_a: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -737,6 +741,11 @@ def _parse_evse(inst: DeviceInstance) -> EvsePhysics:
         firmware_version=_opt_str(md, "firmware-version") or _require(md, "software-version"),
         max_current_a=_req_float(md, "max-current-a"),
         feed=_feed(md),
+        user_max_charge_current_a=(
+            _req_int(md, "user-max-charge-current-a")
+            if "user-max-charge-current-a" in md
+            else None
+        ),
     )
 
 

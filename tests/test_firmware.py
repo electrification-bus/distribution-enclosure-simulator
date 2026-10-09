@@ -80,21 +80,9 @@ def test_the_span_variant_keys_on_the_release(
     assert firmware_conventions("span", release) == expected
 
 
+@pytest.mark.parametrize("variant", [v for v in get_args(Variant) if v != "span"])
 @pytest.mark.parametrize("release", [202633, CURRENT_CONVENTIONS_RELEASE, None])
-def test_the_reference_variant_always_uses_the_current_conventions(
-    release: int | None,
+def test_every_other_variant_always_uses_the_current_conventions(
+    variant: Variant, release: int | None
 ) -> None:
-    assert firmware_conventions("reference", release) == _CURRENT
-
-
-@pytest.mark.parametrize("release", [202633, CURRENT_CONVENTIONS_RELEASE, None])
-def test_span_alpha_test_b2_presets_the_user_limit_on_any_firmware(release: int | None) -> None:
-    """The battery's own frame, and the EVSE user limit at the commissioned
-    maximum, as both reference captures with an EVSE publish it (48 of 48)."""
-    assert firmware_conventions("span-alpha-test-b2", release) == FirmwareConventions(
-        bess_meter_frame="device", user_max_charge_current_preset=True
-    )
-
-
-def test_every_variant_is_covered() -> None:
-    assert set(get_args(Variant)) == {"span", "reference", "span-alpha-test-b2"}
+    assert firmware_conventions(variant, release) == _CURRENT
