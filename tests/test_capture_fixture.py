@@ -97,3 +97,19 @@ def test_a_device_the_panel_names_by_its_id_keeps_that_name(rec: PahoRecorder, m
     for device_id, device in rebuilt.items():
         if device.type in ("bess", "pv", "mid", "lugs"):
             assert device.description["name"] == device_id
+
+
+def test_capture_records_what_the_panel_declares_and_leaves_unvalued(rec: PahoRecorder) -> None:
+    """Every circuit of this panel declares pcs/priority and values none, so each
+    captured circuit lists it as unvalued and the rebuilt panel leaves it so. A
+    settable property is never listed: a consumer may set it later."""
+    definition, _ = definition_from_tree(_tree(), mask=False)
+    for inst in definition.manifest.of_class("circuit"):
+        unvalued = inst.metadata["unvalued"].split(",")
+        assert "pcs/priority" in unvalued
+        assert "load-shed/priority" not in unvalued
+    rebuilt = _rebuilt(rec, mask=False)
+    for device in rebuilt.values():
+        if device.type == "circuit":
+            assert device.declares("pcs/priority")
+            assert device.value("pcs/priority") is None

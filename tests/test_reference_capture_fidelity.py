@@ -64,7 +64,7 @@ _RESIDUAL: dict[str, int] = {
     "r202639-d": 19,
     "r202639-e": 13,
     _MAIN32_R202639: 7,
-    _MAIN32_R202633: 28,
+    _MAIN32_R202633: 3,
 }
 _NOT_COMPARED = frozenset({"connection/count"})
 _ATTRIBUTES = ("datatype", "settable", "unit", "format", "name")

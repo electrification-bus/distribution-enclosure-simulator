@@ -28,7 +28,11 @@ from ebus_panel_sim.exceptions import (
 )
 from ebus_panel_sim.firmware import firmware_conventions
 from ebus_panel_sim.manifest import DeviceManifest
-from ebus_panel_sim.manifest_physics import EVSE_MIN_CHARGE_CURRENT_A, ManifestPhysicsView
+from ebus_panel_sim.manifest_physics import (
+    EVSE_MIN_CHARGE_CURRENT_A,
+    ManifestPhysicsView,
+    unvalued_paths,
+)
 from ebus_panel_sim.native_devices import (
     BESSConfig,
     BESSDevice,
@@ -152,6 +156,32 @@ def _typed(raw: str, datatype: str, fmt: str | None, *, where: str) -> object:
     return raw
 
 
+def _declared_unvalued(
+    manifest: DeviceManifest, profiles: ProfileTable
+) -> dict[tuple[str, str], frozenset[str]]:
+    """Each device's ``unvalued`` metadata, keyed ``(entity_class, instance_id)``.
+
+    A path the device's profile does not declare is an error, so a typo cannot
+    silently leave a property valued."""
+    out: dict[tuple[str, str], frozenset[str]] = {}
+    for inst in manifest.instances:
+        paths = unvalued_paths(inst.metadata)
+        if not paths:
+            continue
+        profile = profiles.get(inst.entity_class)
+        declared = (
+            {f"{cap}/{key}" for cap, c in profile.capabilities.items() for key in c.properties}
+            if profile is not None
+            else set()
+        )
+        if unknown := sorted(paths - declared):
+            raise ManifestValidationError(
+                f"{inst.instance_id} key 'unvalued': its profile declares no {', '.join(unknown)}"
+            )
+        out[(inst.entity_class, inst.instance_id)] = paths
+    return out
+
+
 class Emitter:
     """One emitter per logical panel/clone."""
 
@@ -220,6 +250,7 @@ class Emitter:
         self._profiles = load_profiles(variant=variant)
         self._mapping = load_mapping_table()
         self._mapping.validate_against(self._profiles)
+        self._unvalued = _declared_unvalued(manifest, self._profiles)
 
         # The root device holds the shared connection — built from mqtt_cfg, or
         # the caller's when injected — and children publish through it either
@@ -348,6 +379,7 @@ class Emitter:
             self._profiles,
             self._typed_wire_values(),
             bess_meter_frame=self._conventions.bess_meter_frame,
+            unvalued=self._unvalued,
         )
         self._last_snapshot: EbusPanelSnapshot | None = None
         self._started = False

@@ -335,6 +335,18 @@ def relay_locked(md: dict[str, str]) -> bool:
     )
 
 
+def unvalued_paths(md: dict[str, str]) -> frozenset[str]:
+    """The ``capability/property`` paths a device declares and never values, from
+    its ``unvalued`` metadata (comma-separated), as the panel it reproduces did.
+
+    Any device class takes the key, so it is read here rather than by a class's
+    parser."""
+    raw = _opt_str(md, "unvalued")
+    if raw is None:
+        return frozenset()
+    return frozenset(path.strip() for path in raw.split(",") if path.strip())
+
+
 def never_backup(md: dict[str, str]) -> bool:
     """Whether this circuit's load-shed priority is locked, from its raw metadata.
 

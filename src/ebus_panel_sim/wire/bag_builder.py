@@ -463,6 +463,7 @@ class BagBuilder:
         wire_values: dict[tuple[str, str, str], object] | None = None,
         *,
         bess_meter_frame: BessMeterFrame = "device",
+        unvalued: Mapping[tuple[str, str], frozenset[str]] | None = None,
     ) -> None:
         """``wire_values`` holds the constant commissioning values, keyed by
         ``(entity_class, instance_id, property_path)``, for the paths in
@@ -474,7 +475,10 @@ class BagBuilder:
         this instance's copy of the resolver table; the coverage check and the
         binding below read only that copy, never ``_RESOLVERS`` itself. In the
         enclosure frame it is also written in ``power-flows/battery``'s literal
-        form, as that firmware did."""
+        form, as that firmware did.
+
+        ``unvalued`` names, per ``(entity_class, instance_id)``, the paths a
+        device declares and never values; they are never bound."""
         del mapping  # accepted for API symmetry; not consulted today.
         constants = wire_values or {}
         self._bound: list[_BoundProperty] = []
@@ -502,8 +506,10 @@ class BagBuilder:
                 f"out of sync.",
             )
 
-        # Properties a profile declares and never values are never bound.
-        unvalued = {
+        # Properties a profile declares and never values are never bound, nor are
+        # those a device's definition declares unvalued.
+        instance_unvalued = unvalued or {}
+        unvalued_paths = {
             (entity_class, f"{cap_name}/{prop_key}")
             for entity_class, profile in profiles.items()
             for cap_name, cap in profile.capabilities.items()
@@ -530,7 +536,9 @@ class BagBuilder:
         # property_path) keys actually present in the graph. The graph already
         # encodes which instances exist for each entity_class.
         for entity_class, instance_id, property_path in graph.properties:
-            if (entity_class, property_path) in unvalued:
+            if (entity_class, property_path) in unvalued_paths or property_path in (
+                instance_unvalued.get((entity_class, instance_id), frozenset())
+            ):
                 continue
             key = (entity_class, instance_id, property_path)
             resolver = (

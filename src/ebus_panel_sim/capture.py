@@ -39,7 +39,7 @@ from ebus_panel_sim.manifest_physics import (
 )
 from ebus_panel_sim.native_devices import BESSConfig, LoadSheddingConfig
 from ebus_panel_sim.tick_inputs import BESSCommunication, TickInputs
-from ebus_panel_sim.wire.profile_loader import Variant
+from ebus_panel_sim.wire.profile_loader import Variant, load_profiles
 
 _DOMAIN = "ebus/5"
 _LINK_STATES = frozenset(get_args(BESSCommunication))
@@ -472,6 +472,7 @@ class _Mapper:
     def run(self, variant: Variant | None) -> tuple[PanelDefinition, list[CaptureNote]]:
         panel = self.tree[self.panel_id]
         chosen = variant or _infer_variant(panel)
+        self.profiles = load_profiles(variant=chosen)
         feeds = self.feeds()
         self._note_dangling_feeds()
         instances = [self._described(self.panel_id, self._panel())]
@@ -522,11 +523,16 @@ class _Mapper:
         )
 
     def _described(self, device_id: str, inst: DeviceInstance) -> DeviceInstance:
-        """``inst`` carrying the device's published ``$description.name`` where the
-        definition's name would not reproduce it. A device named by its own id
-        is named by its published (masked) id; one named as its ``info/name``
-        follows the definition's name."""
+        """``inst`` as the device was published: its ``$description.name`` where the
+        definition's name would not reproduce it, and the properties it declares
+        and leaves unvalued.
+
+        A device named by its own id is named by its published (masked) id; one
+        named as its ``info/name`` follows the definition's name."""
         device = self.tree[device_id]
+        unvalued = self._unvalued(device, inst.entity_class)
+        if unvalued:
+            inst = dataclasses.replace(inst, metadata={**inst.metadata, "unvalued": unvalued})
         raw = device.description.get("name")
         if not isinstance(raw, str) or not raw or raw == device.value("info/name"):
             return inst
@@ -534,6 +540,25 @@ class _Mapper:
         if name == inst.display_name:
             return inst
         return dataclasses.replace(inst, description_name=name)
+
+    def _unvalued(self, device: Device, entity_class: str) -> str:
+        """The paths the device declares and leaves unvalued that the variant's
+        profile would otherwise value, comma-separated. A settable property is
+        left out: a consumer may set it later."""
+        profile = self.profiles.get(entity_class)
+        if profile is None:
+            return ""
+        return ",".join(
+            sorted(
+                path
+                for cap_name, cap in profile.capabilities.items()
+                for key, prop in cap.properties.items()
+                if not prop.settable
+                and not prop.unvalued
+                and device.declares(path := f"{cap_name}/{key}")
+                and device.properties.get(path) is None
+            )
+        )
 
     def _load_shedding(self) -> LoadSheddingConfig | None:
         """The off-grid SOC shed threshold from the panel's published shed policy."""
