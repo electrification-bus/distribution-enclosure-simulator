@@ -502,3 +502,40 @@ def test_at_most_one_remote_ct() -> None:
         Emitter(
             _with_remote_ct(_variant_manifest(), 2), SetterRegistry(), variant="span-alpha-test-b2"
         )
+
+
+def _solar_and_other_generation() -> DeviceManifest:
+    """The loads-only site with its SOLAR circuit, plus a second circuit that also
+    reads negative but has no solar role."""
+    manifest = _loads_only(solar=True)
+    return _with(manifest, "kitchen", **{"feeds-role": "LOADS"})
+
+
+@pytest.mark.spec_only
+@pytest.mark.parametrize(
+    ("variant", "pv", "site"),
+    [("span-alpha-test-b2", -2000.0, 700.0), ("span", -2300.0, 1000.0)],
+)
+def test_power_flows_pv_is_the_generation_of_solar_role_circuits(
+    rec: PahoRecorder, variant: Variant, pv: float, site: float
+) -> None:
+    """Assumed, as no reference capture has solar: the eBus catalog's
+    connection/feeds-role SOLAR names the circuit feeding a solar source, so the
+    variant takes power-flows/pv from those circuits alone and books any other
+    circuit's negative reading against the site. The span variant counts every
+    negative circuit as solar. The grid is the same either way."""
+    em = Emitter(_solar_and_other_generation(), SetterRegistry(), variant=variant)
+    em.start()
+    snap = em.publish_tick(
+        TickInputs(
+            current_time=0.0,
+            grid_online=True,
+            circuits={"solar": -2000.0, "kitchen": -300.0, "ev": 1000.0},
+        )
+    )
+    flows = snap.power_flows
+    assert flows.pv == pytest.approx(pv)
+    assert flows.site == pytest.approx(site)
+    assert flows.grid == pytest.approx(1300.0)
+    values = [flows.pv, flows.battery or 0.0, flows.grid, flows.site]
+    assert sum(v for v in values if v is not None) == pytest.approx(0.0)

@@ -923,6 +923,18 @@ class Emitter:
             battery_w=battery_w,
             grid_online=tick.grid_online,
             has_battery=has_battery,
+            # eBus connection/feeds-role SOLAR: the variant takes solar from the
+            # circuits commissioned with that role, the span variant from every
+            # circuit reading negative.
+            solar_circuits=(
+                frozenset(
+                    cid
+                    for cid, c in circuits_phys.items()
+                    if c.wire_values.get("connection/feeds-role") == "SOLAR"
+                )
+                if self._variant == "span-alpha-test-b2"
+                else None
+            ),
         )
 
         # Cross-device connection edges. Real SPAN owns the connection index on

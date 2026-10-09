@@ -115,11 +115,24 @@ def resolve(
     battery_w: float,  # signed; positive = discharging
     grid_online: bool,
     has_battery: bool,
+    solar_circuits: frozenset[str] | None = None,
 ) -> PanelMeterReading:
-    """Build the panel-level reading from per-circuit gated powers + battery + grid."""
+    """Build the panel-level reading from per-circuit gated powers + battery + grid.
 
-    load_demand_w = sum(p for p in gated_powers.values() if p > 0)
-    pv_available_w = -sum(p for p in gated_powers.values() if p < 0)  # positive magnitude
+    ``solar_circuits`` names the circuits whose generation is solar, by their
+    role (eBus connection/feeds-role SOLAR). Given, solar is their negative
+    readings alone, and any other circuit's reading, negative or not, is booked
+    against the site. Without it every negative reading counts as solar. The
+    upstream flow, and so the grid, is the same either way."""
+
+    if solar_circuits is None:
+        load_demand_w = sum(p for p in gated_powers.values() if p > 0)
+        pv_available_w = -sum(p for p in gated_powers.values() if p < 0)  # positive magnitude
+    else:
+        pv_available_w = -sum(
+            p for cid, p in gated_powers.items() if p < 0 and cid in solar_circuits
+        )
+        load_demand_w = sum(gated_powers.values()) + pv_available_w
 
     upstream_active_w = load_demand_w - pv_available_w
 

@@ -105,7 +105,7 @@ A circuit carrying `commissioned-system: pv` or `commissioned-system: backup` is
 
 A `remote-ct` instance (no metadata) is a meter on the service conductor, outside the panel. It is published only by `span-alpha-test-b2`, at most one per panel, as a `circuit` device with only a `meter`: no `info`, and so no `info/spaces`, which is how a consumer tells it from a branch circuit. Its `active-power` is the utility-side grid power, positive on import, and `imported-energy` grows on import.
 
-Under `span-alpha-test-b2`, a locked relay also locks `load-shed/priority`, and `commissioned-system` is rejected: that variant publishes a PV or battery breaker as an ordinary circuit with a locked relay at `NEVER`.
+Under `span-alpha-test-b2`, a locked relay also locks `load-shed/priority`, and `commissioned-system` is rejected: that variant publishes a PV or battery breaker as an ordinary circuit with a locked relay at `NEVER`. Its solar is a circuit with `feeds-role: SOLAR`, never a `pv` device (a `pv` instance is rejected): `power-flows/pv` is those circuits' generation, and any other circuit's reading, negative or not, is booked against `power-flows/site`. No reference capture has solar, so this follows the public eBus catalog's `connection/feeds-role` and is assumed; its tests carry the `spec_only` marker.
 
 The keys from `site-name` on the `panel` row, from `tags` on the `circuit` row, and every optional `lugs` key are commissioning facts, checked against the datatype of the property they feed and published verbatim (a number keeps the digits it is written with), only by a variant whose profile declares that property (today `span-alpha-test-b2`). A key absent from the manifest leaves its property unpublished.
 
