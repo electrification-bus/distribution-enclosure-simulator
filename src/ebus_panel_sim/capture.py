@@ -34,6 +34,7 @@ from typing import Any, cast, get_args
 from ebus_panel_sim.definition import PanelDefinition, dump_definition, dump_ticks
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
 from ebus_panel_sim.manifest_physics import (
+    WIRE_VALUE_PATHS,
     _circuit_wire_values,
     _lugs_wire_values,
     _panel_wire_values,
@@ -60,6 +61,8 @@ _SITE_MASKS = {
     "utility-meter-serial-number": "MASKED-METER",
 }
 _MASKED_SSID = "masked-ssid"
+# The properties naming another device a connection feeds or is fed by.
+_CONNECTION_EDGE = re.compile(r"^connection/(feeds|fed-by)-device-(id|type|status)$")
 # A shorter original ID masks a display name only when it is the whole name, so
 # an ID such as ``bess`` does not rename "Example BESS".
 _MIN_EMBEDDED = 6
@@ -544,12 +547,16 @@ class _Mapper:
         return dataclasses.replace(inst, description_name=name)
 
     def _unvalued(self, device: Device, entity_class: str) -> str:
-        """The paths the device declares and leaves unvalued that the variant's
-        profile would otherwise value, comma-separated. A settable property is
-        left out: a consumer may set it later."""
+        """The paths the device declares and leaves unvalued, comma-separated.
+
+        Left out are those the definition already leaves unvalued another way: a
+        settable property, which a consumer may set later; a commissioning fact,
+        published only when its key is present; and a connection to another
+        device, published only when the definition makes that connection."""
         profile = self.profiles.get(entity_class)
         if profile is None:
             return ""
+        implied = WIRE_VALUE_PATHS.get(entity_class, frozenset())
         return ",".join(
             sorted(
                 path
@@ -557,7 +564,9 @@ class _Mapper:
                 for key, prop in cap.properties.items()
                 if not prop.settable
                 and not prop.unvalued
-                and device.declares(path := f"{cap_name}/{key}")
+                and (path := f"{cap_name}/{key}") not in implied
+                and not _CONNECTION_EDGE.match(path)
+                and device.declares(path)
                 and device.properties.get(path) is None
             )
         )
