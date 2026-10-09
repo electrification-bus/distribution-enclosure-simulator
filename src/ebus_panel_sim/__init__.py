@@ -97,7 +97,7 @@ from ebus_panel_sim.wire.set_router import SetterHandler, SetterRegistry
 # via `[tool.hatch.version]`, and publish.yml refuses to release when the git tag
 # disagrees. Bump it in this one place. Note this is the PACKAGE version and is
 # distinct from the producer-contract version the docstrings above refer to.
-__version__ = "0.10.0b2"
+__version__ = "0.10.0b3"
 
 __all__ = [
     "ASSERTION_CLEAR_AFTER_S",
