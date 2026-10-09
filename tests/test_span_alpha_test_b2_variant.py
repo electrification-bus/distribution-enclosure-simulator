@@ -283,6 +283,18 @@ def test_an_unconfigured_requested_import_limit_reads_200(
     assert rec.retained["ebus/5/abc-123/pcs/requested-import-limit-enablement"] == "UNCONFIGURED"
 
 
+def test_the_reference_variant_keeps_its_requested_import_limit(rec: PahoRecorder) -> None:
+    """200.0 is a SPAN panel's value; the reference variant publishes only what the
+    specification says, and is unchanged."""
+    reference = DeviceManifest(
+        instances=tuple(
+            i for i in _variant_manifest().instances if i.entity_class not in ("pv", "evse")
+        )
+    )
+    _started(rec, reference, variant="reference")
+    assert float(rec.retained["ebus/5/abc-123/pcs/requested-import-limit"]) == 0.0
+
+
 def test_the_variant_declares_the_main_relay_and_shed_forecast_unvalued(
     rec: PahoRecorder,
 ) -> None:

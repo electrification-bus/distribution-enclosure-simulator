@@ -91,6 +91,12 @@ _BESS_COMMUNICATION_STATES: Final[frozenset[str]] = frozenset(get_args(BESSCommu
 # only these values there (SPAN-API-Client-Docs specs/r202633/homie-schema.json).
 _SPAN_REPORTED_LINK_STATUSES: Final = frozenset({"OK", "LOST"})
 _NOMINAL_FREQUENCY_HZ = 60.0
+# What a SPAN panel publishes for pcs/requested-import-limit while it is
+# UNCONFIGURED: 200.0 on every public and reference capture, whatever the panel's
+# breaker, service rating or import limit. The reference variant publishes only
+# what the specification says, so it keeps its own value.
+_SPAN_UNCONFIGURED_REQUESTED_IMPORT_LIMIT_A: Final = 200.0
+_REFERENCE_REQUESTED_IMPORT_LIMIT_A: Final = 0.0
 
 
 def _busbar_current(site_w: float, service_voltage_v: float) -> float | None:
@@ -1218,6 +1224,11 @@ class Emitter:
             grid_state=meter.grid_state,
             dsm_state=meter.dsm_state,
             current_run_config=meter.current_run_config,
+            requested_import_limit_a=(
+                _REFERENCE_REQUESTED_IMPORT_LIMIT_A
+                if self._variant == "reference"
+                else _SPAN_UNCONFIGURED_REQUESTED_IMPORT_LIMIT_A
+            ),
             operator_import_limit_enablement=panel_phys.operator_import_limit_enablement,
             off_grid_import_limit_enablement=panel_phys.off_grid_import_limit_enablement,
             off_grid_import_limit_a=(

@@ -269,9 +269,7 @@ class EbusPanelPcs:
     off_grid_import_limit_a: float | None = None
     off_grid_import_limit_enablement: str | None = None
     off_grid_import_limit_active: bool | None = None
-    # Every public and reference capture publishes 200.0 while the requested
-    # limit is UNCONFIGURED.
-    requested_import_limit_a: float | None = 200.0
+    requested_import_limit_a: float | None = 0.0
     requested_import_limit_enablement: str = "UNCONFIGURED"
     requested_import_limit_active: bool = False
 
