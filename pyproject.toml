@@ -81,9 +81,8 @@ path = "src/ebus_panel_sim/__init__.py"
 # `packages` already carries everything under the package directory, including the
 # YAML/JSON wire data (profiles, mapping, catalogs) and the reference captures
 # (`reference_captures/`, each a captured tree, most with a recorded definition and
-# ticks). They
-# live in the package, not under `tests/`, so that consumers can load them from the
-# wheel through `load_reference_capture`. A `force-include` table naming
+# ticks). They live in the package, not under `tests/`, so that consumers can load
+# them from the wheel through `load_reference_capture`. A `force-include` table naming
 # those same trees re-adds each file at a path the archive already holds, which
 # hatchling treats as fatal ("A second file is being added to the wheel archive at
 # the same path"), so the wheel could never build. Tests exercise the source tree
