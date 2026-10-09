@@ -24,9 +24,9 @@ class LiteralForm:
     The span profile writes a number in the shortest form wherever the public
     MAIN 32 captures show no rounding rule for it, so a value the panel may not
     round is not rounded here: the BESS ``nameplate-capacity`` and the PV
-    ``nominal-power``, whose only samples (``81``, ``4640``) are integral, and the
-    EVSE ``meter/advertised-current`` and ``pcs/off-grid-import-limit``, which
-    neither capture publishes."""
+    ``nominal-power``, whose only samples (``81``, ``27``; ``4640``, ``11680``) are
+    integral, and the EVSE ``meter/advertised-current`` and
+    ``pcs/off-grid-import-limit``, which no MAIN 32 capture publishes."""
 
     kind: LiteralKind
     places: int = 0

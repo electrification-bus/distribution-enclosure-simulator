@@ -567,7 +567,7 @@ def _solar_and_other_generation() -> DeviceManifest:
 def test_power_flows_pv_is_the_generation_of_solar_role_circuits(
     rec: PahoRecorder, variant: Variant, pv: float, site: float
 ) -> None:
-    """Assumed, as no reference capture has solar: the eBus catalog's
+    """Assumed, as no reference capture has a SOLAR-role circuit: the eBus catalog's
     connection/feeds-role SOLAR names the circuit feeding a solar source, so the
     variant takes power-flows/pv from those circuits alone and books any other
     circuit's negative reading against the site. The span variant counts every

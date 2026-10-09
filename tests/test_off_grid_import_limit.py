@@ -1,8 +1,8 @@
 """The off-grid import limit is commissioned state, never a constant.
 
 Every public and reference capture shows the same rule: without a commissioned
-enablement a panel publishes none of the three off-grid properties (both MAIN 32
-captures), with one it publishes the enablement and ``-active``, and it values the
+enablement a panel publishes none of the three off-grid properties (every MAIN 32
+capture), with one it publishes the enablement and ``-active``, and it values the
 limit only while ENABLED (47.9 A on the one capture that has it)."""
 
 from __future__ import annotations

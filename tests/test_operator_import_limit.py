@@ -1,8 +1,9 @@
 """The operator import limit's enablement is commissioned state.
 
 The reference captures publish it DISABLED on three panels and UNCONFIGURED on
-the others, both MAIN 32 captures included, so a definition carries it and the
-emitter publishes it as given; without one it reads UNCONFIGURED."""
+three, ``main32_r202639`` included, and the MAIN 32 captures whose PCS is off
+leave it unvalued. So a definition carries it and the emitter publishes it as
+given; without one it reads UNCONFIGURED."""
 
 from __future__ import annotations
 

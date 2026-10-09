@@ -27,6 +27,7 @@ def test_the_names_are_the_shipped_captures_sorted() -> None:
     assert reference_capture_names() == (
         "main32_r202633",
         "main32_r202639",
+        "main32_r202639-upstream-pv",
         "r202639-a",
         "r202639-b",
         "r202639-c",
@@ -56,6 +57,30 @@ def test_a_capture_is_derived_exactly_when_it_ships_no_recording(name: str) -> N
     recorded = [(_DATA / f"{name}{suffix}").is_file() for suffix in (".yaml", ".ticks.yaml")]
     assert recorded in ([True, True], [False, False])
     assert load_reference_capture(name).derived_from_tree is not recorded[0]
+
+
+_RECORDED = [n for n in reference_capture_names() if (_DATA / f"{n}.yaml").is_file()]
+
+
+@pytest.mark.parametrize("name", _RECORDED)
+def test_a_recorded_definition_lists_what_the_capture_tool_leaves_unvalued(name: str) -> None:
+    """Each device's unvalued list is the one panel-sim-capture writes from the
+    captured tree, so the emitter leaves unvalued exactly what the panel did."""
+    capture = load_reference_capture(name)
+    written, _ = definition_from_tree(capture.tree)
+    assert {
+        i.instance_id: i.metadata.get("unvalued") for i in capture.definition.manifest.instances
+    } == {i.instance_id: i.metadata.get("unvalued") for i in written.manifest.instances}
+
+
+def test_the_upstream_pv_definition_names_devices_as_the_capture_tool_does() -> None:
+    """Its definition carries the description names panel-sim-capture writes from
+    the captured tree, as it carries the tool's unvalued lists."""
+    capture = load_reference_capture("main32_r202639-upstream-pv")
+    written, _ = definition_from_tree(capture.tree)
+    assert {i.instance_id: i.description_name for i in capture.definition.manifest.instances} == {
+        i.instance_id: i.description_name for i in written.manifest.instances
+    }
 
 
 def test_only_the_r202633_capture_is_derived() -> None:

@@ -2,9 +2,10 @@
 
 Each ``r202639-<handle>`` reference capture (``load_reference_capture``) is a
 masked tree of a SPAN panel on ``spanos3/r202639/03`` with the definition and the
-60 one-second ticks recorded with it. The two MAIN 32 captures are held to the
-same bar: ``main32_r202639`` with its definition and ticks, and the r202633
-capture ``main32_r202633``, which has neither, through the definition
+60 one-second ticks recorded with it. The three MAIN 32 captures are held to the
+same bar: ``main32_r202639`` and ``main32_r202639-upstream-pv`` (its PV inverters
+and battery upstream of the panel) with their definitions and ticks, and the
+r202633 capture ``main32_r202633``, which has neither, through the definition
 ``panel-sim-capture`` writes from it and one tick sampled from it, as the
 accessor derives them.
 
@@ -53,10 +54,18 @@ from .conftest import PahoRecorder
 
 _MAIN32_R202639 = "main32_r202639"
 _MAIN32_R202633 = "main32_r202633"
+_MAIN32_R202639_UPSTREAM_PV = "main32_r202639-upstream-pv"
 _FEEDTHROUGH = (
     "The panel feeds a sub-panel through its downstream lugs (2700.6 W in the "
     "capture), which a definition cannot express, so the emitter's site lacks that "
     "load and its grid and upstream lugs run the other way."
+)
+_UPSTREAM_PV_SITE = (
+    "With its PV inverters and battery upstream of the panel, the panel writes site "
+    "as an integer (4443, the negated sum of the integer grid, pv and battery flows), "
+    "where the other MAIN 32 captures on the same firmware write one decimal. One "
+    "capture does not show when the panel writes which, so the span profile keeps "
+    "one decimal."
 )
 _FED_BY_ENCLOSURE = (
     "The upstream lugs are fed by another enclosure, which a definition cannot "
@@ -79,6 +88,9 @@ _EXCEPTIONS: dict[str, dict[str, str]] = {
     _MAIN32_R202639: {
         "distribution-enclosure #1: power-flows/grid sign": _FEEDTHROUGH,
         "lugs UPSTREAM: meter/active-power sign": _FEEDTHROUGH,
+    },
+    _MAIN32_R202639_UPSTREAM_PV: {
+        "distribution-enclosure #1: power-flows/site shape": _UPSTREAM_PV_SITE,
     },
     _MAIN32_R202633: {
         f"lugs UPSTREAM: connection/fed-by-device-{key}: valued only by the capture": (
