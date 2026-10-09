@@ -193,6 +193,41 @@ def _declared_unvalued(
     return out
 
 
+# How span-alpha-test-b2 books a circuit's power by its feeds-role, as r202639
+# firmware does: SOLAR to pv, STORAGE to battery, LOADS (or no role) to site. A
+# circuit feeding an EVSE is site whatever its role.
+_SOLAR_ROLE: Final = "SOLAR"
+_STORAGE_ROLE: Final = "STORAGE"
+# UNUSED is a surveyed, empty breaker: about 0 W, and any reading it does show is
+# load-side, so site is where it belongs.
+_SITE_ROLES: Final = frozenset({"LOADS", "UNUSED"})
+_BOOKED_ROLES: Final = _SITE_ROLES | {_SOLAR_ROLE, _STORAGE_ROLE}
+
+
+def unbooked_circuit_roles(manifest: DeviceManifest) -> list[tuple[str, str]]:
+    """``(circuit id, role)`` for each circuit whose feeds-role span-alpha-test-b2
+    has no known power-flow booking for: GENERATOR, SUBPANEL and MIXED. A circuit
+    feeding an EVSE is site whatever its role, so it never appears."""
+    evse_feeds = {i.metadata.get("feed") for i in manifest.of_class("evse")}
+    return [
+        (inst.instance_id, role)
+        for inst in manifest.of_class("circuit")
+        if (role := inst.metadata.get("feeds-role")) is not None
+        and role not in _BOOKED_ROLES
+        and inst.instance_id not in evse_feeds
+    ]
+
+
+def _check_flow_roles(manifest: DeviceManifest) -> None:
+    """Refuse a circuit role whose booking is not known, rather than guess a flow."""
+    if unbooked := unbooked_circuit_roles(manifest):
+        circuit_id, role = unbooked[0]
+        raise ManifestValidationError(
+            f"{circuit_id} key 'feeds-role': variant 'span-alpha-test-b2' does not "
+            f"know how to book a {role} circuit's power; use LOADS, SOLAR, STORAGE or UNUSED"
+        )
+
+
 class Emitter:
     """One emitter per logical panel/clone."""
 
@@ -251,6 +286,8 @@ class Emitter:
             raise ManifestValidationError(
                 f"at most one remote-ct per panel, got {len(remote_cts)}"
             )
+        if variant == "span-alpha-test-b2":
+            _check_flow_roles(manifest)
         if variant == "span-alpha-test-b2" and any(
             i.metadata.get("commissioned-system") for i in manifest.of_class("circuit")
         ):
@@ -936,6 +973,11 @@ class Emitter:
                 self._energy.observe(eid, evse_power, tick.current_time)
 
         # Step 5: panel-level aggregation.
+        storage_circuits = frozenset(
+            cid
+            for cid, c in circuits_phys.items()
+            if c.wire_values.get("connection/feeds-role") == _STORAGE_ROLE
+        )
         meter = resolve_panel(
             panel=panel_phys,
             circuits=circuits_phys,
@@ -943,6 +985,29 @@ class Emitter:
             battery_w=battery_w,
             grid_online=tick.grid_online,
             has_battery=has_battery,
+            # By eBus connection/feeds-role (see _check_flow_roles): the variant
+            # takes solar from SOLAR circuits, battery from STORAGE circuits and a
+            # battery's own breaker, and site from the rest, as r202639 firmware
+            # does; the span variant takes solar from every circuit reading
+            # negative. The variant's site would also take the upstream load its
+            # remote-ct meter measures, but this model's remote-ct reads the panel's
+            # own grid power, so it measures none. A third-party backup system
+            # that reports pv, battery and grid from its own meter is not modelled.
+            solar_circuits=(
+                frozenset(
+                    cid
+                    for cid, c in circuits_phys.items()
+                    if c.wire_values.get("connection/feeds-role") == _SOLAR_ROLE
+                )
+                if self._variant == "span-alpha-test-b2"
+                else None
+            ),
+            battery_circuits=(
+                storage_circuits
+                | {bphys.feed for bphys in self._physics.all_bess().values() if bphys.feed}
+                if self._variant == "span-alpha-test-b2"
+                else frozenset()
+            ),
         )
 
         # Cross-device connection edges. Real SPAN owns the connection index on
@@ -1232,13 +1297,15 @@ class Emitter:
                 and not tick.grid_online
             ),
         )
-        # Under span-alpha-test-b2, a panel with neither a battery nor solar (a
-        # circuit commissioned feeds-role SOLAR) leaves pv and battery unset.
+        # Under span-alpha-test-b2, a panel with neither a battery (a BESS, or a
+        # circuit commissioned feeds-role STORAGE) nor solar (a SOLAR circuit)
+        # leaves pv and battery unset.
         loads_only = (
             self._variant == "span-alpha-test-b2"
             and not has_battery
+            and not storage_circuits
             and not any(
-                c.wire_values.get("connection/feeds-role") == "SOLAR"
+                c.wire_values.get("connection/feeds-role") == _SOLAR_ROLE
                 for c in circuits_phys.values()
             )
         )

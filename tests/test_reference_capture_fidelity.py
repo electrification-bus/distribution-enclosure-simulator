@@ -74,9 +74,12 @@ _FED_BY_ENCLOSURE = (
 _EXCEPTIONS: dict[str, dict[str, str]] = {
     "r202639-b": {
         "distribution-enclosure #1: power-flows/site sign": (
-            "The panel published site -8.8 W beside grid -0.2 W and no other flow, so "
-            "its own flows do not balance; the emitter's do, and its site follows the "
-            "circuits' small positive load."
+            "The panel's site is its load circuits (2.5 W) plus the upstream load its "
+            "meter-only circuit on the service conductor measures (0.2 W less the "
+            "upstream lugs' 11.5 W), as r202639 firmware computes it: -8.8 W. The "
+            "emitter's meter-only circuit reads the panel's own grid power and its lugs "
+            "carry only its circuits, so it measures no upstream load and its site "
+            "stays the circuits' small load."
         ),
     },
     _MAIN32_R202639: {

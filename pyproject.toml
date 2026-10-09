@@ -108,6 +108,9 @@ ignore = ["TC001", "TC002", "TC003"]
 testpaths = ["tests"]
 # A misspelt or unregistered marker is an error, not a warning.
 strict_markers = true
+markers = [
+    "spec_only: behaviour no reference capture shows, from the public eBus specification or the firmware's stated rules",
+]
 
 [tool.mypy]
 python_version = "3.11"
