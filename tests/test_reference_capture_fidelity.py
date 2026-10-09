@@ -2,11 +2,16 @@
 
 ``tests/fixtures/r202639-<handle>-tree-v1.json`` is a masked tree of a SPAN panel
 on ``spanos3/r202639/03``, and ``r202639-<handle>.yaml`` and ``.ticks.yaml`` are the
-definition and the 60 one-second ticks recorded with it. The emitter publishes
-the definition through every tick, and the retained tree is compared with the
-capture device by device: ``$description`` keys, type and children, nodes,
-declared properties and their datatype, settable, unit, format and name, valued
-versus unvalued, the literal form of each value, and the sign of each power.
+definition and the 60 one-second ticks recorded with it. The two MAIN 32 captures
+are held to the same bar: ``main32_r202639`` with its definition and ticks, and
+the r202633 capture ``main32-tree-v1.json``, which has neither, through the
+definition ``panel-sim-capture`` writes from it and one tick sampled from it.
+
+The emitter publishes the definition through every tick, and the retained tree
+is compared with the capture device by device: ``$description`` keys, type and
+children, nodes, declared properties and their datatype, settable, unit, format
+and name, valued versus unvalued, the literal form of each value, and the sign
+of each power.
 Masked identifiers, time-varying magnitudes and ``connection/count`` may differ.
 Devices are aligned by role, not id: a branch circuit by its spaces and name, a
 circuit device without ``info/spaces`` by its ordinal, lugs by direction, and any
@@ -25,8 +30,22 @@ from pathlib import Path
 
 import pytest
 
-from ebus_panel_sim import Emitter, SetterRegistry, load_definition, load_ticks
-from ebus_panel_sim.capture import Device, Tree, tree_from_retained, tree_from_snapshot
+from ebus_panel_sim import (
+    Emitter,
+    PanelDefinition,
+    SetterRegistry,
+    TickInputs,
+    load_definition,
+    load_ticks,
+)
+from ebus_panel_sim.capture import (
+    Device,
+    Tree,
+    definition_from_tree,
+    ticks_from_samples,
+    tree_from_retained,
+    tree_from_snapshot,
+)
 
 from .conftest import PahoRecorder
 
@@ -34,6 +53,8 @@ _FIXTURES = Path(__file__).parent / "fixtures"
 _HANDLES = sorted(
     path.name.removesuffix("-tree-v1.json") for path in _FIXTURES.glob("r202639-*-tree-v1.json")
 )
+_MAIN32_R202639 = "main32_r202639"
+_MAIN32_R202633 = "main32-r202633"
 # The differences each capture still shows, exactly; a capture absent here must
 # show none.
 _RESIDUAL: dict[str, int] = {
@@ -42,6 +63,8 @@ _RESIDUAL: dict[str, int] = {
     "r202639-c": 17,
     "r202639-d": 30,
     "r202639-e": 19,
+    _MAIN32_R202639: 7,
+    _MAIN32_R202633: 28,
 }
 _NOT_COMPARED = frozenset({"connection/count"})
 _ATTRIBUTES = ("datatype", "settable", "unit", "format", "name")
@@ -184,11 +207,25 @@ def _differences(captured: Tree, published: Tree) -> list[str]:
     return out
 
 
-def _published(rec: PahoRecorder, handle: str) -> Tree:
-    definition = load_definition(_FIXTURES / f"{handle}.yaml")
+def _capture(handle: str) -> Tree:
+    name = "main32-tree-v1.json" if handle == _MAIN32_R202633 else f"{handle}-tree-v1.json"
+    return tree_from_snapshot(json.loads((_FIXTURES / name).read_text(encoding="utf-8")))
+
+
+def _inputs(handle: str, captured: Tree) -> tuple[PanelDefinition, list[TickInputs]]:
+    """The definition and ticks a capture is republished from."""
+    if handle == _MAIN32_R202633:
+        definition, _ = definition_from_tree(captured, mask=False)
+        return definition, ticks_from_samples(captured, [(0.0, captured)], mask=False)
+    return load_definition(_FIXTURES / f"{handle}.yaml"), load_ticks(
+        _FIXTURES / f"{handle}.ticks.yaml"
+    )
+
+
+def _published(rec: PahoRecorder, definition: PanelDefinition, ticks: list[TickInputs]) -> Tree:
     emitter = Emitter.from_definition(definition, SetterRegistry())
     emitter.start()
-    for tick in load_ticks(_FIXTURES / f"{handle}.ticks.yaml"):
+    for tick in ticks:
         emitter.publish_tick(tick)
     return tree_from_retained(rec.retained)
 
@@ -200,14 +237,12 @@ def test_every_reference_capture_is_found() -> None:
         assert (_FIXTURES / f"{handle}.ticks.yaml").is_file()
 
 
-@pytest.mark.parametrize("handle", _HANDLES)
+@pytest.mark.parametrize("handle", [*_HANDLES, _MAIN32_R202639, _MAIN32_R202633])
 def test_the_emitter_differs_from_the_capture_by_its_residual(
     rec: PahoRecorder, handle: str
 ) -> None:
-    captured = tree_from_snapshot(
-        json.loads((_FIXTURES / f"{handle}-tree-v1.json").read_text(encoding="utf-8"))
-    )
-    differences = _differences(captured, _published(rec, handle))
+    captured = _capture(handle)
+    differences = _differences(captured, _published(rec, *_inputs(handle, captured)))
     expected = _RESIDUAL.get(handle, 0)
     assert len(differences) == expected, (
         f"{len(differences)} differences, expected {expected}:\n" + "\n".join(differences)
