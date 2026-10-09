@@ -1,0 +1,407 @@
+schema: panel-sim-definition/1
+variant: span
+devices:
+- class: panel
+  id: masked-panel
+  name: SPAN Panel eBus Adapter
+  metadata:
+    vendor-name: SPAN
+    serial-number: MASKED-PANEL
+    firmware-version: spanos3/r202639/03
+    hardware-version: '1.2'
+    panel-model: MAIN_32
+    panel-size: '32'
+    main-breaker-rating-a: '200'
+    postal-code: '00000'
+    time-zone: America/New_York
+    line-voltage-v: '122.8'
+    service-voltage-v: '245.6'
+    islandable: 'true'
+    unvalued: pcs/operator-import-limit,pcs/operator-import-limit-active,pcs/operator-import-limit-enablement
+- class: lugs
+  id: lugs-upstream
+  name: Upstream lugs
+  description_name: lugs-upstream
+  metadata:
+    direction: upstream
+- class: lugs
+  id: lugs-downstream
+  name: Downstream lugs
+  description_name: lugs-downstream
+  metadata:
+    direction: downstream
+- class: bess
+  id: bess-1
+  name: bess-1
+  metadata:
+    vendor-name: Tesla
+    model: Powerwall 2 AC
+    part-number: 1232100-00-H
+    firmware-version: 26.34.0 7d707328
+    serial-number: MASKED-BESS-1
+    nameplate-capacity-kwh: '27'
+    relative-position: UPSTREAM
+    initial-soe-kwh: '27.0'
+- class: pv
+  id: pv-1
+  name: pv-1
+  metadata:
+    vendor-name: SolarEdge
+    model: SE7600H-US
+    nominal-power-w: '11680'
+    inverter-type: ac-coupled
+    relative-position: IN_PANEL
+- class: pv
+  id: pv-2
+  name: pv-2
+  metadata:
+    vendor-name: SolarEdge
+    model: SE7600H-US
+    nominal-power-w: '11680'
+    inverter-type: ac-coupled
+    relative-position: IN_PANEL
+- class: circuit
+  id: circuit-4
+  name: Circuit 4
+  metadata:
+    tab-numbers: '6'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    initial-consumed-wh: '75366.9'
+    initial-produced-wh: '77.4'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-25
+  name: Circuit 25
+  metadata:
+    tab-numbers: '32'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '272224.0'
+    initial-produced-wh: '64.5'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-3
+  name: Circuit 3
+  metadata:
+    tab-numbers: 5,7
+    placement: upstream-of-lugs
+    breaker-rating-a: '90'
+    dipole: 'true'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    initial-consumed-wh: '9248806.0'
+    initial-produced-wh: '396.4'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-16
+  name: Circuit 16
+  metadata:
+    tab-numbers: '23'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: non-controllable
+    initial-consumed-wh: '182819.6'
+    initial-produced-wh: '99.8'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-19
+  name: Circuit 19
+  metadata:
+    tab-numbers: '26'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '45736.0'
+    initial-produced-wh: '0.0'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-24
+  name: Circuit 24
+  metadata:
+    tab-numbers: '31'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '1714760.9'
+    initial-produced-wh: '66.5'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-9
+  name: Circuit 9
+  metadata:
+    tab-numbers: 13,15
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'true'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    initial-consumed-wh: '2551059.4'
+    initial-produced-wh: '172.7'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-10
+  name: Circuit 10
+  metadata:
+    tab-numbers: 16,18
+    placement: upstream-of-lugs
+    breaker-rating-a: '60'
+    dipole: 'true'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '1484971.5'
+    initial-produced-wh: '240.9'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-22
+  name: Circuit 22
+  metadata:
+    tab-numbers: '29'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '58964.2'
+    initial-produced-wh: '0.3'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-6
+  name: Circuit 6
+  metadata:
+    tab-numbers: 9,11
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    pcs-priority: '1'
+    initial-consumed-wh: '246599.6'
+    initial-produced-wh: '467.8'
+- class: circuit
+  id: circuit-2
+  name: Circuit 2
+  metadata:
+    tab-numbers: 2,4
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'true'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    initial-consumed-wh: '1210933.5'
+    initial-produced-wh: '168.0'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-17
+  name: Circuit 17
+  metadata:
+    tab-numbers: '24'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '18189.5'
+    initial-produced-wh: '63.3'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-23
+  name: Circuit 23
+  metadata:
+    tab-numbers: '30'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '350545.8'
+    initial-produced-wh: '0.2'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-1
+  name: Circuit 1
+  metadata:
+    tab-numbers: 1,3
+    placement: upstream-of-lugs
+    breaker-rating-a: '40'
+    dipole: 'true'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    initial-consumed-wh: '3761147.0'
+    initial-produced-wh: '5139.7'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-20
+  name: Circuit 20
+  metadata:
+    tab-numbers: '27'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '1104934.4'
+    initial-produced-wh: '0.0'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-18
+  name: Circuit 18
+  metadata:
+    tab-numbers: '25'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '623071.2'
+    initial-produced-wh: '0.0'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-11
+  name: Circuit 11
+  metadata:
+    tab-numbers: '17'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    initial-consumed-wh: '652806.1'
+    initial-produced-wh: '0.2'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-15
+  name: Circuit 15
+  metadata:
+    tab-numbers: '22'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '1183961.6'
+    initial-produced-wh: '70.8'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-21
+  name: Circuit 21
+  metadata:
+    tab-numbers: '28'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '106428.0'
+    initial-produced-wh: '131.6'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-12
+  name: Circuit 12
+  metadata:
+    tab-numbers: '19'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '91120.5'
+    initial-produced-wh: '72.2'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-13
+  name: Circuit 13
+  metadata:
+    tab-numbers: '20'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '90348.0'
+    initial-produced-wh: '92.8'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-14
+  name: Circuit 14
+  metadata:
+    tab-numbers: '21'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '512965.4'
+    initial-produced-wh: '206.6'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-8
+  name: Circuit 8
+  metadata:
+    tab-numbers: 12,14
+    placement: upstream-of-lugs
+    breaker-rating-a: '70'
+    dipole: 'true'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '1023105.1'
+    initial-produced-wh: '166.8'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-7
+  name: Circuit 7
+  metadata:
+    tab-numbers: '10'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '544327.9'
+    initial-produced-wh: '137.1'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-5
+  name: Circuit 5
+  metadata:
+    tab-numbers: '8'
+    placement: upstream-of-lugs
+    breaker-rating-a: '20'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: non-controllable
+    initial-consumed-wh: '3131637.0'
+    initial-produced-wh: '50.1'
+    unvalued: pcs/priority
+- class: mid
+  id: mid-1
+  name: mid-1
+  metadata:
+    vendor-name: Tesla
+    serial-number: MASKED-MID-1
+bess:
+- instance_id: bess-1
+  nameplate_capacity_kwh: 27.0
+  max_charge_w: 5000.0
+  max_discharge_w: 5000.0
+  charge_efficiency: 0.95
+  discharge_efficiency: 0.95
+  backup_reserve_pct: 20.0
+  charge_mode: self-consumption
+  charge_hours: []
+  discharge_hours: []
+  initial_soc_pct: 100.0
+load_shedding:
+  soc_threshold_pct: 49.0

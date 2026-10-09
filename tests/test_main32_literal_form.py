@@ -1,12 +1,13 @@
-"""The MAIN 32 r202639 capture's definition, published, writes numbers as the panel does.
+"""The MAIN 32 r202639 captures' definitions, published, write numbers as the panel does.
 
-The reference capture ``main32_r202639`` is a masked MAIN 32 on
-``spanos3/r202639/03`` with the definition and ticks recorded with it. The panel
-writes ``power-flows/grid``, ``pv`` and ``battery`` as integers and ``site`` with
-one decimal, every reading
-with one decimal, the BESS nameplate capacity and the PV nominal power (both
-integral here) without a point, and never ``-0.0`` or an exponent. Every
-non-root device's ``$description.name`` is its device id."""
+The reference captures ``main32_r202639`` and ``main32_r202639-upstream-pv`` are
+masked MAIN 32 panels on ``spanos3/r202639/03``, each with the definition and ticks
+recorded with it. The panel writes ``power-flows/grid``, ``pv`` and ``battery`` as
+integers and ``site`` with one decimal, every reading with one decimal, the BESS
+nameplate capacity and the PV nominal power (integral in both) without a point,
+and never ``-0.0`` or an exponent; a form one capture shows that the span profile
+does not write is listed in ``_FORM_EXCEPTIONS`` with its reason. In
+``main32_r202639`` every non-root device's ``$description.name`` is its device id."""
 
 from __future__ import annotations
 
@@ -19,14 +20,23 @@ from ebus_panel_sim import Emitter, SetterRegistry, Tree, load_reference_capture
 from ebus_panel_sim.capture import tree_from_retained
 
 from .conftest import PahoRecorder
+from .test_reference_capture_fidelity import _UPSTREAM_PV_SITE
 
 _CAPTURE = "main32_r202639"
+_CAPTURES = (_CAPTURE, "main32_r202639-upstream-pv")
+# Number forms a capture shows that the span profile does not write, by (device
+# type, property path), each with its reason.
+_FORM_EXCEPTIONS: dict[str, dict[tuple[str, str], str]] = {
+    "main32_r202639-upstream-pv": {
+        ("distribution-enclosure", "power-flows/site"): _UPSTREAM_PV_SITE,
+    },
+}
 _PANEL = "masked-panel"
 _NUMBER = re.compile(r"^-?\d+(\.\d+)?$")
 
 
-def _published(rec: PahoRecorder) -> Tree:
-    capture = load_reference_capture(_CAPTURE)
+def _published(rec: PahoRecorder, name: str) -> Tree:
+    capture = load_reference_capture(name)
     emitter = Emitter.from_definition(capture.definition, SetterRegistry())
     emitter.start()
     for tick in capture.ticks[:5]:
@@ -50,23 +60,37 @@ def _form(literal: str) -> str:
     return f"{len(literal.split('.', 1)[1])}dp" if "." in literal else "integer"
 
 
+@pytest.fixture(params=_CAPTURES)
+def name(request: pytest.FixtureRequest) -> str:
+    return str(request.param)
+
+
 @pytest.fixture
-def published(rec: PahoRecorder) -> Tree:
-    return _published(rec)
+def published(rec: PahoRecorder, name: str) -> Tree:
+    return _published(rec, name)
 
 
-def test_every_number_takes_the_form_the_capture_shows(published: Tree) -> None:
-    capture = load_reference_capture(_CAPTURE).tree
+def test_every_number_takes_the_form_the_capture_shows(published: Tree, name: str) -> None:
+    capture = load_reference_capture(name).tree
     in_capture = {
         key: {_form(v) for v in values.values()} for key, values in _numbers(capture).items()
     }
+    exceptions = _FORM_EXCEPTIONS.get(name, {})
     compared = 0
+    unexplained: list[tuple[tuple[str, str], str, str]] = []
+    occurring: set[tuple[str, str]] = set()
     for key, values in _numbers(published).items():
         if key not in in_capture:  # unvalued in the capture, so it shows no form
             continue
         for device_id, value in values.items():
-            assert _form(value) in in_capture[key], (key, device_id, value)
-            compared += 1
+            if _form(value) in in_capture[key]:
+                compared += 1
+            elif key in exceptions:
+                occurring.add(key)
+            else:
+                unexplained.append((key, device_id, value))
+    assert not unexplained
+    assert occurring == set(exceptions), "exceptions that no longer occur"
     assert compared > 100
 
 
@@ -109,16 +133,18 @@ def test_no_number_is_negative_zero_or_an_exponent(published: Tree) -> None:
             assert not (value.startswith("-") and float(value) == 0), value
 
 
-def test_every_circuit_names_info_spaces_as_the_panel_does(published: Tree) -> None:
+def test_every_circuit_names_info_spaces_as_the_panel_does(published: Tree, name: str) -> None:
     circuits = [d for d in published.values() if d.type == "circuit"]
-    assert len(circuits) == 16
+    captured = load_reference_capture(name).tree
+    assert len(circuits) == sum(1 for d in captured.values() if d.type == "circuit")
     for circuit in circuits:
         declaration = circuit.declaration("info/spaces")
         assert declaration is not None
         assert declaration["name"] == "Physical panel position(s) the circuit occupies"
 
 
-def test_every_device_but_the_panel_is_named_by_its_id(published: Tree) -> None:
+def test_every_device_but_the_panel_is_named_by_its_id(rec: PahoRecorder) -> None:
+    published = _published(rec, _CAPTURE)
     assert published[_PANEL].description["name"] == "SPAN Panel eBus Adapter"
     for device_id, device in published.items():
         if device_id != _PANEL:

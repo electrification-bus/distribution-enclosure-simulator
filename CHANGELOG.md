@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- The reference capture `main32_r202639-upstream-pv`: a MAIN 32 on `spanos3/r202639/03` with its PV inverters and battery upstream of the panel.
+
 ## [0.10.0b2] - 2026-10-09
 
 ### Added
