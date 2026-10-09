@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from collections.abc import Mapping
 from typing import Any, Final, get_args
@@ -27,7 +28,11 @@ from ebus_panel_sim.exceptions import (
 )
 from ebus_panel_sim.firmware import firmware_conventions
 from ebus_panel_sim.manifest import DeviceManifest
-from ebus_panel_sim.manifest_physics import EVSE_MIN_CHARGE_CURRENT_A, ManifestPhysicsView
+from ebus_panel_sim.manifest_physics import (
+    EVSE_MIN_CHARGE_CURRENT_A,
+    ManifestPhysicsView,
+    unvalued_paths,
+)
 from ebus_panel_sim.native_devices import (
     BESSConfig,
     BESSDevice,
@@ -86,14 +91,20 @@ _BESS_COMMUNICATION_STATES: Final[frozenset[str]] = frozenset(get_args(BESSCommu
 # only these values there (SPAN-API-Client-Docs specs/r202633/homie-schema.json).
 _SPAN_REPORTED_LINK_STATUSES: Final = frozenset({"OK", "LOST"})
 _NOMINAL_FREQUENCY_HZ = 60.0
+# What a SPAN panel publishes for pcs/requested-import-limit while it is
+# UNCONFIGURED: 200.0 on every public and reference capture, whatever the panel's
+# breaker, service rating or import limit. The reference variant publishes only
+# what the specification says, so it keeps its own value.
+_SPAN_UNCONFIGURED_REQUESTED_IMPORT_LIMIT_A: Final = 200.0
+_REFERENCE_REQUESTED_IMPORT_LIMIT_A: Final = 0.0
 
 
 def _busbar_current(site_w: float, service_voltage_v: float) -> float | None:
-    """Estimated busbar current: the site's power over the service voltage, in A
-    to one decimal, unpublished when exactly 0. A SPAN panel estimates it from
-    apparent power; this model has active power only."""
-    amps = round(abs(site_w) / service_voltage_v, 1) if service_voltage_v > 0 else 0.0
-    return amps or None
+    """Estimated busbar current: the site's power over the service voltage, in A,
+    or None without a service voltage. A SPAN panel estimates it from apparent
+    power and publishes it on every reference capture, 0.1 A at a few watts;
+    this model has active power only."""
+    return abs(site_w) / service_voltage_v if service_voltage_v > 0 else None
 
 
 def _declared_enum(
@@ -126,15 +137,27 @@ def _link_status(communication: BESSCommunication, reported: frozenset[str]) -> 
     return communication if communication in reported else "LOST"
 
 
+# The literal shapes a panel writes numbers in: ASCII digits only, and no exponent,
+# sign other than a leading minus, separator, padding or bare point.
+_WIRE_LITERAL: Final[dict[str, re.Pattern[str]]] = {
+    "float": re.compile(r"-?[0-9]+(\.[0-9]+)?"),
+    "integer": re.compile(r"-?[0-9]+"),
+}
+
+
 def _typed(raw: str, datatype: str, fmt: str | None, *, where: str) -> object:
-    """A metadata string as a value of the property's Homie datatype."""
-    try:
-        if datatype == "float":
-            return float(raw)
-        if datatype == "integer":
-            return int(raw)
-    except ValueError as exc:
-        raise ManifestValidationError(f"{where}: not a {datatype} ({raw!r})") from exc
+    """A metadata string checked against the property's Homie datatype.
+
+    A number must already be in a literal shape the panel writes (``120.0``,
+    ``-3``; never ``1e3``, ``+5``, ``1_000``, a padded string or negative zero),
+    and is then published exactly as written: a commissioning fact keeps the
+    digits it was recorded with, so no literal form applies to it. A boolean is
+    published in lower case."""
+    shape = _WIRE_LITERAL.get(datatype)
+    if shape is not None:
+        if shape.fullmatch(raw) is None or (raw.startswith("-") and float(raw) == 0):
+            raise ManifestValidationError(f"{where}: not a {datatype} literal ({raw!r})")
+        return raw
     if datatype == "boolean":
         if raw.lower() not in ("true", "false"):
             raise ManifestValidationError(f"{where}: not a boolean ({raw!r})")
@@ -142,6 +165,32 @@ def _typed(raw: str, datatype: str, fmt: str | None, *, where: str) -> object:
     if datatype == "enum" and fmt is not None and raw not in fmt.split(","):
         raise ManifestValidationError(f"{where}: must be one of {fmt}, got {raw!r}")
     return raw
+
+
+def _declared_unvalued(
+    manifest: DeviceManifest, profiles: ProfileTable
+) -> dict[tuple[str, str], frozenset[str]]:
+    """Each device's ``unvalued`` metadata, keyed ``(entity_class, instance_id)``.
+
+    A path the device's profile does not declare is an error, so a typo cannot
+    silently leave a property valued."""
+    out: dict[tuple[str, str], frozenset[str]] = {}
+    for inst in manifest.instances:
+        paths = unvalued_paths(inst.metadata)
+        if not paths:
+            continue
+        profile = profiles.get(inst.entity_class)
+        declared = (
+            {f"{cap}/{key}" for cap, c in profile.capabilities.items() for key in c.properties}
+            if profile is not None
+            else set()
+        )
+        if unknown := sorted(paths - declared):
+            raise ManifestValidationError(
+                f"{inst.instance_id} key 'unvalued': its profile declares no {', '.join(unknown)}"
+            )
+        out[(inst.entity_class, inst.instance_id)] = paths
+    return out
 
 
 class Emitter:
@@ -212,6 +261,7 @@ class Emitter:
         self._profiles = load_profiles(variant=variant)
         self._mapping = load_mapping_table()
         self._mapping.validate_against(self._profiles)
+        self._unvalued = _declared_unvalued(manifest, self._profiles)
 
         # The root device holds the shared connection — built from mqtt_cfg, or
         # the caller's when injected — and children publish through it either
@@ -282,7 +332,16 @@ class Emitter:
             frozenset({"LOST", "DEGRADED"}) if variant == "span-alpha-test-b2" else None
         )
         self._shed_policy_override: str | None = None
-        self._evse_user_max_override: dict[str, int] = {}
+        # An EVSE whose definition gives a user limit starts from it, clamped as a
+        # /set is.
+        self._evse_user_max_override: dict[str, int] = {
+            eid: max(
+                EVSE_MIN_CHARGE_CURRENT_A,
+                min(ephys.user_max_charge_current_a, int(ephys.max_current_a)),
+            )
+            for eid, ephys in self._physics.all_evse().items()
+            if ephys.user_max_charge_current_a is not None
+        }
         self._evse_lock_override: dict[str, str] = {}
 
         self._remote_ct_ids = tuple(i.instance_id for i in manifest.of_class("remote-ct"))
@@ -340,12 +399,13 @@ class Emitter:
             self._profiles,
             self._typed_wire_values(),
             bess_meter_frame=self._conventions.bess_meter_frame,
+            unvalued=self._unvalued,
         )
         self._last_snapshot: EbusPanelSnapshot | None = None
         self._started = False
 
     def _typed_wire_values(self) -> dict[tuple[str, str, str], object]:
-        """The manifest's verbatim commissioning values, typed by the profile.
+        """The manifest's verbatim commissioning values, checked against the profile.
 
         A value for a path the variant's profile does not declare is dropped."""
         sources: list[tuple[str, str, dict[str, str]]] = [
@@ -1132,7 +1192,11 @@ class Emitter:
             eth0_link=tick.envelope.eth0_link,
             wlan_link=tick.envelope.wlan_link,
             wwan_link=tick.envelope.wwan_link,
-            wifi_ssid=tick.envelope.wifi_ssid,
+            wifi_ssid=(
+                tick.envelope.wifi_ssid
+                if tick.envelope.wifi_ssid is not None
+                else panel_phys.wifi_ssid
+            ),
             cloud_connection=tick.envelope.cloud_connection,
             postal_code=panel_phys.postal_code,
             time_zone=panel_phys.time_zone,
@@ -1148,8 +1212,25 @@ class Emitter:
             grid_state=meter.grid_state,
             dsm_state=meter.dsm_state,
             current_run_config=meter.current_run_config,
-            # Never valued under span-alpha-test-b2.
-            requested_import_limit_a=None if self._variant == "span-alpha-test-b2" else 0.0,
+            requested_import_limit_a=(
+                _REFERENCE_REQUESTED_IMPORT_LIMIT_A
+                if self._variant == "reference"
+                else _SPAN_UNCONFIGURED_REQUESTED_IMPORT_LIMIT_A
+            ),
+            operator_import_limit_enablement=panel_phys.operator_import_limit_enablement,
+            off_grid_import_limit_enablement=panel_phys.off_grid_import_limit_enablement,
+            off_grid_import_limit_a=(
+                panel_phys.off_grid_import_limit_a
+                if panel_phys.off_grid_import_limit_enablement == "ENABLED"
+                else None
+            ),
+            # Enforced only while ENABLED and islanded.
+            off_grid_import_limit_active=(
+                None
+                if panel_phys.off_grid_import_limit_enablement is None
+                else panel_phys.off_grid_import_limit_enablement == "ENABLED"
+                and not tick.grid_online
+            ),
         )
         # Under span-alpha-test-b2, a panel with neither a battery nor solar (a
         # circuit commissioned feeds-role SOLAR) leaves pv and battery unset.

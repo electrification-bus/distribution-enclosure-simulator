@@ -21,6 +21,7 @@ from ebus_panel_sim import (
     TickInputs,
     Variant,
 )
+from ebus_panel_sim.manifest_physics import WIRE_VALUE_PATHS
 from ebus_panel_sim.wire.literal import LiteralForm
 from ebus_panel_sim.wire.profile_loader import load_profiles
 
@@ -67,6 +68,31 @@ def test_the_variant_redeclares_the_span_properties_it_changes() -> None:
     assert profiles["evse"].capabilities["switch"].properties["lock-state"].settable is True
     assert "meter" not in profiles["evse"].capabilities
     assert "meter" in load_profiles(variant="span")["evse"].capabilities
+
+
+def test_the_panel_model_format_lists_unknown_first() -> None:
+    """As every reference capture declares it."""
+    model = load_profiles(variant="span-alpha-test-b2")["panel"].capabilities["info"]
+    assert model.properties["model"].format == "UNKNOWN,MAIN_16,MLO_24,MAIN_32,MAIN_40,MLO_48"
+
+
+def test_every_number_the_variant_computes_has_a_literal_form() -> None:
+    """Frequency with two decimals and the busbar current with one, as the reference
+    captures show; a commissioning number is published as written instead."""
+    profiles = load_profiles(variant="span-alpha-test-b2")
+    meter = profiles["panel"].capabilities["meter"].properties
+    assert meter["frequency"].literal == LiteralForm("fixed", 2)
+    assert meter["busbar-current"].literal == LiteralForm("fixed", 1)
+    missing = sorted(
+        (entity_class, f"{cap_name}/{key}")
+        for entity_class, profile in profiles.items()
+        for cap_name, cap in profile.capabilities.items()
+        for key, prop in cap.properties.items()
+        if prop.datatype in ("integer", "float")
+        and prop.literal is None
+        and f"{cap_name}/{key}" not in WIRE_VALUE_PATHS.get(entity_class, frozenset())
+    )
+    assert not missing
 
 
 def test_the_variant_writes_power_flows_and_the_meter_only_circuit_with_one_decimal() -> None:
@@ -117,15 +143,15 @@ def _started(
     return em
 
 
-def test_commissioning_values_are_published_typed(rec: PahoRecorder) -> None:
+def test_commissioning_values_are_published_as_written(rec: PahoRecorder) -> None:
     _started(rec, _variant_manifest())
     retained = rec.retained
     assert retained["ebus/5/abc-123/info/name"] == "Home"
-    assert float(retained["ebus/5/abc-123/info/latitude"]) == pytest.approx(37.77)
+    assert retained["ebus/5/abc-123/info/latitude"] == "37.77"
     assert retained["ebus/5/abc-123/info/country-code"] == "US"
     assert retained["ebus/5/solar/connection/feeds-role"] == "SOLAR"
     assert retained["ebus/5/solar/info/dedicated"] == "true"
-    assert float(retained["ebus/5/solar/info/nominal-voltage"]) == pytest.approx(240.0)
+    assert retained["ebus/5/solar/info/nominal-voltage"] == "240"
     assert retained["ebus/5/lugs-upstream/connection/service-rating"] == "200"
     # Absent keys stay unpublished.
     assert "ebus/5/kitchen/connection/feeds-role" not in retained
@@ -136,6 +162,50 @@ def test_the_span_variant_ignores_the_commissioning_keys(rec: PahoRecorder) -> N
     _started(rec, _variant_manifest(), variant="span")
     assert "ebus/5/abc-123/info/name" not in rec.retained
     assert "ebus/5/solar/connection/feeds-role" not in rec.retained
+
+
+@pytest.mark.parametrize(
+    ("instance", "key", "raw"),
+    [
+        *(
+            ("abc-123", "latitude", raw)
+            for raw in (
+                "north",
+                "nan",
+                "inf",
+                "1e3",
+                "-0.0",
+                "1_000.5",
+                " 120.0",
+                "+5",
+                "12.",
+                ".5",
+                "\u0663\u0667.7",  # Arabic-Indic digits, which float() accepts
+            )
+        ),
+        *(
+            ("lugs-upstream", "service-rating-a", raw)
+            for raw in ("1e3", "1_000", " 7", "+5", "-0", "200.0", "\uff12\uff10\uff10")
+        ),
+    ],
+)
+def test_a_commissioning_number_not_in_a_wire_literal_shape_is_rejected(
+    instance: str, key: str, raw: str
+) -> None:
+    """A panel writes ASCII digits only, and never an exponent, a plus sign, a
+    digit separator, padding, a bare point or negative zero, so a definition may
+    not either."""
+    manifest = _with(_variant_manifest(), instance, **{key: raw})
+    with pytest.raises(ManifestValidationError, match=key.removesuffix("-a")):
+        Emitter(manifest, SetterRegistry(), variant="span-alpha-test-b2")
+
+
+@pytest.mark.parametrize("raw", ["0.0", "-122.4194", "37.77490", "-3"])
+def test_a_commissioning_number_in_a_wire_shape_is_published_as_written(
+    rec: PahoRecorder, raw: str
+) -> None:
+    _started(rec, _with(_variant_manifest(), "abc-123", latitude=raw))
+    assert rec.retained["ebus/5/abc-123/info/latitude"] == raw
 
 
 def test_an_enum_value_outside_the_format_is_rejected() -> None:
@@ -203,14 +273,53 @@ def test_a_main_breaker_rating_publishes_the_breaker(rec: PahoRecorder) -> None:
     assert rec.retained["ebus/5/abc-123/breaker/rating"] == "200"
 
 
-def test_the_variant_never_values_the_requested_import_limit(rec: PahoRecorder) -> None:
-    _started(rec, _variant_manifest())
-    assert "ebus/5/abc-123/pcs/requested-import-limit" not in rec.retained
+@pytest.mark.parametrize("variant", ["span-alpha-test-b2", "span"])
+def test_an_unconfigured_requested_import_limit_reads_200(
+    rec: PahoRecorder, variant: Variant
+) -> None:
+    """As every public and reference capture publishes it while UNCONFIGURED."""
+    _started(rec, _variant_manifest(), variant=variant)
+    assert rec.retained["ebus/5/abc-123/pcs/requested-import-limit"] == "200.0"
+    assert rec.retained["ebus/5/abc-123/pcs/requested-import-limit-enablement"] == "UNCONFIGURED"
 
 
-def test_span_values_the_requested_import_limit(rec: PahoRecorder) -> None:
-    _started(rec, _variant_manifest(), variant="span")
-    assert "ebus/5/abc-123/pcs/requested-import-limit" in rec.retained
+def test_the_reference_variant_keeps_its_requested_import_limit(rec: PahoRecorder) -> None:
+    """200.0 is a SPAN panel's value; the reference variant publishes only what the
+    specification says, and is unchanged."""
+    reference = DeviceManifest(
+        instances=tuple(
+            i for i in _variant_manifest().instances if i.entity_class not in ("pv", "evse")
+        )
+    )
+    _started(rec, reference, variant="reference")
+    assert float(rec.retained["ebus/5/abc-123/pcs/requested-import-limit"]) == 0.0
+
+
+def test_the_variant_declares_the_main_relay_and_shed_forecast_unvalued(
+    rec: PahoRecorder,
+) -> None:
+    """Every reference capture leaves status/relay unvalued, and both with a battery
+    leave shed-forecast unvalued; the span variant values them."""
+    em, _ = _variant_with_battery()
+    em.publish_tick(TickInputs(current_time=0.0, grid_online=True, circuits={"kitchen": 500.0}))
+    description = json.loads(rec.retained["ebus/5/abc-123/$description"])
+    assert "relay" in description["nodes"]["status"]["properties"]
+    assert set(description["nodes"]["shed-forecast"]["properties"]) == {
+        "total-time-remaining",
+        "time-to-priority-shed",
+        "full-charge-total-time-remaining",
+        "full-charge-time-to-priority-shed",
+        "confidence",
+    }
+    assert "ebus/5/abc-123/status/relay" not in rec.retained
+    assert not any(t.startswith("ebus/5/abc-123/shed-forecast/") for t in rec.retained)
+
+
+def test_the_busbar_current_is_published_at_any_load(rec: PahoRecorder) -> None:
+    """Every reference capture publishes it, 0.1 A at a few watts."""
+    em = _started(rec, _variant_manifest())
+    em.publish_tick(TickInputs(current_time=1.0, grid_online=True, circuits={"kitchen": 0.0}))
+    assert rec.retained["ebus/5/abc-123/meter/busbar-current"] == "0.0"
 
 
 def _loads_only(*, solar: bool) -> DeviceManifest:
@@ -312,7 +421,7 @@ def test_the_variant_accepts_an_islanding_assertion_only_while_lost_or_degraded(
 def test_busbar_current_and_frequency_are_published(rec: PahoRecorder) -> None:
     _started(rec, _variant_manifest())  # 500 W of site load at 240 V service
     assert float(rec.retained["ebus/5/abc-123/meter/busbar-current"]) == pytest.approx(2.1)
-    assert float(rec.retained["ebus/5/abc-123/meter/frequency"]) == pytest.approx(60.0)
+    assert rec.retained["ebus/5/abc-123/meter/frequency"] == "60.00"
 
 
 def test_an_unknown_link_refuses_an_assertion_but_holds_off_the_clear(

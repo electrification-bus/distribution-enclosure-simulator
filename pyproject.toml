@@ -59,7 +59,7 @@ panel-sim-capture = "ebus_panel_sim.capture:main"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0",
+    "pytest>=9.0",
     "ruff>=0.15.0",
     "mypy>=1.10",
     "types-pyyaml>=6.0",
@@ -106,6 +106,8 @@ ignore = ["TC001", "TC002", "TC003"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# A misspelt or unregistered marker is an error, not a warning.
+strict_markers = true
 
 [tool.mypy]
 python_version = "3.11"

@@ -20,6 +20,9 @@ A numeric property may carry a ``literal`` entry, ``"integer"``, ``"<n>dp"`` or
 ``"shortest"``: the form its numbers are written in on the wire
 (``ebus_panel_sim.wire.literal``). The span overlay gives one to every number the span
 variant publishes; a property without one is published as its value converts.
+
+A property may carry ``"unvalued": true``: the variant declares it in ``$description``
+and never publishes a value for it, as its panels do.
 """
 
 from __future__ import annotations
@@ -52,6 +55,7 @@ class ProfileProperty:
     format: str | None
     settable: bool
     literal: LiteralForm | None = None
+    unvalued: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,6 +233,7 @@ def _hydrate_property(
             format=_resolve_format(sel, None),
             settable=bool(sel.get("settable", False)),
             literal=_literal(path, cap_name, key, sel, datatype),
+            unvalued=_unvalued(path, cap_name, key, sel),
         )
     if catalog_def is None:
         raise ProfileValidationError(
@@ -243,7 +248,16 @@ def _hydrate_property(
         format=_resolve_format(sel, catalog_def),
         settable=bool(sel.get("settable", catalog_def.get("settable", False))),
         literal=_literal(path, cap_name, key, sel, datatype),
+        unvalued=_unvalued(path, cap_name, key, sel),
     )
+
+
+def _unvalued(path: Path, cap_name: str, key: str, sel: dict[str, Any]) -> bool:
+    """Whether the selection declares the property and never values it."""
+    raw = sel.get("unvalued", False)
+    if not isinstance(raw, bool):
+        raise ProfileValidationError(f"{path}: {cap_name}/{key} unvalued must be true or false")
+    return raw
 
 
 def _literal(

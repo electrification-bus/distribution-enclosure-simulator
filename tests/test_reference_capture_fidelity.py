@@ -2,22 +2,29 @@
 
 ``tests/fixtures/r202639-<handle>-tree-v1.json`` is a masked tree of a SPAN panel
 on ``spanos3/r202639/03``, and ``r202639-<handle>.yaml`` and ``.ticks.yaml`` are the
-definition and the 60 one-second ticks recorded with it. The emitter publishes
-the definition through every tick, and the retained tree is compared with the
-capture device by device: ``$description`` keys, type and children, nodes,
-declared properties and their datatype, settable, unit, format and name, valued
-versus unvalued, the literal form of each value, and the sign of each power.
+definition and the 60 one-second ticks recorded with it. The two MAIN 32 captures
+are held to the same bar: ``main32_r202639`` with its definition and ticks, and
+the r202633 capture ``main32-tree-v1.json``, which has neither, through the
+definition ``panel-sim-capture`` writes from it and one tick sampled from it.
+
+The emitter publishes the definition through every tick, and the retained tree
+is compared with the capture device by device: ``$description`` keys, type and
+children, nodes, declared properties and their datatype, settable, unit, format
+and name, valued versus unvalued, the literal form of each value, the value
+itself where the definition commissions it (``_COMPARED_BY_VALUE``), and the
+sign of each power.
 Masked identifiers, time-varying magnitudes and ``connection/count`` may differ.
 Devices are aligned by role, not id: a branch circuit by its spaces and name, a
 circuit device without ``info/spaces`` by its ordinal, lugs by direction, and any
 other device by its type's ordinal.
 
-A capture the emitter does not reproduce yet is held to the exact number of
-differences it still shows, so a change in either direction fails until the
-count is updated, and a capture reproduced in full drops out of the table."""
+Every capture must reproduce in full, but for the exceptions listed below, each
+with the reason the emitter cannot close it. A listed exception that no longer
+occurs fails too, so the list never outlives its reason."""
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import re
 from collections import Counter
@@ -25,8 +32,24 @@ from pathlib import Path
 
 import pytest
 
-from ebus_panel_sim import Emitter, SetterRegistry, load_definition, load_ticks
-from ebus_panel_sim.capture import Device, Tree, tree_from_retained, tree_from_snapshot
+from ebus_panel_sim import (
+    DeviceManifest,
+    Emitter,
+    PanelDefinition,
+    SetterRegistry,
+    TickInputs,
+    load_definition,
+    load_ticks,
+)
+from ebus_panel_sim.capture import (
+    Device,
+    Tree,
+    definition_from_tree,
+    ticks_from_samples,
+    tree_from_retained,
+    tree_from_snapshot,
+)
+from ebus_panel_sim.manifest_physics import unvalued_paths
 
 from .conftest import PahoRecorder
 
@@ -34,16 +57,63 @@ _FIXTURES = Path(__file__).parent / "fixtures"
 _HANDLES = sorted(
     path.name.removesuffix("-tree-v1.json") for path in _FIXTURES.glob("r202639-*-tree-v1.json")
 )
-# The differences each capture still shows, exactly; a capture absent here must
-# show none.
-_RESIDUAL: dict[str, int] = {
-    "r202639-a": 17,
-    "r202639-b": 17,
-    "r202639-c": 17,
-    "r202639-d": 30,
-    "r202639-e": 19,
+_MAIN32_R202639 = "main32_r202639"
+_MAIN32_R202633 = "main32-r202633"
+_FEEDTHROUGH = (
+    "The panel feeds a sub-panel through its downstream lugs (2700.6 W in the "
+    "capture), which a definition cannot express, so the emitter's site lacks that "
+    "load and its grid and upstream lugs run the other way."
+)
+_FED_BY_ENCLOSURE = (
+    "The upstream lugs are fed by another enclosure, which a definition cannot "
+    "express; panel-sim-capture reports it as a note."
+)
+# Differences a capture may still show, by prefix (the device role, the path and the
+# kind of difference, without values), each with the reason the emitter cannot
+# close it.
+_EXCEPTIONS: dict[str, dict[str, str]] = {
+    "r202639-b": {
+        "distribution-enclosure #1: power-flows/site sign": (
+            "The panel published site -8.8 W beside grid -0.2 W and no other flow, so "
+            "its own flows do not balance; the emitter's do, and its site follows the "
+            "circuits' small positive load."
+        ),
+    },
+    _MAIN32_R202639: {
+        "distribution-enclosure #1: power-flows/grid sign": _FEEDTHROUGH,
+        "lugs UPSTREAM: meter/active-power sign": _FEEDTHROUGH,
+    },
+    _MAIN32_R202633: {
+        f"lugs UPSTREAM: connection/fed-by-device-{key}: valued only by the capture": (
+            _FED_BY_ENCLOSURE
+        )
+        for key in ("id", "status", "type")
+    },
 }
 _NOT_COMPARED = frozenset({"connection/count"})
+# Values a definition carries as commissioned, which neither vary with time nor are
+# masked: compared exactly, not only by shape.
+_COMPARED_BY_VALUE = frozenset(
+    {
+        "breaker/poles",
+        "breaker/rating",
+        "config/max-charge-current",
+        "config/user-max-charge-current",
+        "connection/backed-up",
+        "connection/feeds-role",
+        "connection/overcurrent-protection",
+        "connection/service-rating",
+        "info/dedicated",
+        "info/locations",
+        "info/model",
+        "info/nominal-voltage",
+        "info/tags",
+        "pcs/off-grid-import-limit",
+        "pcs/off-grid-import-limit-enablement",
+        "pcs/operator-import-limit-enablement",
+        "pcs/priority",
+    }
+)
 _ATTRIBUTES = ("datatype", "settable", "unit", "format", "name")
 _SIGNED = re.compile(r"^(meter/active-power|power-flows/.+)$")
 _NUMBER = re.compile(r"^-?\d+(\.\d+)?([eE][-+]?\d+)?$")
@@ -166,6 +236,8 @@ def _device_differences(captured: Device, published: Device) -> list[str]:
                 shape_c, shape_p = _shape(value_c, decl_c[key]), _shape(value_p, decl_p[key])
                 if shape_c != shape_p:
                     out.append(f"{path} shape: {shape_c} ({value_c}) vs {shape_p} ({value_p})")
+                elif path in _COMPARED_BY_VALUE and value_c != value_p:
+                    out.append(f"{path} value: {value_c} vs {value_p}")
                 signs = (_sign(value_c), _sign(value_p))
                 if _SIGNED.match(path) and all(signs) and signs[0] != signs[1]:
                     out.append(f"{path} sign: {value_c} vs {value_p}")
@@ -184,11 +256,25 @@ def _differences(captured: Tree, published: Tree) -> list[str]:
     return out
 
 
-def _published(rec: PahoRecorder, handle: str) -> Tree:
-    definition = load_definition(_FIXTURES / f"{handle}.yaml")
+def _capture(handle: str) -> Tree:
+    name = "main32-tree-v1.json" if handle == _MAIN32_R202633 else f"{handle}-tree-v1.json"
+    return tree_from_snapshot(json.loads((_FIXTURES / name).read_text(encoding="utf-8")))
+
+
+def _inputs(handle: str, captured: Tree) -> tuple[PanelDefinition, list[TickInputs]]:
+    """The definition and ticks a capture is republished from."""
+    if handle == _MAIN32_R202633:
+        definition, _ = definition_from_tree(captured, mask=False)
+        return definition, ticks_from_samples(captured, [(0.0, captured)], mask=False)
+    return load_definition(_FIXTURES / f"{handle}.yaml"), load_ticks(
+        _FIXTURES / f"{handle}.ticks.yaml"
+    )
+
+
+def _published(rec: PahoRecorder, definition: PanelDefinition, ticks: list[TickInputs]) -> Tree:
     emitter = Emitter.from_definition(definition, SetterRegistry())
     emitter.start()
-    for tick in load_ticks(_FIXTURES / f"{handle}.ticks.yaml"):
+    for tick in ticks:
         emitter.publish_tick(tick)
     return tree_from_retained(rec.retained)
 
@@ -200,15 +286,70 @@ def test_every_reference_capture_is_found() -> None:
         assert (_FIXTURES / f"{handle}.ticks.yaml").is_file()
 
 
-@pytest.mark.parametrize("handle", _HANDLES)
-def test_the_emitter_differs_from_the_capture_by_its_residual(
+@pytest.mark.parametrize("handle", [*_HANDLES, _MAIN32_R202639, _MAIN32_R202633])
+def test_the_emitter_reproduces_the_capture_but_for_its_listed_exceptions(
     rec: PahoRecorder, handle: str
 ) -> None:
-    captured = tree_from_snapshot(
-        json.loads((_FIXTURES / f"{handle}-tree-v1.json").read_text(encoding="utf-8"))
+    captured = _capture(handle)
+    differences = _differences(captured, _published(rec, *_inputs(handle, captured)))
+    exceptions = _EXCEPTIONS.get(handle, {})
+    unexplained = [d for d in differences if not any(d.startswith(e) for e in exceptions)]
+    assert not unexplained, f"{len(unexplained)} differences:\n" + "\n".join(unexplained)
+    stale = [e for e in exceptions if not any(d.startswith(e) for d in differences)]
+    assert not stale, "exceptions that no longer occur:\n" + "\n".join(stale)
+    assert len(differences) == len(exceptions), differences
+
+
+@pytest.mark.parametrize("handle", [*_HANDLES, _MAIN32_R202639])
+def test_every_unvalued_path_is_one_the_emitter_would_otherwise_publish(
+    rec: PahoRecorder, handle: str
+) -> None:
+    """A definition's unvalued lists are minimal: republished without them, the
+    emitter values every listed path, so none is implied by the profile, the
+    variant's rules or an absent key."""
+    definition, ticks = _inputs(handle, _capture(handle))
+    listed = {
+        (inst.instance_id, path)
+        for inst in definition.manifest.instances
+        for path in unvalued_paths(inst.metadata)
+    }
+    bare = dataclasses.replace(
+        definition,
+        manifest=DeviceManifest(
+            instances=tuple(
+                dataclasses.replace(
+                    inst, metadata={k: v for k, v in inst.metadata.items() if k != "unvalued"}
+                )
+                for inst in definition.manifest.instances
+            )
+        ),
     )
-    differences = _differences(captured, _published(rec, handle))
-    expected = _RESIDUAL.get(handle, 0)
-    assert len(differences) == expected, (
-        f"{len(differences)} differences, expected {expected}:\n" + "\n".join(differences)
+    published = _published(rec, bare, ticks[:1])
+    implied = sorted(
+        (instance_id, path)
+        for instance_id, path in listed
+        if published[instance_id].properties.get(path) is None
     )
+    assert not implied
+
+
+def test_a_commissioned_value_is_compared_exactly_and_a_reading_by_shape() -> None:
+    """Same shape, different values: a commissioned limit differs, a reading does not."""
+    declared = {"datatype": "float", "unit": "A"}
+    description = {
+        "type": "energy.ebus.device.distribution-enclosure",
+        "nodes": {
+            "pcs": {"properties": {"off-grid-import-limit": declared}},
+            "meter": {"properties": {"voltage-a": declared}},
+        },
+    }
+
+    def device(limit: str, voltage: str) -> Device:
+        return Device(
+            description=description,
+            properties={"pcs/off-grid-import-limit": limit, "meter/voltage-a": voltage},
+        )
+
+    assert _device_differences(device("47.9", "121.7"), device("48.0", "122.0")) == [
+        "pcs/off-grid-import-limit value: 47.9 vs 48.0"
+    ]

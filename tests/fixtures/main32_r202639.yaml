@@ -17,6 +17,7 @@ devices:
     line-voltage-v: '121.9'
     service-voltage-v: '243.8'
     islandable: 'true'
+    operator-import-limit-enablement: 'UNCONFIGURED'
 - class: lugs
   id: lugs-upstream
   name: Upstream lugs
@@ -247,6 +248,7 @@ devices:
     commissioned-system: pv
     initial-consumed-wh: '45779.2'
     initial-produced-wh: '17468878.0'
+    unvalued: 'breaker/rating,pcs/priority'
 - class: circuit
   id: circuit-3
   name: Attic-Back-Outlet

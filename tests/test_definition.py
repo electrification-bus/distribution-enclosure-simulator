@@ -360,3 +360,39 @@ def test_a_description_name_may_differ_from_the_name(tmp_path: Path, rec: PahoRe
         description = json.loads(rec.retained[f"ebus/5/{inst.instance_id}/$description"])
         assert description["name"] == inst.instance_id != inst.display_name
         assert rec.retained[f"ebus/5/{inst.instance_id}/info/name"] == inst.display_name
+
+
+def _with_unvalued(definition: PanelDefinition, instance_id: str, paths: str) -> PanelDefinition:
+    return dataclasses.replace(
+        definition,
+        manifest=DeviceManifest(
+            instances=tuple(
+                dataclasses.replace(i, metadata={**i.metadata, "unvalued": paths})
+                if i.instance_id == instance_id
+                else i
+                for i in definition.manifest.instances
+            )
+        ),
+    )
+
+
+def test_a_device_can_declare_properties_it_leaves_unvalued(rec: PahoRecorder) -> None:
+    """``unvalued`` keeps a declared property in ``$description`` and never
+    publishes it, as the panel a definition reproduces did."""
+    example = load_definition(_EXAMPLES / "forty_tab_minimal.yaml")
+    definition = _with_unvalued(example, "bess", "soc/soc, soc/soe")
+    emitter = Emitter.from_definition(definition, SetterRegistry())
+    emitter.start()
+    emitter.publish_tick(load_ticks(_EXAMPLES / "forty_tab_minimal.ticks.yaml")[0])
+    description = json.loads(rec.retained["ebus/5/bess/$description"])
+    assert {"soc", "soe"} <= set(description["nodes"]["soc"]["properties"])
+    assert "ebus/5/bess/soc/soc" not in rec.retained
+    assert "ebus/5/bess/soc/soe" not in rec.retained
+    assert "ebus/5/bess/meter/active-power" in rec.retained
+
+
+def test_an_unvalued_path_the_profile_does_not_declare_is_rejected() -> None:
+    example = load_definition(_EXAMPLES / "forty_tab_minimal.yaml")
+    definition = _with_unvalued(example, "bess", "soc/charge")
+    with pytest.raises(ManifestValidationError, match=r"unvalued.*soc/charge"):
+        Emitter.from_definition(definition, SetterRegistry())

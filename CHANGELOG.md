@@ -7,10 +7,16 @@
 - spanos3/r202639/03 batch 2: reference captures and the variant that reproduces them.
 - **A device's `$description.name` can differ from its name.** A definition device's optional `description_name` (`DeviceInstance.description_name`) is published as its `$description.name`, while a circuit keeps publishing its `name` as `info/name`. `panel-sim-capture` writes it for a device the panel names by its own ID, and `tests/fixtures/main32_r202639.yaml` now carries each child device's ID there, as that capture does.
 
+### Changed
+
+- **`panel-sim-capture` writes more of what a panel published**: masking replaces the site's name, address, coordinates and utility meter serial with placeholders instead of dropping them and writes a reported Wi-Fi SSID as `masked-ssid`, each device gets a minimal `unvalued` list, and the off-grid import limit, the operator import limit's enablement and an EVSE's user limit are captured as `off-grid-import-limit-enablement`/`off-grid-import-limit-a`, `operator-import-limit-enablement` and `user-max-charge-current-a`.
+
 ### Fixed
 
 - **Published numbers use the panel's literal form** (integer or fixed places, never `-0.0`). Each number the span variant publishes takes the form its profile property declares as `literal` (`integer` or `<n>dp`, rounded half away from zero, or `shortest`, unrounded): readings with one decimal and `power-flows/grid`, `pv` and `battery` as integers, as the MAIN 32 capture on release 202639 shows, and unrounded the numbers that capture shows no rounding rule for: the BESS `nameplate-capacity` and the PV `nominal-power` (integral samples only), the EVSE `meter/advertised-current` and `pcs/off-grid-import-limit` (no samples). A BESS `meter/active-power` published in the panel's frame is written as `power-flows/battery` is. The reference variant publishes numbers as before.
 - **The span variant names a circuit's `info/spaces` property "Physical panel position(s) the circuit occupies"**, as a SPAN panel does.
+- **The off-grid import limit is published only as a definition commissions it**: its enablement from `off-grid-import-limit-enablement`, and the limit from `off-grid-import-limit-a` only while `ENABLED`, never a constant `0.0` with `UNCONFIGURED`.
+- **An unconfigured `pcs/requested-import-limit` reads `200.0`** in the span variants, as every public SPAN capture publishes it, instead of `0.0`; the reference variant is unchanged.
 
 ## [0.9.0] - 2026-10-06
 

@@ -37,7 +37,7 @@
           "datatype": "string"
         },
         "model": {
-          "format": "MAIN_16,MLO_24,MAIN_32,MAIN_40,MLO_48,UNKNOWN"
+          "format": "UNKNOWN,MAIN_16,MLO_24,MAIN_32,MAIN_40,MLO_48"
         }
       }
     },
@@ -46,10 +46,12 @@
         "busbar-current": {
           "name": "Estimated busbar current",
           "datatype": "float",
-          "unit": "A"
+          "unit": "A",
+          "literal": "1dp"
         },
         "frequency": {
-          "name": "Line frequency"
+          "name": "Line frequency",
+          "literal": "2dp"
         }
       }
     },
@@ -57,6 +59,32 @@
       "properties": {
         "off-grid-import-limit": {
           "literal": "1dp"
+        }
+      }
+    },
+    "status": {
+      "properties": {
+        "relay": {
+          "unvalued": true
+        }
+      }
+    },
+    "shed-forecast": {
+      "properties": {
+        "total-time-remaining": {
+          "unvalued": true
+        },
+        "time-to-priority-shed": {
+          "unvalued": true
+        },
+        "full-charge-total-time-remaining": {
+          "unvalued": true
+        },
+        "full-charge-time-to-priority-shed": {
+          "unvalued": true
+        },
+        "confidence": {
+          "unvalued": true
         }
       }
     },

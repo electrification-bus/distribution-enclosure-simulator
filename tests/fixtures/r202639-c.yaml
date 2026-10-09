@@ -17,6 +17,16 @@ devices:
     line-voltage-v: '121.8'
     service-voltage-v: '243.6'
     islandable: 'true'
+    wifi-ssid: 'masked-ssid'
+    site-name: 'Masked Panel'
+    address-lines: 'Masked Address'
+    locality: 'Masked City'
+    region: 'Masked Region'
+    latitude: '0.0'
+    longitude: '0.0'
+    off-grid-import-limit-enablement: 'ENABLED'
+    off-grid-import-limit-a: '47.9'
+    operator-import-limit-enablement: 'DISABLED'
 - class: bess
   id: bess-1
   name: bess-1

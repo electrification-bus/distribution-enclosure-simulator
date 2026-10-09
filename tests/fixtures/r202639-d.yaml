@@ -16,6 +16,16 @@ devices:
     line-voltage-v: '122.2'
     service-voltage-v: '244.4'
     islandable: 'true'
+    wifi-ssid: 'masked-ssid'
+    site-name: 'Masked Panel'
+    address-lines: 'Masked Address'
+    locality: 'Masked City'
+    region: 'Masked Region'
+    latitude: '0.0'
+    longitude: '0.0'
+    off-grid-import-limit-enablement: 'DISABLED'
+    unvalued: 'power-flows/pv'
+    operator-import-limit-enablement: 'DISABLED'
 - class: bess
   id: bess-1
   name: bess-1
@@ -26,6 +36,7 @@ devices:
     nameplate-capacity-kwh: '13.5'
     relative-position: IN_PANEL
     feed: circuit-4
+    unvalued: 'info/nameplate-capacity,soc/soc,soc/soe'
 - class: lugs
   id: lugs-upstream
   name: Upstream lugs
@@ -39,6 +50,7 @@ devices:
   metadata:
     direction: downstream
     feeds-role: UNUSED
+    unvalued: 'meter/active-power,meter/exported-energy,meter/imported-energy'
 - class: circuit
   id: circuit-7
   name: FLEX⁺
@@ -153,6 +165,7 @@ devices:
     protection-functions: OVERCURRENT
     initial-consumed-wh: '78533900304.6'
     initial-produced-wh: '456.5'
+    unvalued: 'pcs/priority'
 - class: evse
   id: evse-1
   name: evse-1
@@ -164,12 +177,15 @@ devices:
     model: unknown
     max-current-a: '48'
     feed: circuit-7
+    user-max-charge-current-a: '48'
+    unvalued: 'info/model'
 - class: mid
   id: mid-1
   name: mid-1
   metadata:
     vendor-name: Lucid
     serial-number: MASKED-MID-1
+    unvalued: 'grid/grid-forming-entity,grid/islanding-state'
 bess:
 - instance_id: bess-1
   nameplate_capacity_kwh: 13.5

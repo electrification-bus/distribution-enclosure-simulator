@@ -13,8 +13,9 @@ Command line::
         --cafile <serial>.crt -o panel.yaml
     panel-sim-capture --from-snapshot snapshot.json -o panel.yaml
 
-Masking is on by default: serial numbers, device IDs and the postal code are
-replaced. ``--no-mask`` keeps them.
+Masking is on by default: serial numbers, device IDs, the postal code, the
+Wi-Fi SSID and the site's name, address, coordinates and utility meter serial
+are replaced. ``--no-mask`` keeps them.
 """
 
 from __future__ import annotations
@@ -31,33 +32,36 @@ from pathlib import Path
 from typing import Any, cast, get_args
 
 from ebus_panel_sim.definition import PanelDefinition, dump_definition, dump_ticks
+from ebus_panel_sim.emitter import Emitter
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
 from ebus_panel_sim.manifest_physics import (
     _circuit_wire_values,
     _lugs_wire_values,
     _panel_wire_values,
+    unvalued_paths,
 )
 from ebus_panel_sim.native_devices import BESSConfig, LoadSheddingConfig
 from ebus_panel_sim.tick_inputs import BESSCommunication, TickInputs
-from ebus_panel_sim.wire.profile_loader import Variant
+from ebus_panel_sim.wire.profile_loader import Variant, load_profiles
+from ebus_panel_sim.wire.set_router import SetterRegistry
 
 _DOMAIN = "ebus/5"
 _LINK_STATES = frozenset(get_args(BESSCommunication))
 _TYPE_PREFIX = "energy.ebus.device."
 # The circuits a SPAN panel adds for a commissioned PV or battery system.
 _COMMISSIONED_NAMES = {"Commissioned PV System": "pv", "Commissioned Backup System": "backup"}
-# Site facts dropped when masking.
-_SITE_KEYS = frozenset(
-    {
-        "site-name",
-        "address-lines",
-        "locality",
-        "region",
-        "latitude",
-        "longitude",
-        "utility-meter-serial-number",
-    }
-)
+# Site facts replaced when masking, by placeholders of the same datatype, so a
+# masked definition still values what the panel valued.
+_SITE_MASKS = {
+    "site-name": "Masked Panel",
+    "address-lines": "Masked Address",
+    "locality": "Masked City",
+    "region": "Masked Region",
+    "latitude": "0.0",
+    "longitude": "0.0",
+    "utility-meter-serial-number": "MASKED-METER",
+}
+_MASKED_SSID = "masked-ssid"
 # A shorter original ID masks a display name only when it is the whole name, so
 # an ID such as ``bess`` does not rename "Example BESS".
 _MIN_EMBEDDED = 6
@@ -294,8 +298,78 @@ def definition_from_tree(
     ``span-alpha-test-b2`` for a panel whose hardware version string selects it,
     ``span`` for any other SPAN panel, and ``reference`` otherwise.
     ``generic_names`` replaces each circuit's name with ``Circuit <n>``, numbered
-    in tab order."""
-    return _Mapper(tree, mask, root, generic_names).run(variant)
+    in tab order.
+
+    Each device's ``unvalued`` list is minimal: the definition is republished once
+    without the lists, driven by one tick sampled from the tree, and a path the
+    emitter leaves unvalued anyway is implied and dropped."""
+    definition, notes = _Mapper(tree, mask, root, generic_names).run(variant)
+    (tick,) = ticks_from_samples(tree, [(0.0, tree)], mask=mask, root=root)
+    return _minimal_unvalued(definition, tick), notes
+
+
+class _RetainedTransport:
+    """An in-memory transport for the emitter: the retained topics, last write wins."""
+
+    def __init__(self) -> None:
+        self.retained: dict[str, str] = {}
+        self.is_running = True
+
+    def is_connected(self) -> bool:
+        return True
+
+    def publish(self, topic: str, data: str, qos: int = 1, retain: bool = False) -> object:
+        del qos
+        if retain:
+            if data == "":
+                self.retained.pop(topic, None)
+            else:
+                self.retained[topic] = data
+        return None
+
+    def subscribe(self, sub: str, param: object = None, qos: int = 1) -> object:
+        del sub, param, qos
+        return None
+
+
+def _minimal_unvalued(definition: PanelDefinition, tick: TickInputs) -> PanelDefinition:
+    """``definition`` with each ``unvalued`` list cut to the paths the emitter would
+    otherwise publish."""
+
+    def without_list(inst: DeviceInstance) -> DeviceInstance:
+        md = {k: v for k, v in inst.metadata.items() if k != "unvalued"}
+        return dataclasses.replace(inst, metadata=md)
+
+    bare = dataclasses.replace(
+        definition,
+        manifest=DeviceManifest(
+            instances=tuple(without_list(i) for i in definition.manifest.instances)
+        ),
+    )
+    transport = _RetainedTransport()
+    emitter = Emitter.from_definition(bare, SetterRegistry(), mqttc=transport)
+    emitter.start()
+    emitter.publish_tick(tick)
+    prefix = _DOMAIN + "/"
+    valued = {
+        tuple(topic[len(prefix) :].split("/", 1))
+        for topic in transport.retained
+        if topic.startswith(prefix)
+    }
+    instances: list[DeviceInstance] = []
+    for inst in definition.manifest.instances:
+        kept = sorted(
+            path for path in unvalued_paths(inst.metadata) if (inst.instance_id, path) in valued
+        )
+        bare_inst = without_list(inst)
+        instances.append(
+            dataclasses.replace(
+                bare_inst, metadata={**bare_inst.metadata, "unvalued": ",".join(kept)}
+            )
+            if kept
+            else bare_inst
+        )
+    return dataclasses.replace(definition, manifest=DeviceManifest(instances=tuple(instances)))
 
 
 def ticks_from_samples(
@@ -472,6 +546,7 @@ class _Mapper:
     def run(self, variant: Variant | None) -> tuple[PanelDefinition, list[CaptureNote]]:
         panel = self.tree[self.panel_id]
         chosen = variant or _infer_variant(panel)
+        self.profiles = load_profiles(variant=chosen)
         feeds = self.feeds()
         self._note_dangling_feeds()
         instances = [self._described(self.panel_id, self._panel())]
@@ -522,11 +597,16 @@ class _Mapper:
         )
 
     def _described(self, device_id: str, inst: DeviceInstance) -> DeviceInstance:
-        """``inst`` carrying the device's published ``$description.name`` where the
-        definition's name would not reproduce it. A device named by its own id
-        is named by its published (masked) id; one named as its ``info/name``
-        follows the definition's name."""
+        """``inst`` as the device was published: its ``$description.name`` where the
+        definition's name would not reproduce it, and the properties it declares
+        and leaves unvalued.
+
+        A device named by its own id is named by its published (masked) id; one
+        named as its ``info/name`` follows the definition's name."""
         device = self.tree[device_id]
+        unvalued = self._unvalued(device, inst.entity_class)
+        if unvalued:
+            inst = dataclasses.replace(inst, metadata={**inst.metadata, "unvalued": unvalued})
         raw = device.description.get("name")
         if not isinstance(raw, str) or not raw or raw == device.value("info/name"):
             return inst
@@ -534,6 +614,24 @@ class _Mapper:
         if name == inst.display_name:
             return inst
         return dataclasses.replace(inst, description_name=name)
+
+    def _unvalued(self, device: Device, entity_class: str) -> str:
+        """The paths the device declares and leaves unvalued, comma-separated,
+        before :func:`_minimal_unvalued` drops those nothing would value. A settable
+        property is left out: a consumer may set it later."""
+        profile = self.profiles.get(entity_class)
+        if profile is None:
+            return ""
+        return ",".join(
+            sorted(
+                path
+                for cap_name, cap in profile.capabilities.items()
+                for key, prop in cap.properties.items()
+                if not prop.settable
+                and device.declares(path := f"{cap_name}/{key}")
+                and device.properties.get(path) is None
+            )
+        )
 
     def _load_shedding(self) -> LoadSheddingConfig | None:
         """The off-grid SOC shed threshold from the panel's published shed policy."""
@@ -596,6 +694,14 @@ class _Mapper:
         if postal is None:
             self.note(pid, "postal-code", "not published; using 00000")
         self._put(md, pid, "time-zone", d.value("status/time-zone"), "UTC")
+        if (ssid := d.value("status/wifi-ssid")) is not None:
+            md["wifi-ssid"] = _MASKED_SSID if self.mask else ssid
+        if (operator := d.value("pcs/operator-import-limit-enablement")) is not None:
+            md["operator-import-limit-enablement"] = operator
+        if (enablement := d.value("pcs/off-grid-import-limit-enablement")) is not None:
+            md["off-grid-import-limit-enablement"] = enablement
+            if (limit := d.value("pcs/off-grid-import-limit")) is not None:
+                md["off-grid-import-limit-a"] = limit
         voltage = d.value("meter/voltage-a")
         if voltage is not None and float(voltage) > 0:
             md["line-voltage-v"] = voltage
@@ -774,6 +880,8 @@ class _Mapper:
             current = "32"
             self.note(device_id, "max-current-a", "not published; using 32")
         md["max-current-a"] = current
+        if (user_max := d.value("config/user-max-charge-current")) is not None:
+            md["user-max-charge-current-a"] = user_max
         if device_id in feeds:
             md["feed"] = feeds[device_id]
         name = self._name(device_id, str(d.description.get("name", "EV Charger")))
@@ -790,12 +898,14 @@ class _Mapper:
 
     def _wire_values(self, d: Device, table: Any) -> dict[str, str]:
         """The verbatim commissioning keys, read back from the paths they feed;
-        site address fields are dropped when masking."""
+        site facts are replaced by placeholders when masking."""
         out: dict[str, str] = {}
         for path, key in table(_EchoKeys()).items():
-            if key is None or (self.mask and key in _SITE_KEYS):
+            if key is None or (value := d.value(path)) is None:
                 continue
-            if (value := d.value(path)) is not None:
+            if self.mask and key in _SITE_MASKS:
+                out[key] = _SITE_MASKS[key]
+            else:
                 out[key] = _int_str(value) if key.endswith("-a") else value
         return out
 
