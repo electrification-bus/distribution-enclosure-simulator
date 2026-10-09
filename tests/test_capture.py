@@ -598,15 +598,43 @@ def test_a_span_alpha_test_b2_panel_captures_and_rebuilds(rec: PahoRecorder) -> 
     assert _stable(_publish(rec, captured)) == _stable(original)
 
 
-def test_masking_a_span_alpha_test_b2_panel_drops_the_site_and_remaps_shared_breakers(
+def test_masking_a_span_alpha_test_b2_panel_masks_the_site_and_remaps_shared_breakers(
     rec: PahoRecorder,
 ) -> None:
-    original = _publish(rec, load_definition(_EXAMPLES / "span_alpha_test_b2_minimal.yaml"))
+    """The site's facts are replaced by placeholders, so the masked definition
+    still values what the panel valued and reveals none of it."""
+    source = load_definition(_EXAMPLES / "span_alpha_test_b2_minimal.yaml")
+    original = _publish(rec, source)
     captured, _ = definition_from_tree(tree_from_retained(original))
     panel = captured.manifest.of_class("panel")[0]
-    assert not {"site-name", "address-lines", "latitude", "longitude"} & set(panel.metadata)
+    real = source.manifest.of_class("panel")[0].metadata
+    for key in ("site-name", "address-lines", "locality", "region", "latitude", "longitude"):
+        assert panel.metadata[key] != real[key], key
+    assert panel.metadata["latitude"] == panel.metadata["longitude"] == "0.0"
     ids = {i.instance_id for i in captured.manifest.instances}
     for inst in captured.manifest.of_class("circuit"):
         for shared in inst.metadata.get("shared-with-device-ids", "").split(","):
             assert not shared or shared in ids
     _publish(rec, captured)
+
+
+def test_a_reported_wifi_ssid_is_captured_and_masked(rec: PahoRecorder) -> None:
+    source = _variant_source()
+    panel = source.manifest.of_class("panel")[0]
+    with_ssid = dataclasses.replace(
+        source,
+        manifest=DeviceManifest(
+            instances=tuple(
+                dataclasses.replace(i, metadata={**i.metadata, "wifi-ssid": "Home Network"})
+                if i is panel
+                else i
+                for i in source.manifest.instances
+            )
+        ),
+    )
+    original = _publish(rec, with_ssid)
+    assert original[f"ebus/5/{panel.instance_id}/status/wifi-ssid"] == "Home Network"
+    unmasked, _ = definition_from_tree(tree_from_retained(original), mask=False)
+    masked, _ = definition_from_tree(tree_from_retained(original))
+    assert unmasked.manifest.of_class("panel")[0].metadata["wifi-ssid"] == "Home Network"
+    assert masked.manifest.of_class("panel")[0].metadata["wifi-ssid"] == "masked-ssid"

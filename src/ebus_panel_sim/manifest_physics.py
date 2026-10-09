@@ -49,6 +49,8 @@ class PanelPhysics:
     topology: Literal["flat", "parent-child"] = "flat"
     # From `_panel_wire_values`; see `WIRE_VALUE_PATHS`.
     wire_values: dict[str, str] = field(default_factory=dict)
+    # The Wi-Fi SSID the panel reports when a tick's envelope gives none.
+    wifi_ssid: str | None = None
 
     @property
     def release_build(self) -> int | None:
@@ -535,6 +537,7 @@ def _parse_panel(inst: DeviceInstance) -> PanelPhysics:
         panel_model=_require(md, "panel-model"),
         postal_code=_require(md, "postal-code"),
         time_zone=_require(md, "time-zone"),
+        wifi_ssid=_opt_str(md, "wifi-ssid"),
         service_voltage_v=_opt_float(md, "service-voltage-v", 240.0),
         line_voltage_v=_opt_float(md, "line-voltage-v", 120.0),
         islandable=_opt_bool(md, "islandable", False),

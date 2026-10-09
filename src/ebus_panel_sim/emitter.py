@@ -1172,7 +1172,11 @@ class Emitter:
             eth0_link=tick.envelope.eth0_link,
             wlan_link=tick.envelope.wlan_link,
             wwan_link=tick.envelope.wwan_link,
-            wifi_ssid=tick.envelope.wifi_ssid,
+            wifi_ssid=(
+                tick.envelope.wifi_ssid
+                if tick.envelope.wifi_ssid is not None
+                else panel_phys.wifi_ssid
+            ),
             cloud_connection=tick.envelope.cloud_connection,
             postal_code=panel_phys.postal_code,
             time_zone=panel_phys.time_zone,

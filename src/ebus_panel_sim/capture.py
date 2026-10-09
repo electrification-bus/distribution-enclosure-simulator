@@ -13,8 +13,9 @@ Command line::
         --cafile <serial>.crt -o panel.yaml
     panel-sim-capture --from-snapshot snapshot.json -o panel.yaml
 
-Masking is on by default: serial numbers, device IDs and the postal code are
-replaced. ``--no-mask`` keeps them.
+Masking is on by default: serial numbers, device IDs, the postal code, the
+Wi-Fi SSID and the site's name, address, coordinates and utility meter serial
+are replaced. ``--no-mask`` keeps them.
 """
 
 from __future__ import annotations
@@ -47,17 +48,18 @@ _TYPE_PREFIX = "energy.ebus.device."
 # The circuits a SPAN panel adds for a commissioned PV or battery system.
 _COMMISSIONED_NAMES = {"Commissioned PV System": "pv", "Commissioned Backup System": "backup"}
 # Site facts dropped when masking.
-_SITE_KEYS = frozenset(
-    {
-        "site-name",
-        "address-lines",
-        "locality",
-        "region",
-        "latitude",
-        "longitude",
-        "utility-meter-serial-number",
-    }
-)
+# Site facts replaced when masking, by placeholders of the same datatype, so a
+# masked definition still values what the panel valued.
+_SITE_MASKS = {
+    "site-name": "Masked Panel",
+    "address-lines": "Masked Address",
+    "locality": "Masked City",
+    "region": "Masked Region",
+    "latitude": "0.0",
+    "longitude": "0.0",
+    "utility-meter-serial-number": "MASKED-METER",
+}
+_MASKED_SSID = "masked-ssid"
 # A shorter original ID masks a display name only when it is the whole name, so
 # an ID such as ``bess`` does not rename "Example BESS".
 _MIN_EMBEDDED = 6
@@ -621,6 +623,8 @@ class _Mapper:
         if postal is None:
             self.note(pid, "postal-code", "not published; using 00000")
         self._put(md, pid, "time-zone", d.value("status/time-zone"), "UTC")
+        if (ssid := d.value("status/wifi-ssid")) is not None:
+            md["wifi-ssid"] = _MASKED_SSID if self.mask else ssid
         voltage = d.value("meter/voltage-a")
         if voltage is not None and float(voltage) > 0:
             md["line-voltage-v"] = voltage
@@ -815,12 +819,14 @@ class _Mapper:
 
     def _wire_values(self, d: Device, table: Any) -> dict[str, str]:
         """The verbatim commissioning keys, read back from the paths they feed;
-        site address fields are dropped when masking."""
+        site facts are replaced by placeholders when masking."""
         out: dict[str, str] = {}
         for path, key in table(_EchoKeys()).items():
-            if key is None or (self.mask and key in _SITE_KEYS):
+            if key is None or (value := d.value(path)) is None:
                 continue
-            if (value := d.value(path)) is not None:
+            if self.mask and key in _SITE_MASKS:
+                out[key] = _SITE_MASKS[key]
+            else:
                 out[key] = _int_str(value) if key.endswith("-a") else value
         return out
 
