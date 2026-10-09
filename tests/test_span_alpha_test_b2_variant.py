@@ -180,19 +180,21 @@ def test_the_span_variant_ignores_the_commissioning_keys(rec: PahoRecorder) -> N
                 "+5",
                 "12.",
                 ".5",
+                "\u0663\u0667.7",  # Arabic-Indic digits, which float() accepts
             )
         ),
         *(
             ("lugs-upstream", "service-rating-a", raw)
-            for raw in ("1e3", "1_000", " 7", "+5", "-0", "200.0")
+            for raw in ("1e3", "1_000", " 7", "+5", "-0", "200.0", "\uff12\uff10\uff10")
         ),
     ],
 )
 def test_a_commissioning_number_not_in_a_wire_literal_shape_is_rejected(
     instance: str, key: str, raw: str
 ) -> None:
-    """A panel never writes an exponent, a plus sign, a digit separator, padding,
-    a bare point or negative zero, so a definition may not either."""
+    """A panel writes ASCII digits only, and never an exponent, a plus sign, a
+    digit separator, padding, a bare point or negative zero, so a definition may
+    not either."""
     manifest = _with(_variant_manifest(), instance, **{key: raw})
     with pytest.raises(ManifestValidationError, match=key.removesuffix("-a")):
         Emitter(manifest, SetterRegistry(), variant="span-alpha-test-b2")

@@ -9,7 +9,7 @@ from typing import Literal
 
 LiteralKind = Literal["integer", "fixed", "shortest"]
 
-_DECIMAL_PLACES = re.compile(r"^(\d+)dp$")
+_DECIMAL_PLACES = re.compile(r"^([0-9]+)dp$")
 
 
 @dataclass(frozen=True, slots=True)

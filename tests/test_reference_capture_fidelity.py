@@ -110,6 +110,7 @@ _COMPARED_BY_VALUE = frozenset(
         "info/tags",
         "pcs/off-grid-import-limit",
         "pcs/off-grid-import-limit-enablement",
+        "pcs/operator-import-limit-enablement",
         "pcs/priority",
     }
 )

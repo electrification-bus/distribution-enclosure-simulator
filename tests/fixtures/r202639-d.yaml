@@ -25,6 +25,7 @@ devices:
     longitude: '0.0'
     off-grid-import-limit-enablement: 'DISABLED'
     unvalued: 'power-flows/pv'
+    operator-import-limit-enablement: 'DISABLED'
 - class: bess
   id: bess-1
   name: bess-1

@@ -57,6 +57,9 @@ class PanelPhysics:
     # off-grid properties is published.
     off_grid_import_limit_enablement: str | None = None
     off_grid_import_limit_a: float | None = None
+    # The operator import limit's enablement as commissioned; UNCONFIGURED when
+    # the definition gives none.
+    operator_import_limit_enablement: str = "UNCONFIGURED"
 
     @property
     def release_build(self) -> int | None:
@@ -468,17 +471,23 @@ def _present(values: dict[str, str | None]) -> dict[str, str]:
     return {path: value for path, value in values.items() if value is not None}
 
 
-_OFF_GRID_ENABLEMENTS = frozenset({"UNSPECIFIED", "UNCONFIGURED", "DISABLED", "ENABLED"})
+_ENABLEMENTS = frozenset({"UNSPECIFIED", "UNCONFIGURED", "DISABLED", "ENABLED"})
+
+
+def _enablement(key: str, enablement: str | None) -> str | None:
+    """A commissioned limit enablement, one of the pcs catalog's values."""
+    if enablement is not None and enablement not in _ENABLEMENTS:
+        raise ManifestValidationError(
+            f"key {key!r}: must be one of {sorted(_ENABLEMENTS)}, got {enablement!r}"
+        )
+    return enablement
 
 
 def _off_grid_import_limit(md: dict[str, str]) -> tuple[str | None, float | None]:
     """The commissioned off-grid import limit. An ENABLED limit needs its value."""
-    enablement = _opt_str(md, "off-grid-import-limit-enablement")
-    if enablement is not None and enablement not in _OFF_GRID_ENABLEMENTS:
-        raise ManifestValidationError(
-            f"key 'off-grid-import-limit-enablement': must be one of "
-            f"{sorted(_OFF_GRID_ENABLEMENTS)}, got {enablement!r}"
-        )
+    enablement = _enablement(
+        "off-grid-import-limit-enablement", _opt_str(md, "off-grid-import-limit-enablement")
+    )
     limit = _opt_float(md, "off-grid-import-limit-a", math.nan)
     if enablement == "ENABLED" and math.isnan(limit):
         raise ManifestValidationError(
@@ -570,6 +579,13 @@ def _parse_panel(inst: DeviceInstance) -> PanelPhysics:
         wifi_ssid=_opt_str(md, "wifi-ssid"),
         off_grid_import_limit_enablement=off_grid_enablement,
         off_grid_import_limit_a=off_grid_limit,
+        operator_import_limit_enablement=(
+            _enablement(
+                "operator-import-limit-enablement",
+                _opt_str(md, "operator-import-limit-enablement"),
+            )
+            or "UNCONFIGURED"
+        ),
         service_voltage_v=_opt_float(md, "service-voltage-v", 240.0),
         line_voltage_v=_opt_float(md, "line-voltage-v", 120.0),
         islandable=_opt_bool(md, "islandable", False),
