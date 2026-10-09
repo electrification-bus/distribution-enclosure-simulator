@@ -23,6 +23,7 @@ occurs fails too, so the list never outlives its reason."""
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import re
 from collections import Counter
@@ -31,6 +32,7 @@ from pathlib import Path
 import pytest
 
 from ebus_panel_sim import (
+    DeviceManifest,
     Emitter,
     PanelDefinition,
     SetterRegistry,
@@ -46,6 +48,7 @@ from ebus_panel_sim.capture import (
     tree_from_retained,
     tree_from_snapshot,
 )
+from ebus_panel_sim.manifest_physics import unvalued_paths
 
 from .conftest import PahoRecorder
 
@@ -271,3 +274,36 @@ def test_the_emitter_reproduces_the_capture_but_for_its_listed_exceptions(
     stale = [e for e in exceptions if not any(d.startswith(e) for d in differences)]
     assert not stale, "exceptions that no longer occur:\n" + "\n".join(stale)
     assert len(differences) == len(exceptions), differences
+
+
+@pytest.mark.parametrize("handle", [*_HANDLES, _MAIN32_R202639])
+def test_every_unvalued_path_is_one_the_emitter_would_otherwise_publish(
+    rec: PahoRecorder, handle: str
+) -> None:
+    """A definition's unvalued lists are minimal: republished without them, the
+    emitter values every listed path, so none is implied by the profile, the
+    variant's rules or an absent key."""
+    definition, ticks = _inputs(handle, _capture(handle))
+    listed = {
+        (inst.instance_id, path)
+        for inst in definition.manifest.instances
+        for path in unvalued_paths(inst.metadata)
+    }
+    bare = dataclasses.replace(
+        definition,
+        manifest=DeviceManifest(
+            instances=tuple(
+                dataclasses.replace(
+                    inst, metadata={k: v for k, v in inst.metadata.items() if k != "unvalued"}
+                )
+                for inst in definition.manifest.instances
+            )
+        ),
+    )
+    published = _published(rec, bare, ticks[:1])
+    implied = sorted(
+        (instance_id, path)
+        for instance_id, path in listed
+        if published[instance_id].properties.get(path) is None
+    )
+    assert not implied

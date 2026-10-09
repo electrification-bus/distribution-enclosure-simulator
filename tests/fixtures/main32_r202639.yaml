@@ -17,7 +17,6 @@ devices:
     line-voltage-v: '121.9'
     service-voltage-v: '243.8'
     islandable: 'true'
-    unvalued: 'pcs/off-grid-import-limit,pcs/off-grid-import-limit-active,pcs/off-grid-import-limit-enablement,status/wifi-ssid'
 - class: lugs
   id: lugs-upstream
   name: Upstream lugs
@@ -52,7 +51,6 @@ devices:
     inverter-type: ac-coupled
     relative-position: IN_PANEL
     feed: circuit-16
-    unvalued: 'info/firmware-version,info/serial-number'
 - class: circuit
   id: circuit-9
   name: Ovens
@@ -284,7 +282,6 @@ devices:
   metadata:
     vendor-name: Tesla
     serial-number: MASKED-MID-1
-    unvalued: 'info/firmware-version,info/hardware-version,info/model'
 bess:
 - instance_id: bess-1
   nameplate_capacity_kwh: 81.0

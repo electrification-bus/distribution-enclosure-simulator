@@ -24,7 +24,6 @@ devices:
     latitude: '0.0'
     longitude: '0.0'
     utility-meter-serial-number: 'MASKED-METER'
-    unvalued: 'pcs/off-grid-import-limit,power-flows/battery,power-flows/pv'
     off-grid-import-limit-enablement: 'UNCONFIGURED'
 - class: lugs
   id: lugs-upstream
@@ -74,5 +73,4 @@ devices:
 - class: remote-ct
   id: remote-ct-3
   name: Service CT
-  metadata:
-    unvalued: 'meter/shared-with-device-ids'
+  metadata: {}

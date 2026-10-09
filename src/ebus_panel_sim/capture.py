@@ -32,23 +32,24 @@ from pathlib import Path
 from typing import Any, cast, get_args
 
 from ebus_panel_sim.definition import PanelDefinition, dump_definition, dump_ticks
+from ebus_panel_sim.emitter import Emitter
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
 from ebus_panel_sim.manifest_physics import (
-    WIRE_VALUE_PATHS,
     _circuit_wire_values,
     _lugs_wire_values,
     _panel_wire_values,
+    unvalued_paths,
 )
 from ebus_panel_sim.native_devices import BESSConfig, LoadSheddingConfig
 from ebus_panel_sim.tick_inputs import BESSCommunication, TickInputs
 from ebus_panel_sim.wire.profile_loader import Variant, load_profiles
+from ebus_panel_sim.wire.set_router import SetterRegistry
 
 _DOMAIN = "ebus/5"
 _LINK_STATES = frozenset(get_args(BESSCommunication))
 _TYPE_PREFIX = "energy.ebus.device."
 # The circuits a SPAN panel adds for a commissioned PV or battery system.
 _COMMISSIONED_NAMES = {"Commissioned PV System": "pv", "Commissioned Backup System": "backup"}
-# Site facts dropped when masking.
 # Site facts replaced when masking, by placeholders of the same datatype, so a
 # masked definition still values what the panel valued.
 _SITE_MASKS = {
@@ -61,8 +62,6 @@ _SITE_MASKS = {
     "utility-meter-serial-number": "MASKED-METER",
 }
 _MASKED_SSID = "masked-ssid"
-# The properties naming another device a connection feeds or is fed by.
-_CONNECTION_EDGE = re.compile(r"^connection/(feeds|fed-by)-device-(id|type|status)$")
 # A shorter original ID masks a display name only when it is the whole name, so
 # an ID such as ``bess`` does not rename "Example BESS".
 _MIN_EMBEDDED = 6
@@ -299,8 +298,78 @@ def definition_from_tree(
     ``span-alpha-test-b2`` for a panel whose hardware version string selects it,
     ``span`` for any other SPAN panel, and ``reference`` otherwise.
     ``generic_names`` replaces each circuit's name with ``Circuit <n>``, numbered
-    in tab order."""
-    return _Mapper(tree, mask, root, generic_names).run(variant)
+    in tab order.
+
+    Each device's ``unvalued`` list is minimal: the definition is republished once
+    without the lists, driven by one tick sampled from the tree, and a path the
+    emitter leaves unvalued anyway is implied and dropped."""
+    definition, notes = _Mapper(tree, mask, root, generic_names).run(variant)
+    (tick,) = ticks_from_samples(tree, [(0.0, tree)], mask=mask, root=root)
+    return _minimal_unvalued(definition, tick), notes
+
+
+class _RetainedTransport:
+    """An in-memory transport for the emitter: the retained topics, last write wins."""
+
+    def __init__(self) -> None:
+        self.retained: dict[str, str] = {}
+        self.is_running = True
+
+    def is_connected(self) -> bool:
+        return True
+
+    def publish(self, topic: str, data: str, qos: int = 1, retain: bool = False) -> object:
+        del qos
+        if retain:
+            if data == "":
+                self.retained.pop(topic, None)
+            else:
+                self.retained[topic] = data
+        return None
+
+    def subscribe(self, sub: str, param: object = None, qos: int = 1) -> object:
+        del sub, param, qos
+        return None
+
+
+def _minimal_unvalued(definition: PanelDefinition, tick: TickInputs) -> PanelDefinition:
+    """``definition`` with each ``unvalued`` list cut to the paths the emitter would
+    otherwise publish."""
+
+    def without_list(inst: DeviceInstance) -> DeviceInstance:
+        md = {k: v for k, v in inst.metadata.items() if k != "unvalued"}
+        return dataclasses.replace(inst, metadata=md)
+
+    bare = dataclasses.replace(
+        definition,
+        manifest=DeviceManifest(
+            instances=tuple(without_list(i) for i in definition.manifest.instances)
+        ),
+    )
+    transport = _RetainedTransport()
+    emitter = Emitter.from_definition(bare, SetterRegistry(), mqttc=transport)
+    emitter.start()
+    emitter.publish_tick(tick)
+    prefix = _DOMAIN + "/"
+    valued = {
+        tuple(topic[len(prefix) :].split("/", 1))
+        for topic in transport.retained
+        if topic.startswith(prefix)
+    }
+    instances: list[DeviceInstance] = []
+    for inst in definition.manifest.instances:
+        kept = sorted(
+            path for path in unvalued_paths(inst.metadata) if (inst.instance_id, path) in valued
+        )
+        bare_inst = without_list(inst)
+        instances.append(
+            dataclasses.replace(
+                bare_inst, metadata={**bare_inst.metadata, "unvalued": ",".join(kept)}
+            )
+            if kept
+            else bare_inst
+        )
+    return dataclasses.replace(definition, manifest=DeviceManifest(instances=tuple(instances)))
 
 
 def ticks_from_samples(
@@ -547,26 +616,19 @@ class _Mapper:
         return dataclasses.replace(inst, description_name=name)
 
     def _unvalued(self, device: Device, entity_class: str) -> str:
-        """The paths the device declares and leaves unvalued, comma-separated.
-
-        Left out are those the definition already leaves unvalued another way: a
-        settable property, which a consumer may set later; a commissioning fact,
-        published only when its key is present; and a connection to another
-        device, published only when the definition makes that connection."""
+        """The paths the device declares and leaves unvalued, comma-separated,
+        before :func:`_minimal_unvalued` drops those nothing would value. A settable
+        property is left out: a consumer may set it later."""
         profile = self.profiles.get(entity_class)
         if profile is None:
             return ""
-        implied = WIRE_VALUE_PATHS.get(entity_class, frozenset())
         return ",".join(
             sorted(
                 path
                 for cap_name, cap in profile.capabilities.items()
                 for key, prop in cap.properties.items()
                 if not prop.settable
-                and not prop.unvalued
-                and (path := f"{cap_name}/{key}") not in implied
-                and not _CONNECTION_EDGE.match(path)
-                and device.declares(path)
+                and device.declares(path := f"{cap_name}/{key}")
                 and device.properties.get(path) is None
             )
         )
