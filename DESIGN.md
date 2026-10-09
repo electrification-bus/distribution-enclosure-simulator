@@ -25,12 +25,12 @@ That description assumes the emitter owns the connection. With an injected trans
 
 SPAN changed two conventions in release 202639, and the span variant publishes whichever side the panel's own `firmware-version` names, so one emitter can stand in for a panel on either. `ebus_panel_sim.firmware.release_build` reads the release out of the string: the first `/`-separated segment that is exactly `r` plus six digits (`spanos2/r202633/02` is 202633); anything else, such as the examples' `example/v0.1.0`, names none. `PanelPhysics.release_build` exposes it, and the emitter turns it and the variant into a `FirmwareConventions` once, at construction:
 
-| | span variant, release before 202639 | span variant from release 202639 or naming no release; `span-alpha-test-b2` on any firmware | reference variant, any firmware |
-|---|---|---|---|
-| BESS `meter/active-power` | the panel's frame, equal to `power-flows/battery` (positive while charging) | the battery's own frame, as `devices/bess.md` defines it (positive while discharging) | the battery's own frame |
-| EVSE `config/user-max-charge-current` | `max-current-a` until a user sets it | unpublished until a user sets it | not declared (only the span overlay declares it) |
+| | span variant, release before 202639 | span variant from release 202639 or naming no release | `span-alpha-test-b2`, any firmware | reference variant, any firmware |
+|---|---|---|---|---|
+| BESS `meter/active-power` | the panel's frame, equal to `power-flows/battery` (positive while charging) | the battery's own frame, as `devices/bess.md` defines it (positive while discharging) | the battery's own frame | the battery's own frame |
+| EVSE `config/user-max-charge-current` | `max-current-a` until a user sets it | unpublished until a user sets it | `max-current-a` until a user sets it | not declared (only the span overlay declares it) |
 
-The snapshot is device-frame either way: `EbusBatterySnapshot.active_power_w` is positive while discharging, and only `bag_builder`'s resolver for the BESS meter changes. A `/set` on the user limit is clamped the same way on both sides, and `$format` stays `6:<max-current-a>`. Only the span variant is firmware-keyed: `span-alpha-test-b2` always publishes the current conventions, and the reference variant always publishes the specification's BESS frame, whatever firmware either reports. A consumer is tested across the change by restarting the emitter on a definition reporting the other firmware.
+The snapshot is device-frame either way: `EbusBatterySnapshot.active_power_w` is positive while discharging, and only `bag_builder`'s resolver for the BESS meter changes. A `/set` on the user limit is clamped the same way on both sides, and `$format` stays `6:<max-current-a>`. Only the span variant is firmware-keyed: `span-alpha-test-b2` always publishes the battery's own frame and the user limit at `max-current-a` until set (both reference captures with an EVSE publish 48 of 48), and the reference variant always publishes the specification's BESS frame, whatever firmware either reports. A consumer is tested across the change by restarting the emitter on a definition reporting the other firmware.
 
 ## Native devices
 

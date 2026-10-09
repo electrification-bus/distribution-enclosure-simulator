@@ -90,11 +90,11 @@ _NOMINAL_FREQUENCY_HZ = 60.0
 
 
 def _busbar_current(site_w: float, service_voltage_v: float) -> float | None:
-    """Estimated busbar current: the site's power over the service voltage, in A
-    to one decimal, unpublished when exactly 0. A SPAN panel estimates it from
-    apparent power; this model has active power only."""
-    amps = round(abs(site_w) / service_voltage_v, 1) if service_voltage_v > 0 else 0.0
-    return amps or None
+    """Estimated busbar current: the site's power over the service voltage, in A,
+    or None without a service voltage. A SPAN panel estimates it from apparent
+    power and publishes it on every reference capture, 0.1 A at a few watts;
+    this model has active power only."""
+    return abs(site_w) / service_voltage_v if service_voltage_v > 0 else None
 
 
 def _declared_enum(
@@ -1156,8 +1156,6 @@ class Emitter:
             grid_state=meter.grid_state,
             dsm_state=meter.dsm_state,
             current_run_config=meter.current_run_config,
-            # Never valued under span-alpha-test-b2.
-            requested_import_limit_a=None if self._variant == "span-alpha-test-b2" else 0.0,
         )
         # Under span-alpha-test-b2, a panel with neither a battery nor solar (a
         # circuit commissioned feeds-role SOLAR) leaves pv and battery unset.

@@ -58,11 +58,11 @@ _MAIN32_R202633 = "main32-r202633"
 # The differences each capture still shows, exactly; a capture absent here must
 # show none.
 _RESIDUAL: dict[str, int] = {
-    "r202639-a": 15,
-    "r202639-b": 15,
-    "r202639-c": 15,
-    "r202639-d": 28,
-    "r202639-e": 17,
+    "r202639-a": 12,
+    "r202639-b": 12,
+    "r202639-c": 7,
+    "r202639-d": 19,
+    "r202639-e": 13,
     _MAIN32_R202639: 7,
     _MAIN32_R202633: 28,
 }

@@ -84,3 +84,16 @@ def test_a_removal_that_cannot_apply_is_rejected(
 ) -> None:
     with pytest.raises(ProfileValidationError, match=match):
         _load(tmp_path, overlay)
+
+
+def test_an_overlay_can_declare_a_property_unvalued(tmp_path: Path) -> None:
+    overlay = {"capabilities": {"meter": {"properties": {"frequency": {"unvalued": True}}}}}
+    meter = _load(tmp_path, overlay)["thing"].capabilities["meter"].properties
+    assert meter["frequency"].unvalued is True
+    assert meter["active-power"].unvalued is False
+
+
+def test_unvalued_must_be_a_boolean(tmp_path: Path) -> None:
+    overlay = {"capabilities": {"meter": {"properties": {"frequency": {"unvalued": "yes"}}}}}
+    with pytest.raises(ProfileValidationError, match="unvalued"):
+        _load(tmp_path, overlay)

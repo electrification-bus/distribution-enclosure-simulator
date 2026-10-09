@@ -238,14 +238,41 @@ def test_a_main_breaker_rating_publishes_the_breaker(rec: PahoRecorder) -> None:
     assert rec.retained["ebus/5/abc-123/breaker/rating"] == "200"
 
 
-def test_the_variant_never_values_the_requested_import_limit(rec: PahoRecorder) -> None:
-    _started(rec, _variant_manifest())
-    assert "ebus/5/abc-123/pcs/requested-import-limit" not in rec.retained
+@pytest.mark.parametrize("variant", ["span-alpha-test-b2", "span"])
+def test_an_unconfigured_requested_import_limit_reads_200(
+    rec: PahoRecorder, variant: Variant
+) -> None:
+    """As every public and reference capture publishes it while UNCONFIGURED."""
+    _started(rec, _variant_manifest(), variant=variant)
+    assert rec.retained["ebus/5/abc-123/pcs/requested-import-limit"] == "200.0"
+    assert rec.retained["ebus/5/abc-123/pcs/requested-import-limit-enablement"] == "UNCONFIGURED"
 
 
-def test_span_values_the_requested_import_limit(rec: PahoRecorder) -> None:
-    _started(rec, _variant_manifest(), variant="span")
-    assert "ebus/5/abc-123/pcs/requested-import-limit" in rec.retained
+def test_the_variant_declares_the_main_relay_and_shed_forecast_unvalued(
+    rec: PahoRecorder,
+) -> None:
+    """Every reference capture leaves status/relay unvalued, and both with a battery
+    leave shed-forecast unvalued; the span variant values them."""
+    em, _ = _variant_with_battery()
+    em.publish_tick(TickInputs(current_time=0.0, grid_online=True, circuits={"kitchen": 500.0}))
+    description = json.loads(rec.retained["ebus/5/abc-123/$description"])
+    assert "relay" in description["nodes"]["status"]["properties"]
+    assert set(description["nodes"]["shed-forecast"]["properties"]) == {
+        "total-time-remaining",
+        "time-to-priority-shed",
+        "full-charge-total-time-remaining",
+        "full-charge-time-to-priority-shed",
+        "confidence",
+    }
+    assert "ebus/5/abc-123/status/relay" not in rec.retained
+    assert not any(t.startswith("ebus/5/abc-123/shed-forecast/") for t in rec.retained)
+
+
+def test_the_busbar_current_is_published_at_any_load(rec: PahoRecorder) -> None:
+    """Every reference capture publishes it, 0.1 A at a few watts."""
+    em = _started(rec, _variant_manifest())
+    em.publish_tick(TickInputs(current_time=1.0, grid_online=True, circuits={"kitchen": 0.0}))
+    assert rec.retained["ebus/5/abc-123/meter/busbar-current"] == "0.0"
 
 
 def _loads_only(*, solar: bool) -> DeviceManifest:

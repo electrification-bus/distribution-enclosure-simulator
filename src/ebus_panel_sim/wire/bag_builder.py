@@ -502,6 +502,15 @@ class BagBuilder:
                 f"out of sync.",
             )
 
+        # Properties a profile declares and never values are never bound.
+        unvalued = {
+            (entity_class, f"{cap_name}/{prop_key}")
+            for entity_class, profile in profiles.items()
+            for cap_name, cap in profile.capabilities.items()
+            for prop_key, prop in cap.properties.items()
+            if prop.unvalued
+        }
+
         # Each property's literal form, from its profile declaration.
         literals = {
             (entity_class, f"{cap_name}/{prop_key}"): prop.literal
@@ -521,6 +530,8 @@ class BagBuilder:
         # property_path) keys actually present in the graph. The graph already
         # encodes which instances exist for each entity_class.
         for entity_class, instance_id, property_path in graph.properties:
+            if (entity_class, property_path) in unvalued:
+                continue
             key = (entity_class, instance_id, property_path)
             resolver = (
                 _constant(constants.get(key))

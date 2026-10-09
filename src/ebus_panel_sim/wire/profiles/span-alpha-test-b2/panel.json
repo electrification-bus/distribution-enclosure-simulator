@@ -62,6 +62,32 @@
         }
       }
     },
+    "status": {
+      "properties": {
+        "relay": {
+          "unvalued": true
+        }
+      }
+    },
+    "shed-forecast": {
+      "properties": {
+        "total-time-remaining": {
+          "unvalued": true
+        },
+        "time-to-priority-shed": {
+          "unvalued": true
+        },
+        "full-charge-total-time-remaining": {
+          "unvalued": true
+        },
+        "full-charge-time-to-priority-shed": {
+          "unvalued": true
+        },
+        "confidence": {
+          "unvalued": true
+        }
+      }
+    },
     "power-flows": {
       "properties": {
         "pv": {

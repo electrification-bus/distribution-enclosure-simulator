@@ -13,9 +13,10 @@ The span variant impersonates whichever side the panel's own
 ``firmware-version`` names, so one emitter can stand in for either and a
 consumer can be tested across the change. A firmware string with no release
 build in it, such as the examples' ``example/v0.1.0``, gets the current
-conventions, and so does every other variant: the span-alpha-test-b2 and
-reference variants publish the specification's frame whatever firmware they
-report.
+conventions, and so does the reference variant whatever firmware it reports.
+The span-alpha-test-b2 variant, whatever its firmware, publishes the battery's
+own frame and an EVSE's user limit at the commissioned maximum until a user
+sets one.
 """
 
 from __future__ import annotations
@@ -80,12 +81,23 @@ _EARLIER: Final = FirmwareConventions(
 )
 
 
+# The span-alpha-test-b2 variant publishes the battery's own frame, as the current
+# conventions do, but its EVSE's user limit at the commissioned maximum before any
+# user sets one: the two reference captures with an EVSE both publish 48 of 48.
+_B2_CONVENTIONS: Final = FirmwareConventions(
+    bess_meter_frame="device", user_max_charge_current_preset=True
+)
+
+
 def firmware_conventions(variant: Variant, release: int | None) -> FirmwareConventions:
     """The conventions a panel of ``variant`` reporting ``release`` publishes.
 
     Only a firmware-keyed variant with a release before
     :data:`CURRENT_CONVENTIONS_RELEASE` gets the earlier ones; an unknown release is
-    taken to be current."""
+    taken to be current. The span-alpha-test-b2 variant has its own, whatever its
+    firmware."""
+    if variant == "span-alpha-test-b2":
+        return _B2_CONVENTIONS
     keyed = variant in _FIRMWARE_KEYED_VARIANTS
     if keyed and release is not None and release < CURRENT_CONVENTIONS_RELEASE:
         return _EARLIER
