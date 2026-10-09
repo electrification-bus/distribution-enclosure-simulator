@@ -1,35 +1,25 @@
 """Capture against a real panel's tree: a masked tree-v1 snapshot of a MAIN_32.
 
-`tests/fixtures/main32-tree-v1.json` is a live SPAN panel's tree (released
+The reference capture `main32_r202633` is a live SPAN panel's tree (released
 firmware) with every device ID, serial number, postal code and Wi-Fi SSID
 replaced and circuit names made generic. The other capture tests start from the
 simulator's own output; this one starts from hardware."""
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
 
-from ebus_panel_sim import Emitter, SetterRegistry, TickInputs
-from ebus_panel_sim.capture import (
-    Tree,
-    definition_from_tree,
-    ticks_from_samples,
-    tree_from_retained,
-    tree_from_snapshot,
-)
+from ebus_panel_sim import Emitter, SetterRegistry, TickInputs, Tree, load_reference_capture
+from ebus_panel_sim.capture import definition_from_tree, ticks_from_samples, tree_from_retained
 
 from .conftest import PahoRecorder
 
-_FIXTURE = Path(__file__).parent / "fixtures" / "main32-tree-v1.json"
 # Published by the panel, not yet modeled by the simulator.
 _NOT_MODELED = frozenset({"connection/count"})
 
 
 def _tree() -> Tree:
-    return tree_from_snapshot(json.loads(_FIXTURE.read_text(encoding="utf-8")))
+    return load_reference_capture("main32_r202633").tree
 
 
 def _rebuilt(rec: PahoRecorder, mask: bool) -> Tree:

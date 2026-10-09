@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- The reference panel captures ship in the wheel, with `reference_capture_names()` and `load_reference_capture()` to read them.
+
 ## [0.10.0b1] - 2026-10-08
 
 ### Added

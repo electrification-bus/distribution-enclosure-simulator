@@ -21,6 +21,7 @@ from ebus_panel_sim import (
     TickInputs,
     dump_ticks,
     load_definition,
+    load_reference_capture,
     load_ticks,
 )
 from ebus_panel_sim.capture import (
@@ -646,10 +647,7 @@ def test_a_role_the_variant_cannot_book_is_captured_with_a_note(role: str) -> No
     """A panel with such a breaker is still captured: the definition keeps the role
     the panel published, and a note names the circuit and says the variant cannot
     book it yet, which is also why the definition will not load under it."""
-    raw = json.loads(
-        (Path(__file__).parent / "fixtures" / "r202639-b-tree-v1.json").read_text(encoding="utf-8")
-    )
-    tree = tree_from_snapshot(raw)
+    tree = load_reference_capture("r202639-b").tree
     branch = next(
         device_id
         for device_id, device in sorted(tree.items())

@@ -60,18 +60,27 @@ jobs:
       # Guards the packaging fault that kept this package unbuildable until #8: the
       # wheel must actually carry the YAML/JSON wire data, since every profile and
       # mapping lookup resolves from it at runtime and the test suite reads the
-      # source tree instead.
-      - name: Verify the wheel carries its wire data
+      # source tree instead. The same holds for the reference captures, which
+      # `load_reference_capture` reads from the installed package, so every capture
+      # file in the source tree must be in the wheel.
+      - name: Verify the wheel carries its wire data and reference captures
         run: |
           python - <<'PY'
-          import glob, zipfile, sys
+          import glob, pathlib, zipfile, sys
           names = zipfile.ZipFile(sorted(glob.glob("dist/*.whl"))[0]).namelist()
           missing = [d for d in ("wire/profiles", "wire/mapping", "wire/catalogs")
                      if not any(d in n for n in names)]
+          captures = sorted(
+              p.relative_to("src").as_posix()
+              for p in pathlib.Path("src/ebus_panel_sim/reference_captures").iterdir()
+              if p.suffix in (".json", ".yaml")
+          )
+          missing += [c for c in captures if c not in names]
           dupes = len(names) - len(set(names))
-          if missing or dupes:
-              sys.exit(f"missing={missing} duplicate_entries={dupes}")
-          print(f"ok: {len(names)} entries, no duplicates, all wire data present")
+          if missing or dupes or not captures:
+              sys.exit(f"missing={missing} duplicate_entries={dupes} captures={len(captures)}")
+          print(f"ok: {len(names)} entries, no duplicates, all wire data and "
+                f"{len(captures)} reference capture files present")
           PY
 
       - uses: pypa/gh-action-pypi-publish@release/v1

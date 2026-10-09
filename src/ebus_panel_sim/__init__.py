@@ -19,6 +19,7 @@ Producer contract (v0.3.0): build a ``DeviceManifest`` once at startup, then cal
 ``Emitter.publish_tick(TickInputs)`` each tick with signed circuit/EVSE powers,
 ``current_time``, and ``grid_online``. The emitter does the rest."""
 
+from ebus_panel_sim.capture import CaptureNote, Device, Tree
 from ebus_panel_sim.conventions.tab_legs import Leg, legs_for_tabs
 from ebus_panel_sim.definition import (
     PanelDefinition,
@@ -35,6 +36,7 @@ from ebus_panel_sim.exceptions import (
     MissingSetterError,
     ProfileValidationError,
     RuntimeSpecValidationError,
+    UnknownReferenceCaptureError,
 )
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
 from ebus_panel_sim.manifest_physics import (
@@ -56,6 +58,11 @@ from ebus_panel_sim.native_devices import (
     LoadSheddingDevice,
     NativeDevice,
     NativeTickContext,
+)
+from ebus_panel_sim.reference_captures import (
+    ReferenceCapture,
+    load_reference_capture,
+    reference_capture_names,
 )
 from ebus_panel_sim.relay_resolver import RelayRequester, RelayResolver, RelayState
 from ebus_panel_sim.snapshot import (
@@ -98,8 +105,10 @@ __all__ = [
     "BESSConfig",
     "BESSDevice",
     "BessPhysics",
+    "CaptureNote",
     "ChargeMode",
     "CircuitPhysics",
+    "Device",
     "DeviceInstance",
     "DeviceManifest",
     "DispatchState",
@@ -139,6 +148,7 @@ __all__ = [
     "PanelPhysics",
     "ProfileValidationError",
     "PvPhysics",
+    "ReferenceCapture",
     "RelayRequester",
     "RelayResolver",
     "RelayState",
@@ -146,11 +156,15 @@ __all__ = [
     "SetterHandler",
     "SetterRegistry",
     "TickInputs",
+    "Tree",
+    "UnknownReferenceCaptureError",
     "Variant",
     "__version__",
     "dump_definition",
     "dump_ticks",
     "legs_for_tabs",
     "load_definition",
+    "load_reference_capture",
     "load_ticks",
+    "reference_capture_names",
 ]

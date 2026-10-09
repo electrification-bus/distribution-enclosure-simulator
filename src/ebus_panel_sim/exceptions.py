@@ -36,3 +36,13 @@ class ProfileValidationError(EmitterError):
 class EmitterStateError(EmitterError):
     """Emitter operation called in the wrong state (e.g. tick() before start(), start()
     against a disconnected MQTT client)."""
+
+
+class UnknownReferenceCaptureError(EmitterError, LookupError):
+    """``load_reference_capture`` was given a name the package ships no reference
+    capture under. ``name`` is that name and ``known`` the names it ships."""
+
+    def __init__(self, name: str, known: tuple[str, ...]) -> None:
+        self.name = name
+        self.known = known
+        super().__init__(f"No reference capture {name!r}; the package ships {', '.join(known)}")
