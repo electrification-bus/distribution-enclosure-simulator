@@ -944,8 +944,13 @@ class Emitter:
             grid_online=tick.grid_online,
             has_battery=has_battery,
             # eBus connection/feeds-role SOLAR: the variant takes solar from the
-            # circuits commissioned with that role, the span variant from every
-            # circuit reading negative.
+            # circuits commissioned with that role and site from the rest but a
+            # battery's breaker, as r202639 firmware does; the span variant takes
+            # solar from every circuit reading negative. The variant's site would
+            # also take the upstream load its remote-ct meter measures, but this
+            # model's remote-ct reads the panel's own grid power, so it measures none.
+            # A third-party backup system that reports pv, battery and grid from
+            # its own meter is not modelled.
             solar_circuits=(
                 frozenset(
                     cid
@@ -954,6 +959,9 @@ class Emitter:
                 )
                 if self._variant == "span-alpha-test-b2"
                 else None
+            ),
+            battery_circuits=frozenset(
+                bphys.feed for bphys in self._physics.all_bess().values() if bphys.feed
             ),
         )
 

@@ -586,3 +586,59 @@ def test_power_flows_pv_is_the_generation_of_solar_role_circuits(
     assert flows.grid == pytest.approx(1300.0)
     values = [flows.pv, flows.battery or 0.0, flows.grid, flows.site]
     assert sum(v for v in values if v is not None) == pytest.approx(0.0)
+
+
+@pytest.mark.spec_only
+def test_a_solar_circuit_s_standby_draw_counts_toward_pv_not_site(rec: PahoRecorder) -> None:
+    """r202639 firmware sums the SOLAR circuits' readings into pv, so an inverter's
+    standby draw at night reads as a small positive pv, not as site load."""
+    em = Emitter(_loads_only(solar=True), SetterRegistry(), variant="span-alpha-test-b2")
+    em.start()
+    flows = em.publish_tick(
+        TickInputs(current_time=0.0, grid_online=True, circuits={"solar": 5.0, "ev": 1000.0})
+    ).power_flows
+    assert flows.pv == pytest.approx(5.0)
+    assert flows.site == pytest.approx(1000.0)
+    values = [flows.pv, flows.battery or 0.0, flows.grid, flows.site]
+    assert sum(v for v in values if v is not None) == pytest.approx(0.0)
+
+
+@pytest.mark.spec_only
+@pytest.mark.parametrize(("variant", "site"), [("span-alpha-test-b2", 500.0), ("span", 1300.0)])
+def test_a_battery_breaker_counts_toward_battery_not_site(
+    rec: PahoRecorder, variant: Variant, site: float
+) -> None:
+    """Under the variant, site is the load circuits alone: a breaker that feeds the
+    battery carries the battery's power, which the battery's flow reports. The span
+    variant counts it as load. The flows balance either way."""
+    manifest = _with(
+        _variant_manifest(), "abc-123-bess", feed="kitchen", **{"relative-position": "IN_PANEL"}
+    )
+    manifest = DeviceManifest(
+        instances=tuple(i for i in manifest.instances if i.entity_class not in ("pv", "evse"))
+    )
+    cfg = BESSConfig(
+        instance_id="abc-123-bess",
+        nameplate_capacity_kwh=13.5,
+        max_charge_w=3500.0,
+        max_discharge_w=3500.0,
+    )
+    em = Emitter(manifest, SetterRegistry(), bess_configs=(cfg,), variant=variant)
+    em.start()
+    flows = em.publish_tick(
+        TickInputs(current_time=0.0, grid_online=True, circuits={"kitchen": 800.0, "ev": 500.0})
+    ).power_flows
+    assert flows.site == pytest.approx(site)
+    values = [flows.pv or 0.0, flows.battery or 0.0, flows.grid, flows.site]
+    assert sum(v for v in values if v is not None) == pytest.approx(0.0)
+
+
+def test_with_neither_solar_nor_a_battery_pv_is_unset_not_zero(rec: PahoRecorder) -> None:
+    """r202639 firmware leaves pv (and battery) unset on such a panel. A third-party
+    backup system that reports pv from its own meter, as capture r202639-c's does,
+    would publish it; that case is not modelled yet."""
+    em = _started(rec, _loads_only(solar=False))
+    assert em.last_snapshot is not None
+    assert em.last_snapshot.power_flows.pv is None
+    assert em.last_snapshot.power_flows.battery is None
+    assert "ebus/5/abc-123/power-flows/pv" not in rec.retained
