@@ -32,6 +32,8 @@ SPAN changed two conventions in release 202639, and the span variant publishes w
 
 The snapshot is device-frame either way: `EbusBatterySnapshot.active_power_w` is positive while discharging, and only `bag_builder`'s resolver for the BESS meter changes. A `/set` on the user limit is clamped the same way on both sides, and `$format` stays `6:<max-current-a>`. Only the span variant is firmware-keyed: `span-alpha-test-b2` always publishes the current conventions, and the reference variant always publishes the specification's BESS frame, whatever firmware either reports. A consumer is tested across the change by restarting the emitter on a definition reporting the other firmware.
 
+From release 202645, `span-alpha-test-b2` also declares `connection/connection-point` (`BRANCH` on a branch circuit, `MONITORED` on the `remote-ct`, whose `connection` node holds only that property). It is a profile overlay, `wire/profiles/span-alpha-test-b2-r202645/`, which `load_profiles` merges after the variant's own when `ebus_panel_sim.firmware.release_overlays` names it for the panel's release.
+
 ## Native devices
 
 Two device classes are not pure publishers: their behaviour runs inside the emitter.

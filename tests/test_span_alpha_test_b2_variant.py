@@ -492,8 +492,29 @@ def _with_remote_ct(manifest: DeviceManifest, count: int = 1) -> DeviceManifest:
     return DeviceManifest(instances=manifest.instances + extra)
 
 
+_R202639 = "spanos3/r202639/03"
+_R202645 = "spanos3/r202645/01"
+
+
+def _on_firmware(manifest: DeviceManifest, firmware: str) -> DeviceManifest:
+    """``manifest`` with its panel reporting ``firmware``."""
+    return DeviceManifest(
+        instances=tuple(
+            DeviceInstance(
+                i.entity_class,
+                i.instance_id,
+                i.display_name,
+                {**i.metadata, "firmware-version": firmware}
+                if i.entity_class == "panel"
+                else i.metadata,
+            )
+            for i in manifest.instances
+        )
+    )
+
+
 def test_the_remote_ct_is_a_meter_only_circuit_without_spaces(rec: PahoRecorder) -> None:
-    _started(rec, _with_remote_ct(_variant_manifest()))
+    _started(rec, _on_firmware(_with_remote_ct(_variant_manifest()), _R202639))
     description = json.loads(rec.retained["ebus/5/remote-ct-1/$description"])
     assert description["type"] == "energy.ebus.device.circuit"
     assert set(description["nodes"]) == {"meter"}
@@ -718,3 +739,70 @@ def test_a_circuit_role_with_no_known_booking_is_rejected(role: str) -> None:
     with pytest.raises(ManifestValidationError, match=f"feeds-role.*{role}"):
         Emitter(manifest, SetterRegistry(), variant="span-alpha-test-b2")
     Emitter(manifest, SetterRegistry(), variant="span")
+
+
+def test_from_202645_every_circuit_declares_its_connection_point(rec: PahoRecorder) -> None:
+    """A branch circuit reads BRANCH and the remote CT MONITORED; the remote CT's
+    connection node carries nothing else."""
+    manifest = _on_firmware(_with_remote_ct(_variant_manifest()), _R202645)
+    _started(rec, manifest)
+    for inst in manifest.of_class("circuit"):
+        description = json.loads(rec.retained[f"ebus/5/{inst.instance_id}/$description"])
+        point = description["nodes"]["connection"]["properties"]["connection-point"]
+        assert point["datatype"] == "enum"
+        assert point["format"] == "BRANCH,MONITORED"
+        assert "settable" not in point
+        assert rec.retained[f"ebus/5/{inst.instance_id}/connection/connection-point"] == "BRANCH"
+    description = json.loads(rec.retained["ebus/5/remote-ct-1/$description"])
+    assert set(description["nodes"]) == {"meter", "connection"}
+    assert set(description["nodes"]["connection"]["properties"]) == {"connection-point"}
+    assert rec.retained["ebus/5/remote-ct-1/connection/connection-point"] == "MONITORED"
+
+
+def test_before_202645_no_circuit_declares_a_connection_point(rec: PahoRecorder) -> None:
+    _started(rec, _on_firmware(_with_remote_ct(_variant_manifest()), _R202639))
+    assert not any(t.endswith("/connection/connection-point") for t in rec.retained)
+    for topic, payload in rec.retained.items():
+        if topic.endswith("/$description"):
+            nodes = json.loads(payload).get("nodes", {})
+            assert "connection-point" not in nodes.get("connection", {}).get("properties", {})
+
+
+def test_the_span_variant_never_declares_a_connection_point(rec: PahoRecorder) -> None:
+    """MAIN 32 publishes no connection-point on any release."""
+    manifest = DeviceManifest(
+        instances=tuple(
+            i for i in _on_firmware(_manifest(), _R202645).instances if i.entity_class != "pv"
+        )
+    )
+    _started(rec, manifest, variant="span")
+    assert not any(t.endswith("/connection/connection-point") for t in rec.retained)
+
+
+def test_a_panel_without_downstream_lugs_publishes_none(rec: PahoRecorder) -> None:
+    """From release 202645 a panel with no feedthrough module publishes no
+    downstream lugs device; a definition expresses that by leaving it out."""
+    manifest = DeviceManifest(
+        instances=tuple(
+            i
+            for i in _on_firmware(_variant_manifest(), _R202645).instances
+            if i.instance_id != "lugs-downstream"
+        )
+    )
+    _started(rec, manifest)
+    panel = json.loads(rec.retained["ebus/5/abc-123/$description"])
+    assert "lugs-downstream" not in panel["children"]
+    assert not any(t.startswith("ebus/5/lugs-downstream/") for t in rec.retained)
+
+
+def test_capture_reads_a_202645_remote_ct_back_as_one(rec: PahoRecorder) -> None:
+    """From release 202645 the remote CT has a connection node too, so capture
+    tells it from a branch circuit by connection-point, not by its nodes."""
+    from ebus_panel_sim.capture import definition_from_tree, tree_from_retained
+
+    _started(rec, _on_firmware(_with_remote_ct(_variant_manifest()), _R202645))
+    definition, _ = definition_from_tree(
+        tree_from_retained(rec.retained), variant="span-alpha-test-b2", mask=False
+    )
+    assert [i.instance_id for i in definition.manifest.of_class("remote-ct")] == ["remote-ct-1"]
+    assert "remote-ct-1" not in {i.instance_id for i in definition.manifest.of_class("circuit")}

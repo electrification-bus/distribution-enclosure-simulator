@@ -29,7 +29,7 @@ from ebus_panel_sim.exceptions import (
     ManifestValidationError,
     ProfileValidationError,
 )
-from ebus_panel_sim.firmware import firmware_conventions
+from ebus_panel_sim.firmware import firmware_conventions, release_build
 from ebus_panel_sim.manifest import DeviceManifest
 from ebus_panel_sim.manifest_physics import (
     EVSE_MIN_CHARGE_CURRENT_A,
@@ -242,6 +242,12 @@ def _check_flow_roles(manifest: DeviceManifest) -> None:
         )
 
 
+def _panel_firmware(manifest: DeviceManifest) -> str | None:
+    """The panel's ``firmware-version`` metadata, read before validation."""
+    panels = manifest.of_class("panel")
+    return panels[0].metadata.get("firmware-version") if panels else None
+
+
 class Emitter:
     """One emitter per logical panel/clone."""
 
@@ -310,7 +316,9 @@ class Emitter:
                 "variant 'span-alpha-test-b2' has no commissioned-system circuits; a PV or "
                 "battery breaker is an ordinary circuit with a locked relay at priority NEVER"
             )
-        self._profiles = load_profiles(variant=variant)
+        self._profiles = load_profiles(
+            variant=variant, release=release_build(_panel_firmware(manifest))
+        )
         self._mapping = load_mapping_table()
         self._mapping.validate_against(self._profiles)
         self._unvalued = _declared_unvalued(manifest, self._profiles)

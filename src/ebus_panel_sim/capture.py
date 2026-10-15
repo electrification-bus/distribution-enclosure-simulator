@@ -35,6 +35,7 @@ from typing import Any, cast, get_args
 from ebus_panel_sim.definition import PanelDefinition, dump_definition, dump_ticks
 from ebus_panel_sim.emitter import Emitter, solar_circuits, unbooked_circuit_roles
 from ebus_panel_sim.exceptions import ManifestValidationError
+from ebus_panel_sim.firmware import release_build
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
 from ebus_panel_sim.manifest_physics import (
     _circuit_wire_values,
@@ -689,9 +690,12 @@ class _Mapper:
         # The definition's variant, and whether it publishes a multi-load breaker
         # as one circuit device per protected circuit, which share its meter.
         self.variant: Variant = variant or _infer_variant(self.tree[self.panel_id])
-        self.profiles = load_profiles(variant=self.variant)
+        self.profiles = load_profiles(
+            variant=self.variant,
+            release=release_build(self.tree[self.panel_id].value("info/firmware-version")),
+        )
         self.shares_breakers = declares_shared_breakers(self.profiles)
-        # A circuit device with only a meter is a remote-ct, not a branch circuit.
+        # A circuit device the panel only measures is a remote-ct, not a branch circuit.
         self.remote_cts = {i for i, d in self.tree.items() if _is_remote_ct(d)}
         self.ids = self._id_map()
         self.circuit_numbers = {
@@ -1465,7 +1469,13 @@ class _EchoKeys(dict[str, str]):
 
 
 def _is_remote_ct(device: Device) -> bool:
-    return device.type == "circuit" and set(device.description.get("nodes", {})) == {"meter"}
+    """A circuit device the panel only measures: ``connection/connection-point``
+    ``MONITORED`` from release 202645, and before it a circuit with only a meter."""
+    if device.type != "circuit":
+        return False
+    if (point := device.value("connection/connection-point")) is not None:
+        return point == "MONITORED"
+    return set(device.description.get("nodes", {})) == {"meter"}
 
 
 def _infer_variant(panel: Device) -> Variant:

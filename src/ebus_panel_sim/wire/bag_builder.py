@@ -424,6 +424,10 @@ _RESOLVERS: dict[tuple[str, str], Resolver] = {
     ("remote-ct", "meter/exported-energy"): _remote_ct_field("exported_energy_wh"),
     # Declared and left unpublished, as a SPAN panel's meter-only circuit does.
     ("remote-ct", "meter/shared-with-device-ids"): lambda snapshot, instance_id: None,
+    # From release 202645 (``firmware.CONNECTION_POINT_RELEASE``): the panel hosts a
+    # branch circuit on its busbar and only measures what a remote CT clamps.
+    ("circuit", "connection/connection-point"): lambda snapshot, instance_id: "BRANCH",
+    ("remote-ct", "connection/connection-point"): lambda snapshot, instance_id: "MONITORED",
     ("mid", "info/vendor-name"): _mid_field("vendor_name"),
     ("mid", "info/serial-number"): _mid_field("serial_number"),
     ("mid", "info/model"): _mid_field("model"),
