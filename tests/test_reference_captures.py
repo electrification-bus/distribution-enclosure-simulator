@@ -3,8 +3,8 @@
 Each is a masked tree of a real SPAN panel with a definition and ticks that
 republish it, read from the installed package rather than from this repository,
 so a consumer can replay one from a pinned release without copying files. Most
-ship the definition and ticks recorded with the tree; one ships the tree alone
-and has both derived from it."""
+ship the definition and ticks recorded with the tree; two ship the tree alone
+and have both derived from it."""
 
 from __future__ import annotations
 
@@ -33,6 +33,7 @@ def test_the_names_are_the_shipped_captures_sorted() -> None:
         "r202639-c",
         "r202639-d",
         "r202639-e",
+        "r202639-f",
     )
 
 
@@ -83,14 +84,18 @@ def test_the_upstream_pv_definition_names_devices_as_the_capture_tool_does() -> 
     }
 
 
-def test_only_the_r202633_capture_is_derived() -> None:
+_DERIVED = ["main32_r202633", "r202639-f"]
+
+
+def test_only_the_captures_shipped_as_a_tree_alone_are_derived() -> None:
     derived = [n for n in reference_capture_names() if load_reference_capture(n).derived_from_tree]
-    assert derived == ["main32_r202633"]
+    assert derived == _DERIVED
 
 
-def test_a_derived_capture_is_what_panel_sim_capture_writes_from_its_tree() -> None:
+@pytest.mark.parametrize("name", _DERIVED)
+def test_a_derived_capture_is_what_panel_sim_capture_writes_from_its_tree(name: str) -> None:
     """Unmasked, since the tree is masked already, and one tick: the captured instant."""
-    capture = load_reference_capture("main32_r202633")
+    capture = load_reference_capture(name)
     definition, notes = definition_from_tree(capture.tree, mask=False)
     assert capture.definition == definition
     assert capture.notes == tuple(notes)
@@ -114,7 +119,7 @@ def test_a_derived_capture_notes_the_upstream_lugs_a_definition_cannot_express()
 
 def test_only_a_derived_capture_has_notes() -> None:
     captures = [load_reference_capture(n) for n in reference_capture_names()]
-    assert [c.name for c in captures if c.notes] == ["main32_r202633"]
+    assert [c.name for c in captures if c.notes] == _DERIVED
 
 
 def test_each_load_reads_afresh() -> None:

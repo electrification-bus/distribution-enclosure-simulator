@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- The reference capture `r202639-f`: a panel on `spanos3/r202639/04` whose solar is DC-coupled into the inverter of its battery, upstream of the panel.
+
 ## [0.10.0] - 2026-11-10
 
 ### Added
