@@ -13,7 +13,9 @@ from importlib.resources import files
 import pytest
 
 from ebus_panel_sim import (
+    Emitter,
     EmitterError,
+    SetterRegistry,
     UnknownReferenceCaptureError,
     load_reference_capture,
     reference_capture_names,
@@ -115,6 +117,41 @@ def test_a_derived_capture_notes_the_upstream_lugs_a_definition_cannot_express()
         if i.metadata["direction"] == "upstream"
     ]
     assert any(n.device == upstream.instance_id and n.key == "fed-by" for n in capture.notes)
+
+
+def test_the_r202639_f_solar_reaches_the_panel_through_its_battery() -> None:
+    """The panel reports solar with no SOLAR circuit and no pv device: it is DC-coupled
+    into the battery's inverter, upstream of the panel. So the derived definition
+    writes the battery hybrid, its tick gives that battery the panel's solar, and the
+    republished pv carries it, with the four flows balanced.
+
+    The other magnitudes differ where a definition cannot follow the panel: the
+    battery's charge is clamped by its remaining headroom (300 W to the panel's
+    93 W), the panel's site takes 48.9 W that the battery system meters and no
+    circuit carries, and the panel's upstream lugs read about 0 W because they do
+    not meter behind the battery, where the emitter's lugs carry the circuits'
+    1673.3 W. The fidelity test compares their signs, which agree."""
+    capture = load_reference_capture("r202639-f")
+    assert not any(d.type == "pv" for d in capture.tree.values())
+    assert not any(
+        d.value("connection/feeds-role") == "SOLAR"
+        for d in capture.tree.values()
+        if d.type in ("circuit", "lugs")
+    )
+    (bess,) = capture.definition.manifest.of_class("bess")
+    assert bess.metadata["inverter-type"] == "hybrid"
+    assert bess.metadata["relative-position"] == "UPSTREAM"
+    assert any(n.device == bess.instance_id and n.key == "inverter-type" for n in capture.notes)
+    (tick,) = capture.ticks
+    assert tick.bess_pv == {bess.instance_id: 3247.0}
+
+    emitter = Emitter.from_definition(capture.definition, SetterRegistry())
+    emitter.start()
+    flows = emitter.publish_tick(tick).power_flows
+    assert flows.pv == -3247.0
+    values = [flows.pv, flows.battery, flows.grid, flows.site]
+    assert all(v is not None for v in values)
+    assert sum(v for v in values if v is not None) == pytest.approx(0.0, abs=1e-9)
 
 
 def test_only_a_derived_capture_has_notes() -> None:

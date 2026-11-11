@@ -2,7 +2,12 @@ import pytest
 
 from ebus_panel_sim.conventions.tab_legs import Leg
 from ebus_panel_sim.manifest_physics import CircuitPhysics, PanelPhysics
-from ebus_panel_sim.panel_meter import PanelMeterReading, circuit_current_a, resolve
+from ebus_panel_sim.panel_meter import (
+    PanelMeterReading,
+    circuit_current_a,
+    circuit_solar_w,
+    resolve,
+)
 
 
 def _panel(**overrides: object) -> PanelPhysics:
@@ -158,6 +163,49 @@ def test_on_grid_with_battery_charging_from_pv_surplus() -> None:
     assert r.upstream_active_power_w == -1500.0
     # Node frame: a charging battery draws from the node, like a load.
     assert r.power_flow_battery == 1500.0
+
+
+def test_a_hybrid_inverter_s_pv_joins_pv_and_reaches_the_grid_through_the_battery() -> None:
+    """3 kW from a battery's own inverter, 1 kW of it charging the battery, and
+    500 W of load: no circuit carries the PV, so the lugs see only the load, while
+    the grid sees what the battery's AC terminals deliver, 2 kW, and exports 1.5 kW."""
+    r = resolve(
+        panel=_panel(),
+        circuits={"kitchen": _circuit(tabs=(1,))},
+        gated_powers={"kitchen": 500.0},
+        battery_w=-1000.0,
+        grid_online=True,
+        has_battery=True,
+        inverter_pv_w=3000.0,
+    )
+    assert r.upstream_active_power_w == 500.0
+    assert r.instant_grid_power_w == -1500.0
+    assert r.power_flow_pv == -3000.0
+    assert r.power_flow_battery == 1000.0
+    assert r.power_flow_grid == 1500.0
+    assert r.power_flow_site == 500.0
+    assert _flow_sum(r) == 0.0
+
+
+@pytest.mark.parametrize("solar_circuits", [None, frozenset({"solar"})])
+def test_circuit_solar_and_the_inverter_s_pv_are_one_pv(
+    solar_circuits: frozenset[str] | None,
+) -> None:
+    """Booked by role or by sign, a solar circuit's production and a battery
+    inverter's PV add up in pv, and on grid the flows balance."""
+    r = resolve(
+        panel=_panel(),
+        circuits={"kitchen": _circuit(tabs=(1,)), "solar": _circuit(tabs=(3,))},
+        gated_powers={"kitchen": 500.0, "solar": -2000.0},
+        battery_w=-1000.0,
+        grid_online=True,
+        has_battery=True,
+        solar_circuits=solar_circuits,
+        inverter_pv_w=1000.0,
+    )
+    assert r.power_flow_pv == -3000.0
+    assert circuit_solar_w({"kitchen": 500.0, "solar": -2000.0}, solar_circuits) == 2000.0
+    assert _flow_sum(r) == 0.0
 
 
 def test_pv_surplus_exports_when_battery_charges_less_than_surplus() -> None:

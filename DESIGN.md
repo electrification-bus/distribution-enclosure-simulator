@@ -4,7 +4,7 @@ Internals of the emitter. For what it is and how to run/configure it, see [READM
 
 ## The per-tick pipeline
 
-The producer builds a `DeviceManifest` (identity plus physics keys per device) at startup and hands it to `Emitter` together with a `SetterRegistry`, an `mqtt_cfg` (the broker coordinates ebus-sdk connects with), zero or more `BESSConfig`s, and an optional `LoadSheddingConfig`. Each tick the producer builds a `TickInputs` (signed power per circuit, current time, grid-online flag, panel envelope, and optionally the health of the panel's link to each battery) and calls `emitter.publish_tick(tick_inputs)`. Inside, the emitter:
+The producer builds a `DeviceManifest` (identity plus physics keys per device) at startup and hands it to `Emitter` together with a `SetterRegistry`, an `mqtt_cfg` (the broker coordinates ebus-sdk connects with), zero or more `BESSConfig`s, and an optional `LoadSheddingConfig`. Each tick the producer builds a `TickInputs` (signed power per circuit, current time, grid-online flag, panel envelope, and optionally the health of the panel's link to each battery and the PV a battery's own inverter takes) and calls `emitter.publish_tick(tick_inputs)`. Inside, the emitter:
 
 1. Resolves BESS dispatch (charge/discharge/idle) for every native BESS.
 2. Decides load-shedding (which circuits open when off-grid).
@@ -40,9 +40,9 @@ Two device classes are not pure publishers: their behaviour runs inside the emit
 
 Owns the dispatch decision, SOC/SOE accumulation, mode behaviour (self-consumption / backup-only), and the backup-reserve floor. (The `charge_hours` / `discharge_hours` config fields exist but are inert: the dispatch logic never reads them, and hour-of-day / TOU windows are explicitly not modelled.) Instantiated when `Emitter` is constructed with `bess_configs`, a tuple of `BESSConfig` (default empty). One `BESSDevice` is created per config, keyed by `BESSConfig.instance_id`; duplicate instance IDs raise `EmitterStateError`.
 
-Per-tick inputs (from `TickInputs`): `current_time` (received but not consulted by the current dispatch logic; hour-of-day windows are not modelled), `grid_online` (when false the BESS discharges to meet `load_demand - pv_available`), and the derived `load_demand_w` (sum of positive circuit powers) and `pv_available_w` (magnitude of the negative circuit powers).
+Per-tick inputs (from `TickInputs`): `current_time` (received but not consulted by the current dispatch logic; hour-of-day windows are not modelled), `grid_online` (when false the BESS discharges to meet `load_demand - pv_available`), and the derived `load_demand_w` (sum of positive circuit powers) and `pv_available_w` (magnitude of the negative circuit powers, plus the PV hybrid batteries' own inverters take, `TickInputs.bess_pv`).
 
-Per-tick outputs (into `snapshot.battery`): `soe_percentage`, `soe_kwh`, and `active_power_w` (positive = discharging, negative = charging).
+Per-tick outputs (into `snapshot.battery`): `soe_percentage`, `soe_kwh`, and `active_power_w` (positive = discharging, negative = charging). That is the battery's own charge and discharge: a hybrid battery's inverter PV is not in it. The panel meter adds that PV to `power-flows/pv` and, with the dispatch, to what the battery's AC terminals deliver, from which it derives the grid.
 
 Link health is not the battery's own state but the panel's view of it, so the producer supplies it per tick in `TickInputs.bess_communication` (`OK`, `DEGRADED`, `LOST` or `UNKNOWN`; a battery left out is `OK`) and dispatch does not consult it. It lands in `communication` and `connected` on the battery snapshot, is published as the battery's `status/communication-state`, and sets the connection status of the circuit or lugs that connects the battery. The span variants (`span`, `span-alpha-test-b2`) report only `OK` or `LOST` there, mapping `DEGRADED` and `UNKNOWN` to `LOST`, as a SPAN panel does while its `$description` still declares the catalog's `OK,LOST,DEGRADED`; the reference variant publishes `DEGRADED` as is and maps only `UNKNOWN`, which no connection catalog declares.
 
@@ -106,5 +106,5 @@ The internal handler for `shed/asserted-islanding-state` does what a SPAN panel 
 | Islanding-assertion acceptance and clearing | emitter |
 | Energy integration + per-leg current + panel meter aggregation | emitter |
 | Device identity + static attributes (vendor, serial, ratings, tabs) | producer (via manifest) |
-| Per-circuit / per-EVSE signed power, `current_time`, `grid_online`, envelope, battery link health | producer (per tick) |
+| Per-circuit / per-EVSE signed power, `current_time`, `grid_online`, envelope, battery link health, a hybrid battery's PV | producer (per tick) |
 | Weather, schedules, rates, modelling, recorder/replay history | producer |

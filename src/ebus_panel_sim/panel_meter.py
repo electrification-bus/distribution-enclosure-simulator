@@ -11,6 +11,9 @@ METER frame — positive = consumption, negative = production. Every field below
 is a reading taken by one meter, about itself:
 - Per-circuit ``power_w``: positive = consume, negative = produce (PV/V2G).
 - ``battery_w``: positive = discharging (battery → panel), negative = charging.
+- ``inverter_pv_w``: the PV a battery's own (hybrid) inverter takes on its DC
+  side, positive = producing, which is the PV's own frame rather than a load's.
+  No circuit meters it: it leaves the battery's AC terminals with ``battery_w``.
 - ``instant_grid_power_w``: positive = importing from grid, negative = exporting.
 - ``upstream_active_power_w``: net power through the panel-side upstream lugs,
   before any upstream BESS contribution is removed.
@@ -45,6 +48,8 @@ from typing import TYPE_CHECKING
 from ebus_panel_sim.conventions.tab_legs import Leg
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from ebus_panel_sim.manifest_physics import CircuitPhysics, PanelPhysics
 
 
@@ -107,6 +112,18 @@ _RUN_OFF = "PANEL_OFF_GRID"
 # ---------------------------------------------------------------------------
 
 
+def circuit_solar_w(powers: Mapping[str, float], solar_circuits: frozenset[str] | None) -> float:
+    """The solar a panel takes from its circuits, positive while producing.
+
+    ``powers`` are circuit powers in the producer's sign (positive = consuming).
+    With ``solar_circuits`` it is those circuits' powers negated, a standby draw
+    included; without it, every circuit producing. ``resolve`` books ``pv`` from
+    it, and ``panel-sim-capture`` reads it back out of a published ``pv``."""
+    if solar_circuits is None:
+        return -sum(p for p in powers.values() if p < 0)
+    return -sum(p for cid, p in powers.items() if cid in solar_circuits)
+
+
 def resolve(
     *,
     panel: PanelPhysics,
@@ -117,6 +134,7 @@ def resolve(
     has_battery: bool,
     solar_circuits: frozenset[str] | None = None,
     battery_circuits: frozenset[str] = frozenset(),
+    inverter_pv_w: float = 0.0,  # positive = producing
 ) -> PanelMeterReading:
     """Build the panel-level reading from per-circuit gated powers + battery + grid.
 
@@ -127,13 +145,18 @@ def resolve(
     (a STORAGE role, or a battery's own breaker) to the battery's dispatch; and
     ``site`` is every other circuit, which the caller has checked is a load.
     Without it every negative reading counts as solar and every positive one as
-    site. The upstream flow, and so the grid, is every circuit either way."""
+    site. The upstream flow is every circuit either way.
 
+    ``inverter_pv_w`` is the PV the batteries' own (hybrid) inverters take on their
+    DC side. ``pv`` adds it to the circuits' solar, and since it reaches the panel
+    through the batteries' AC terminals rather than through any circuit, the grid
+    is the upstream flow less what those terminals deliver: the dispatch and this
+    PV together."""
+
+    pv_available_w = circuit_solar_w(gated_powers, solar_circuits)
     if solar_circuits is None:
         load_demand_w = sum(p for p in gated_powers.values() if p > 0)
-        pv_available_w = -sum(p for p in gated_powers.values() if p < 0)  # positive magnitude
     else:
-        pv_available_w = -sum(p for cid, p in gated_powers.items() if cid in solar_circuits)
         load_demand_w = sum(
             p
             for cid, p in gated_powers.items()
@@ -148,7 +171,7 @@ def resolve(
         # Upstream lugs see the panel-side net flow. Utility grid flow is on the
         # other side of an upstream BESS, so remove the BESS contribution to get
         # what the utility is actually supplying or absorbing.
-        grid_w = _grid_power_from_lugs_and_bess(upstream_active_w, battery_w)
+        grid_w = _grid_power_from_lugs_and_bess(upstream_active_w, battery_w + inverter_pv_w)
         grid_state: str | None = "ON_GRID"
         dsm_state = _DSM_ON
         current_run_config = _RUN_ON
@@ -209,19 +232,22 @@ def resolve(
         # Node frame — see the module docstring. Each of these is the meter-frame
         # quantity above it, restated as "power leaving the panel node", which is
         # what makes the four sum to zero.
-        power_flow_pv=-pv_available_w,
+        # `+ 0.0`: a night tick, every term 0.0, would otherwise negate to -0.0.
+        power_flow_pv=-(pv_available_w + inverter_pv_w) + 0.0,
         power_flow_battery=battery_circuits_w - battery_w,
         power_flow_grid=-grid_w,
         power_flow_site=load_demand_w,
     )
 
 
-def _grid_power_from_lugs_and_bess(upstream_active_w: float, battery_w: float) -> float:
+def _grid_power_from_lugs_and_bess(upstream_active_w: float, bess_ac_w: float) -> float:
     """Return utility-side grid power from panel-side lugs and BESS power.
 
-    BESS sign convention is positive=discharging, negative=charging. The BESS sits
-    upstream of the lugs, so whatever it supplies the utility does not have to, and
-    whatever it absorbs the utility must: one subtraction, in both directions.
+    ``bess_ac_w`` is what the batteries' AC terminals deliver, positive out of them:
+    their dispatch (positive = discharging, negative = charging) plus any PV their
+    own inverters take. The BESS sits upstream of the lugs, so whatever it supplies
+    the utility does not have to, and whatever it absorbs the utility must: one
+    subtraction, in both directions.
 
     Charging used to be credited only against the PV surplus visible at the lugs, so
     that a charging BESS "never creates extra grid import". That clamp is gone. It
@@ -233,7 +259,7 @@ def _grid_power_from_lugs_and_bess(upstream_active_w: float, battery_w: float) -
     stop arriving; the meter stopped saying where it came from, which is the one
     thing a meter is for. It also put the node balance out by the amount hidden.
     """
-    return upstream_active_w - battery_w
+    return upstream_active_w - bess_ac_w
 
 
 def _per_leg_current(

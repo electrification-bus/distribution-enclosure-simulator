@@ -65,12 +65,6 @@ _R202639_04_SHED_FORECAST = (
     "show whether that firmware always values them, or how it estimates them, so the "
     "variant keeps them unvalued."
 )
-_DC_COUPLED = (
-    "The panel's solar is DC-coupled into its battery's inverter, which no circuit "
-    "carries and a definition cannot express yet, so the emitter's pv is 0 and its "
-    "battery discharges to cover the load, where on the panel that solar covers the "
-    "load and charges the battery."
-)
 _FEEDTHROUGH = (
     "The panel feeds a sub-panel through its downstream lugs (2700.6 W in the "
     "capture), which a definition cannot express, so the emitter's site lacks that "
@@ -115,19 +109,15 @@ _EXCEPTIONS: dict[str, dict[str, str]] = {
         for key in ("id", "status", "type")
     },
     _R202639_F: {
-        "bess #1: meter/active-power sign": _DC_COUPLED,
-        "distribution-enclosure #1: power-flows/battery sign": _DC_COUPLED,
-        **{
-            f"distribution-enclosure #1: shed-forecast/{key}: valued only by the capture": (
-                _R202639_04_SHED_FORECAST
-            )
-            for key in (
-                "full-charge-time-to-priority-shed",
-                "full-charge-total-time-remaining",
-                "time-to-priority-shed",
-                "total-time-remaining",
-            )
-        },
+        f"distribution-enclosure #1: shed-forecast/{key}: valued only by the capture": (
+            _R202639_04_SHED_FORECAST
+        )
+        for key in (
+            "full-charge-time-to-priority-shed",
+            "full-charge-total-time-remaining",
+            "time-to-priority-shed",
+            "total-time-remaining",
+        )
     },
 }
 _NOT_COMPARED = frozenset({"connection/count"})
