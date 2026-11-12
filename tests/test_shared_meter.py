@@ -28,7 +28,9 @@ from ebus_panel_sim import (
     DeviceInstance,
     DeviceManifest,
     Emitter,
+    LoadSheddingConfig,
     ManifestValidationError,
+    RelayState,
     SetterRegistry,
     TickInputs,
     Variant,
@@ -670,3 +672,128 @@ def test_a_tree_whose_breaker_cannot_be_one_device_is_a_capture_error(
     snapshot.write_text(json.dumps(_snapshot(retained)))
     assert main(["--from-snapshot", str(snapshot), "-o", str(tmp_path / "panel.yaml")]) == 2
     assert match in capsys.readouterr().err
+
+
+def _written(
+    rec: PahoRecorder,
+    manifest: DeviceManifest,
+    target: str,
+    path: str,
+    value: object,
+    variant: Variant = "span-alpha-test-b2",
+) -> dict[str, str]:
+    """The tree after a write to ``target``'s ``path`` and a tick with every circuit
+    drawing 500 W."""
+    setters = SetterRegistry()
+    emitter = Emitter(manifest, setters, variant=variant)
+    emitter.start()
+    handler = setters.get("circuit", path)
+    assert handler is not None
+    handler("circuit", target, path, value)
+    loads = {i.instance_id: 500.0 for i in manifest.of_class("circuit")}
+    emitter.publish_tick(TickInputs(current_time=0.0, grid_online=True, circuits=loads))
+    return rec.retained
+
+
+def _opened(retained: dict[str, str], breaker: tuple[str, ...]) -> None:
+    """Every circuit on ``breaker`` reads its relay open by the user and its meter
+    nothing, and the circuit beside them is untouched."""
+    for cid in breaker:
+        assert retained[f"ebus/5/{cid}/switch/relay"] == "OPEN", cid
+        assert retained[f"ebus/5/{cid}/switch/relay-requester"] == "USER", cid
+        assert retained[f"ebus/5/{cid}/meter/active-power"] == "0.0", cid
+    assert retained["ebus/5/other/switch/relay"] == "CLOSED"
+    assert retained["ebus/5/other/meter/active-power"] == "-500.0"
+
+
+@pytest.mark.spec_only
+@pytest.mark.parametrize(
+    ("manifest", "target", "breaker"),
+    [
+        (_tandem(), "porch", ("hall", "porch")),
+        (_tandem_quad(), "heater", ("left", "right", "heater")),
+        (_tandem_quad(), "left", ("left", "right", "heater")),
+    ],
+)
+def test_a_relay_write_reaches_every_circuit_on_the_breaker(
+    rec: PahoRecorder, manifest: DeviceManifest, target: str, breaker: tuple[str, ...]
+) -> None:
+    """One relay switches the breaker's every circuit, so opening it from one opens
+    them all, attributed to the user, and the meter they share reads nothing."""
+    _opened(_written(rec, manifest, target, "switch/relay", False), breaker)
+
+
+@pytest.mark.spec_only
+def test_an_override_through_the_emitter_s_relays_reaches_every_circuit_on_the_breaker(
+    rec: PahoRecorder,
+) -> None:
+    """The breaker's relay is one relay to every writer, a producer calling
+    ``Emitter.relays`` directly included, not only to the /set handler."""
+    emitter = Emitter(_tandem(), SetterRegistry(), variant="span-alpha-test-b2")
+    emitter.start()
+    emitter.relays.set_user_override("hall", RelayState.OPEN)
+    loads = {"hall": 500.0, "porch": 500.0, "other": 500.0}
+    emitter.publish_tick(TickInputs(current_time=0.0, grid_online=True, circuits=loads))
+    _opened(rec.retained, ("hall", "porch"))
+
+
+@pytest.mark.spec_only
+@pytest.mark.parametrize(
+    ("manifest", "target", "breaker"),
+    [
+        (_tandem(), "hall", ("hall", "porch")),
+        (_tandem_quad(), "right", ("left", "right", "heater")),
+    ],
+)
+def test_a_priority_write_reaches_every_circuit_on_the_breaker(
+    rec: PahoRecorder, manifest: DeviceManifest, target: str, breaker: tuple[str, ...]
+) -> None:
+    """Shedding acts on the breaker's one relay, so its priority is one too."""
+    retained = _written(rec, manifest, target, "load-shed/priority", "OFF_GRID")
+    for cid in breaker:
+        assert retained[f"ebus/5/{cid}/load-shed/priority"] == "OFF_GRID", cid
+    assert retained["ebus/5/other/load-shed/priority"] == "SOC_THRESHOLD"
+
+
+@pytest.mark.spec_only
+@pytest.mark.parametrize(("written", "relay"), [(None, "OPEN"), ("NEVER", "CLOSED")])
+def test_a_breaker_sheds_by_its_one_priority(
+    rec: PahoRecorder, written: str | None, relay: str
+) -> None:
+    """Off-grid, a tandem at OFF_GRID sheds, both its circuits on its one relay; a
+    priority of NEVER written to one of them keeps the whole breaker on."""
+    off_grid = {"default-priority": "OFF_GRID"}
+    manifest = _with(_with(_tandem(), "hall", **off_grid), "porch", **off_grid)
+    setters = SetterRegistry()
+    emitter = Emitter(
+        manifest,
+        setters,
+        variant="span-alpha-test-b2",
+        load_shedding_config=LoadSheddingConfig(),
+    )
+    emitter.start()
+    if written is not None:
+        handler = setters.get("circuit", "load-shed/priority")
+        assert handler is not None
+        handler("circuit", "porch", "load-shed/priority", written)
+    loads = {"hall": 500.0, "porch": 500.0, "other": 500.0}
+    snapshot = emitter.publish_tick(
+        TickInputs(current_time=0.0, grid_online=False, circuits=loads)
+    )
+    assert snapshot.circuits["hall"].relay_state == snapshot.circuits["porch"].relay_state == relay
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "written", "untouched"),
+    [
+        ("switch/relay", False, "OPEN", "CLOSED"),
+        ("load-shed/priority", "OFF_GRID", "OFF_GRID", "SOC_THRESHOLD"),
+    ],
+)
+@pytest.mark.parametrize("variant", [v for v in get_args(Variant) if v != "span-alpha-test-b2"])
+def test_a_variant_that_declares_no_sharing_writes_only_the_circuit_written(
+    rec: PahoRecorder, variant: Variant, path: str, value: object, written: str, untouched: str
+) -> None:
+    retained = _written(rec, _tandem(), "hall", path, value, variant=variant)
+    assert retained[f"ebus/5/hall/{path}"] == written
+    assert retained[f"ebus/5/porch/{path}"] == untouched

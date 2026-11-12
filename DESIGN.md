@@ -58,8 +58,8 @@ When the grid is offline the policy returns the circuit instance-ids whose prior
 
 | Entity class | Property | Effect |
 |---|---|---|
-| circuit | `switch/relay` | Updates the `RelayResolver` user override |
-| circuit | `load-shed/priority` | Updates the emitter's per-circuit priority override (refused on a never-backup or commissioned-system circuit) |
+| circuit | `switch/relay` | Updates the `RelayResolver` user override, which the circuits on a multi-load breaker share (`RelayResolver.share`) where the variant publishes one as a device per protected circuit |
+| circuit | `load-shed/priority` | Updates the emitter's priority override, held once for the circuits on such a breaker (refused on a never-backup or commissioned-system circuit) |
 | panel | `shed/asserted-islanding-state` | Updates the consumer-asserted islanding override, accepted only while a battery link is not `OK` (under `span-alpha-test-b2`, only while it is `LOST` or `DEGRADED`; see below) |
 | evse | `config/user-max-charge-current` | Sets the per-EVSE user charge-current ceiling, which is unpublished until first set (published at `max-current-a` from the start by the span variant under firmware before release 202639; see [Firmware-keyed conventions](#firmware-keyed-conventions)); an integer, clamped into `[6, max-charge-current]` (the advertised `$format`), anything else refused |
 

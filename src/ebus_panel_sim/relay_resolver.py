@@ -38,11 +38,20 @@ canonical eBus ``switch/relay-requester`` domain:
 The producer never sees /set commands. ``Emitter`` registers internal handlers
 for ``circuit.switch/relay`` and ``circuit.load-shed/priority``; those handlers
 call ``RelayResolver.set_user_override`` (and the priority equivalent on a
-sibling state map)."""
+sibling state map).
+
+The circuits a multi-load breaker protects sit behind its one relay
+(``RelayResolver.share``). The resolver holds that relay's lock, override and
+shed decision once, so a command to any of its circuits, from whichever writer,
+is a command to all of them, and they always resolve alike."""
 
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class RelayState(StrEnum):
@@ -60,19 +69,28 @@ class RelayRequester(StrEnum):
 
 
 class RelayResolver:
-    """Maintains relay state per circuit instance.
+    """Maintains relay state per relay, for the circuit instances behind each.
 
-    Construct empty, register each circuit with its locked flag, then update
-    overrides and shed decisions; query ``state()`` for the resolved final
-    state."""
+    Construct empty, register each circuit with its locked flag, share a relay
+    among the circuits on each multi-load breaker, then update overrides and
+    shed decisions; query ``state()`` for the resolved final state."""
 
     def __init__(self) -> None:
-        # locked map: instance_id -> bool (manifest declaration; immutable post-register)
+        # instance_id -> the key of the relay it sits behind: itself, or the
+        # first circuit on its multi-load breaker. The maps below are by that key.
+        self._relay_of: dict[str, str] = {}
+        # locked map: relay -> bool (manifest declaration; immutable post-register)
         self._always_on: dict[str, bool] = {}
-        # /set override map: instance_id -> RelayState | None (None = no override)
+        # /set override map: relay -> RelayState | None (None = no override)
         self._user_overrides: dict[str, RelayState | None] = {}
-        # load-shed decision map: instance_id -> bool (True = wants OPEN)
+        # load-shed decision map: relay -> bool (True = wants OPEN)
         self._shed: dict[str, bool] = {}
+
+    def _relay(self, instance_id: str, caller: str) -> str:
+        relay = self._relay_of.get(instance_id)
+        if relay is None:
+            raise KeyError(f"{caller} for unregistered instance_id={instance_id!r}")
+        return relay
 
     def register(self, instance_id: str, *, always_on: bool) -> None:
         """Idempotent — re-registering with a different value updates the manifest
@@ -82,21 +100,53 @@ class RelayResolver:
         ``always-on`` *or* ``non-controllable``. The name is the hardware's own
         — SPAN commissions this as ``alwaysOn`` and publishes
         ``relay-controllable = !always-on`` — so it is the flag, not a subset of
-        it. Derive it with :func:`manifest_physics.relay_locked`."""
-        self._always_on[instance_id] = always_on
-        self._user_overrides.setdefault(instance_id, None)
-        self._shed.setdefault(instance_id, False)
+        it. Derive it with :func:`manifest_physics.relay_locked`.
+
+        A circuit behind a shared relay updates that relay's lock."""
+        relay = self._relay_of.setdefault(instance_id, instance_id)
+        self._always_on[relay] = always_on
+        self._user_overrides.setdefault(relay, None)
+        self._shed.setdefault(relay, False)
+
+    def share(self, instance_ids: Sequence[str]) -> None:
+        """Put registered circuits, each behind a relay of its own, behind one
+        relay, as a multi-load breaker protects its circuits: an override or shed
+        decision for any of them is then one for all of them. The relay keeps the
+        first circuit's override and shed decision.
+
+        Raises ``KeyError`` for an unregistered circuit, and ``ValueError`` for a
+        circuit named twice or already sharing a relay, or where their locks
+        differ, since one relay is locked or it is not."""
+        if not instance_ids:
+            return
+        for instance_id in instance_ids:
+            self._relay(instance_id, "share")
+        behind = list(self._relay_of.values())
+        if len(set(instance_ids)) != len(instance_ids) or any(
+            self._relay_of[i] != i or behind.count(i) > 1 for i in instance_ids
+        ):
+            raise ValueError(
+                f"share: {', '.join(instance_ids)} must each sit behind a relay of its own"
+            )
+        if len({self._always_on[i] for i in instance_ids}) > 1:
+            raise ValueError(
+                f"share: {', '.join(instance_ids)} differ in their relay's lock; one relay "
+                "is locked or it is not"
+            )
+        first, *others = instance_ids
+        for other in others:
+            self._relay_of[other] = first
+            del self._always_on[other], self._user_overrides[other], self._shed[other]
 
     def set_user_override(self, instance_id: str, state: RelayState | None) -> None:
         """Operator /set or explicit clear. ``state=None`` clears the override
         and lets load-shed (or default-CLOSED) take effect.
 
         Locked circuits silently drop the override — operator cannot open them."""
-        if instance_id not in self._always_on:
-            raise KeyError(f"set_user_override for unregistered instance_id={instance_id!r}")
-        if self._always_on[instance_id]:
+        relay = self._relay(instance_id, "set_user_override")
+        if self._always_on[relay]:
             return  # absolute: a locked relay ignores /set
-        self._user_overrides[instance_id] = state
+        self._user_overrides[relay] = state
 
     def clear_user_override(self, instance_id: str) -> None:
         self.set_user_override(instance_id, None)
@@ -107,11 +157,10 @@ class RelayResolver:
 
         Locked circuits silently drop the request: the enclosure never opens a
         circuit commissioned locked (``devices/distribution-enclosure.md``)."""
-        if instance_id not in self._always_on:
-            raise KeyError(f"set_shed for unregistered instance_id={instance_id!r}")
-        if self._always_on[instance_id]:
+        relay = self._relay(instance_id, "set_shed")
+        if self._always_on[relay]:
             return
-        self._shed[instance_id] = open_relay
+        self._shed[relay] = open_relay
 
     def clear_all_shed(self) -> None:
         """Reset every shed decision to False. Called by the emitter at the
@@ -135,14 +184,15 @@ class RelayResolver:
         The lock is therefore invisible here. It removes the consumer's ability
         to re-prioritise the circuit, which is a ``$settable`` question on
         ``load-shed/priority``, not an attribution question on the relay."""
-        if self._always_on.get(instance_id, False):
+        relay = self._relay_of.get(instance_id, instance_id)
+        if self._always_on.get(relay, False):
             return RelayState.CLOSED, RelayRequester.CONFIGURATION
-        override = self._user_overrides.get(instance_id)
+        override = self._user_overrides.get(relay)
         if override is not None:
             return override, RelayRequester.USER
-        if self._shed.get(instance_id, False):
+        if self._shed.get(relay, False):
             return RelayState.OPEN, RelayRequester.LOAD_SHED
         return RelayState.CLOSED, RelayRequester.NONE
 
     def known(self, instance_id: str) -> bool:
-        return instance_id in self._always_on
+        return instance_id in self._relay_of
