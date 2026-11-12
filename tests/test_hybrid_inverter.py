@@ -343,9 +343,9 @@ def test_pv_for_a_hybrid_battery_that_is_not_configured_is_refused() -> None:
 def test_a_night_tick_publishes_pv_as_zero_never_negative_zero(
     rec: PahoRecorder, variant: Variant
 ) -> None:
-    """No circuit producing and the inverter's PV exactly 0.0, as at night: pv is
-    zero, which the reference variant, writing numbers as they are, would
-    otherwise publish as -0.0."""
+    """No circuit producing and the inverter's PV exactly 0.0, as at night: pv reads
+    zero, never -0.0, which the reference variant, writing numbers as they are,
+    would publish if it negated a sum of zeros."""
     _emitter(_manifest(), variant).publish_tick(
         TickInputs(
             current_time=0.0,
@@ -357,6 +357,36 @@ def test_a_night_tick_publishes_pv_as_zero_never_negative_zero(
     pv = rec.retained["ebus/5/panel/power-flows/pv"]
     assert float(pv) == 0.0
     assert not pv.startswith("-")
+
+
+@pytest.mark.spec_only
+def test_inverter_pv_that_cancels_the_circuits_solar_publishes_zero(rec: PahoRecorder) -> None:
+    """A circuit producing 5 W while the inverter's PV side draws 5 W: pv is zero,
+    which the reference variant would otherwise write as -0.0."""
+    _emitter(_manifest(), "reference").publish_tick(
+        TickInputs(
+            current_time=0.0,
+            grid_online=True,
+            circuits={"kitchen": 500.0, "garage": -5.0},
+            bess_pv={_BESS: -5.0},
+        )
+    )
+    assert rec.retained["ebus/5/panel/power-flows/pv"] == "0.0"
+
+
+@pytest.mark.parametrize(
+    "bess", [_AC_COUPLED, None], ids=["ac-coupled battery", "hybrid battery, no PV given"]
+)
+def test_without_inverter_pv_the_reference_variant_writes_pv_as_before(
+    rec: PahoRecorder, bess: dict[str, str] | None
+) -> None:
+    """The reference variant writes a number as it is, and before batteries took PV
+    it wrote the pv of a panel with no producing circuit as ``0``. Where no inverter
+    PV is given, it still does."""
+    _emitter(_manifest(bess=bess), "reference").publish_tick(
+        TickInputs(current_time=0.0, grid_online=True, circuits={"kitchen": 500.0})
+    )
+    assert rec.retained["ebus/5/panel/power-flows/pv"] == "0"
 
 
 @pytest.mark.parametrize("value", ["dc-coupled", "Hybrid", "true"])

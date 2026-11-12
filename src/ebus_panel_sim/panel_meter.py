@@ -232,8 +232,12 @@ def resolve(
         # Node frame — see the module docstring. Each of these is the meter-frame
         # quantity above it, restated as "power leaving the panel node", which is
         # what makes the four sum to zero.
-        # `+ 0.0`: a night tick, every term 0.0, would otherwise negate to -0.0.
-        power_flow_pv=-(pv_available_w + inverter_pv_w) + 0.0,
+        # Without inverter PV, pv is the circuits' solar negated, exactly as before
+        # (the reference variant writes it as it is, so 0 stays 0). With some, the
+        # sum is a float, and `+ 0.0` keeps one that cancels from reading -0.0.
+        power_flow_pv=(
+            -pv_available_w if inverter_pv_w == 0 else -(pv_available_w + inverter_pv_w) + 0.0
+        ),
         power_flow_battery=battery_circuits_w - battery_w,
         power_flow_grid=-grid_w,
         power_flow_site=load_demand_w,
