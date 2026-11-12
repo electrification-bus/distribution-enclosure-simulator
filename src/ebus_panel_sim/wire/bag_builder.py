@@ -141,9 +141,12 @@ def _remote_ct_field(field: str) -> Resolver:
 
 
 def _circuit_spaces(snapshot: EbusPanelSnapshot, instance_id: str) -> object:
-    """``info/spaces`` — the position(s) the breaker occupies, as a comma list.
+    """``info/spaces`` — the position(s) the circuit's breaker occupies, as a comma
+    list.
 
-    A two-pole/tandem breaker lands on multiple tabs (e.g. ``"32,34"``); the
+    A two-pole breaker lands on two spaces (e.g. ``"32,34"``), as does each
+    two-pole circuit of a quad; a tandem puts two circuits in one space, so a
+    single-pole circuit lists only its own (``devices/circuit.md``). The
     multi-valued string preserves every position a single scalar would lose."""
     circuit = snapshot.circuits.get(instance_id)
     if circuit is None or not circuit.tabs:
