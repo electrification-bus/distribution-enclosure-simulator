@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+**BREAKING (wire).** Under a variant whose circuit profile declares both `meter/shared-with-device-ids` and `switch/shared-with-device-ids`, circuits that name each other in `shared-with-device-ids` each publish their breaker's one reading, where each published its own load: the sum of their loads, the breaker's current and one energy register ([#68](https://github.com/electrification-bus/distribution-enclosure-simulator/issues/68)). The tandem in the shipped example whose variant declares both lists (`circuit-1` and `circuit-2`) now publishes `meter/active-power` `-181.0` on both, where they published `-121.0` and `-60.0`. The span and reference variants, which declare neither, publish as before.
+
+**BREAKING (snapshot).** For a circuit on a shared breaker under a variant whose circuit profile declares both `shared-with-device-ids` lists, `EbusCircuitSnapshot.instant_power_w`, `current_a`, `consumed_energy_wh` and `produced_energy_wh` are the breaker's reading, the same on every circuit on it, and the panel's energy totals count the breaker's register once.
+
+**BREAKING (behavior).** Under a variant whose circuit profile declares both `shared-with-device-ids` lists, a definition whose circuits list each other in `shared-with-device-ids` but cannot be one breaker is rejected, though 0.10.0 loaded it: one circuit not naming another, circuits differing in a seed, the relay's lock, `default-priority`, `never-backup` or `placement`, or circuits on spaces no one breaker covers. For a definition under such a variant, `ticks_from_samples`, and so `panel-sim-capture --record`, now gives each circuit on a shared breaker an equal share of the breaker's reading instead of the whole of it, so ticks 0.10.0 recorded from a panel with shared breakers replay each breaker's reading once per circuit on it, doubling a tandem's; record them again. The shipped `r202639-e` ticks are rewritten to those shares, so its replayed site, grid and upstream lugs, which counted each of its tandems twice, move by 0.1 to 0.3 W at 33 of its 60 ticks, and the lugs' imported energy by 0.1 Wh at one. `definition_from_tree` raises `CaptureError` for any definition the emitter refuses, where it let the emitter's `ManifestValidationError` through.
+
+### Added
+
+- **Circuits on one multi-load breaker publish its one reading**: under a variant whose circuit profile declares both `shared-with-device-ids` lists, circuits naming each other in `shared-with-device-ids` each publish the breaker's combined power, energy and current, the larger leg across two spaces, as SPAN publishes tandems and quads with those lists ([SPAN-API-Client-Docs#21](https://github.com/spanio/SPAN-API-Client-Docs/issues/21), [#68](https://github.com/electrification-bus/distribution-enclosure-simulator/issues/68)).
+- **New public surface for shared breakers**: `CircuitPhysics` gains `shared_with` (default `()`), the other circuits on the circuit's breaker, and `ticks_from_samples` takes the definition's `variant`, defaulting as `definition_from_tree`'s does, since only a variant that shares breakers splits a shared reading.
+
+### Fixed
+
+- **A masked capture no longer writes a listed ID it cannot map**: 0.10.0 copied an entry of a circuit's `shared-with-device-ids` that names no circuit in the tree into a masked definition verbatim, and it is now dropped with a note.
+
 ## [0.10.0] - 2026-11-10
 
 ### Added

@@ -33,6 +33,7 @@ from typing import Any, cast, get_args
 
 from ebus_panel_sim.definition import PanelDefinition, dump_definition, dump_ticks
 from ebus_panel_sim.emitter import Emitter, unbooked_circuit_roles
+from ebus_panel_sim.exceptions import ManifestValidationError
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
 from ebus_panel_sim.manifest_physics import (
     _circuit_wire_values,
@@ -41,6 +42,7 @@ from ebus_panel_sim.manifest_physics import (
     unvalued_paths,
 )
 from ebus_panel_sim.native_devices import BESSConfig, LoadSheddingConfig
+from ebus_panel_sim.shared_hardware import declares_shared_breakers
 from ebus_panel_sim.tick_inputs import BESSCommunication, TickInputs
 from ebus_panel_sim.wire.profile_loader import Variant, load_profiles
 from ebus_panel_sim.wire.set_router import SetterRegistry
@@ -302,8 +304,15 @@ def definition_from_tree(
 
     Each device's ``unvalued`` list is minimal: the definition is republished once
     without the lists, driven by one tick sampled from the tree, and a path the
-    emitter leaves unvalued anyway is implied and dropped."""
-    definition, notes = _Mapper(tree, mask, root, generic_names).run(variant)
+    emitter leaves unvalued anyway is implied and dropped. A definition the emitter
+    refuses raises ``CaptureError``.
+
+    A circuit's ``shared-with-device-ids`` keeps only the other circuits in the
+    tree, each entry noted that is dropped. Where the variant publishes a
+    multi-load breaker as one circuit device per protected circuit, the circuits on
+    one must each list all the others, and each is seeded with the largest register
+    any of them publishes."""
+    definition, notes = _Mapper(tree, mask, root, generic_names, variant).run()
     if definition.variant == "span-alpha-test-b2" and (
         unbooked := unbooked_circuit_roles(definition.manifest)
     ):
@@ -322,8 +331,13 @@ def definition_from_tree(
                 for circuit_id, role in unbooked
             ),
         ]
-    (tick,) = ticks_from_samples(tree, [(0.0, tree)], mask=mask, root=root)
-    return _minimal_unvalued(definition, tick), notes
+    (tick,) = ticks_from_samples(
+        tree, [(0.0, tree)], mask=mask, root=root, variant=definition.variant
+    )
+    try:
+        return _minimal_unvalued(definition, tick), notes
+    except ManifestValidationError as exc:
+        raise CaptureError(f"the tree maps to a definition the emitter refuses: {exc}") from exc
 
 
 class _RetainedTransport:
@@ -396,20 +410,51 @@ def ticks_from_samples(
     *,
     mask: bool = True,
     root: str | None = None,
+    variant: Variant | None = None,
 ) -> list[TickInputs]:
     """Replayable ticks from timestamped samples of the same tree.
 
-    Device IDs match ``definition_from_tree(tree, mask=mask)``. A circuit's power
+    Device IDs match ``definition_from_tree(tree, mask=mask)``, and ``variant`` is
+    the definition's, defaulting as ``definition_from_tree``'s does. A circuit's power
     is its published ``meter/active-power`` negated back to the producer's sign
-    (positive = consuming); an EVSE draws what its feeding circuit does; the grid
+    (positive = consuming); an EVSE draws what the tick gives its feeding circuit; the grid
     is offline when a MID reports ``grid/islanding-state`` ``OFF_GRID`` or
     ``grid/grid-state`` ``DOWN`` or, without a MID, the panel's main relay is
     ``OPEN``; each battery's link is its ``status/communication-state``.
 
     Only the panel's own device tree is read. A circuit feeding a battery is
     left out: the simulated battery's dispatch already accounts for that power,
-    so recording it too would count it twice."""
-    mapper = _Mapper(tree, mask, root)
+    so recording it too would count it twice.
+
+    Under a variant that publishes a multi-load breaker as one circuit device per
+    protected circuit (its circuit profile declaring both ``shared-with-device-ids``
+    lists), circuits that share a meter, which a panel names in
+    ``meter/shared-with-device-ids``, each publish the meter's one reading and
+    nothing of their own load, so each is given an equal share of it (of their
+    mean, should their readings differ, read a moment apart). The shares add back
+    to the reading, to within float rounding, as a tick's circuits on one meter add
+    up to what it reads. That reproduces the meter's power and energy, and its
+    current in one space or across two with every circuit two-pole. On a tandem or
+    quad whose circuits all draw the same way and book into the same flow, the
+    flows and lugs, which the emitter takes from each circuit's own load,
+    reproduce too. What depends on how the load divides, which the panel does not
+    publish, cannot:
+
+    - circuits drawing opposite ways: the lugs add each circuit's current whatever
+      its direction, so they read the net current instead of the two;
+    - circuits whose roles book them into different flows, such as a SOLAR circuit
+      sharing a breaker with a load: ``power-flows/pv`` and ``site`` each take half
+      the net reading, and the lugs and busbar follow them;
+    - a tandem-quad: its meter reads the mean of its two spaces instead of the
+      larger, as little as half, and the lugs' legs move;
+    - an EVSE fed by a circuit on a shared breaker draws that circuit's share;
+    - a battery's circuit on a shared breaker is left out, as every battery
+      circuit is, so the others' shares carry the battery's flow, which its
+      dispatch counts again.
+
+    Under any other variant the emitter publishes each circuit's own load, so each
+    circuit keeps the reading it published."""
+    mapper = _Mapper(tree, mask, root, variant=variant)
     feeds = mapper.feeds()
     battery_circuits = {feed for der, feed in feeds.items() if mapper.tree[der].type == "bess"}
     ticks: list[TickInputs] = []
@@ -426,6 +471,7 @@ def ticks_from_samples(
                 and published not in battery_circuits
             ):
                 circuits[published] = -float(power) + 0.0
+        circuits = _equal_shares(circuits, mapper.shared_meters)
         evse = {
             mapper.ids[evse_id]: circuits.get(feed, 0.0)
             for evse_id, feed in feeds.items()
@@ -448,6 +494,23 @@ def ticks_from_samples(
     return ticks
 
 
+def _equal_shares(
+    circuits: dict[str, float], meters: Sequence[tuple[str, ...]]
+) -> dict[str, float]:
+    """``circuits`` with each shared meter's reading split equally among the circuits
+    publishing it, whose shares add back to the reading to within float rounding."""
+    shared = dict(circuits)
+    for members in meters:
+        readings = [circuits[m] for m in members if m in circuits]
+        if not readings:
+            continue
+        share = sum(readings) / len(readings) / len(readings) + 0.0
+        for member in members:
+            if member in circuits:
+                shared[member] = share
+    return shared
+
+
 def _grid_online(sample: Tree) -> bool:
     mids = [d for d in sample.values() if d.type == "mid"]
     for mid in mids:
@@ -464,7 +527,12 @@ def _grid_online(sample: Tree) -> bool:
 
 class _Mapper:
     def __init__(
-        self, tree: Tree, mask: bool, root: str | None = None, generic_names: bool = False
+        self,
+        tree: Tree,
+        mask: bool,
+        root: str | None = None,
+        generic_names: bool = False,
+        variant: Variant | None = None,
     ) -> None:
         self.mask = mask
         self.generic_names = generic_names
@@ -486,6 +554,11 @@ class _Mapper:
         # Only the panel's own device tree; other publishers on the broker are
         # not part of it.
         self.tree = {i: tree[i] for i in _tree_order(tree, self.panel_id)}
+        # The definition's variant, and whether it publishes a multi-load breaker
+        # as one circuit device per protected circuit, which share its meter.
+        self.variant: Variant = variant or _infer_variant(self.tree[self.panel_id])
+        self.profiles = load_profiles(variant=self.variant)
+        self.shares_breakers = declares_shared_breakers(self.profiles)
         # A circuit device with only a meter is a remote-ct, not a branch circuit.
         self.remote_cts = {i for i, d in self.tree.items() if _is_remote_ct(d)}
         self.ids = self._id_map()
@@ -508,6 +581,11 @@ class _Mapper:
         self.secrets = {i for i in self.tree if i not in self.ids.values()} | {
             serial for d in self.tree.values() if (serial := d.value("info/serial-number"))
         }
+        # Each circuit on a shared breaker -> the other circuits on it, as listed.
+        self.siblings = self._siblings()
+        # The circuits behind each shared meter, by published ID, where the variant
+        # shares one; under any other, each circuit's reading is its own.
+        self.shared_meters = self._shared_meters() if self.shares_breakers else []
         # Where tabs are not published, circuits get the next free ones.
         self.next_tab = 1 + max(
             (t for d in self.tree.values() for t in _tabs(d.value("info/spaces"))), default=0
@@ -559,12 +637,63 @@ class _Mapper:
     def note(self, device_id: str, key: str, text: str) -> None:
         self.notes.append(CaptureNote(self.ids.get(device_id, device_id), key, text))
 
+    def _siblings(self) -> dict[str, tuple[str, ...]]:
+        """Each circuit on a shared breaker, by device ID, with the other circuits
+        its ``meter/shared-with-device-ids`` lists, in the panel's order.
+
+        An entry, read without the spaces around it, that is not another circuit
+        in the tree is dropped, with a note that counts rather than names it, since
+        the name may be an unmasked ID."""
+        circuits = [
+            i for i, d in self.tree.items() if d.type == "circuit" and i not in self.remote_cts
+        ]
+        siblings: dict[str, tuple[str, ...]] = {}
+        for cid in circuits:
+            listed = self.tree[cid].value("meter/shared-with-device-ids")
+            entries = [o.strip() for o in (listed or "").split(",") if o.strip()]
+            kept = tuple(o for o in entries if o != cid and o in circuits)
+            if dropped := len(entries) - len(kept):
+                self.note(
+                    cid,
+                    "shared-with-device-ids",
+                    f"{dropped} of the {len(entries)} listed "
+                    f"{'is' if dropped == 1 else 'are'} not another circuit in the tree; "
+                    "dropped",
+                )
+            if kept:
+                siblings[cid] = kept
+        return siblings
+
+    def _shared_meters(self) -> list[tuple[str, ...]]:
+        """The circuits behind each shared meter, by published ID. Each circuit on a
+        breaker must list all the others, as a panel's do and as the emitter
+        requires; a ``CaptureError`` says which do not."""
+        for cid, kept in self.siblings.items():
+            breaker = {cid, *kept}
+            for other in kept:
+                if {other, *self.siblings.get(other, ())} != breaker:
+                    raise CaptureError(
+                        f"{self.ids[cid]} and {self.ids[other]} disagree about which "
+                        "circuits share their breaker"
+                    )
+        return sorted(
+            {
+                tuple(sorted(self.ids[m] for m in (cid, *kept)))
+                for cid, kept in self.siblings.items()
+            }
+        )
+
+    def _register(self, cid: str, path: str) -> str | None:
+        """The energy register ``path`` the circuit publishes. Where the variant
+        shares breakers, circuits on one publish its one register, read a moment
+        apart, so it is the largest any of them publishes."""
+        breaker = (cid, *self.siblings.get(cid, ())) if self.shares_breakers else (cid,)
+        values = [value for m in breaker if (value := self.tree[m].value(path)) is not None]
+        return max(values, key=float) if values else None
+
     # -- run -------------------------------------------------------------
 
-    def run(self, variant: Variant | None) -> tuple[PanelDefinition, list[CaptureNote]]:
-        panel = self.tree[self.panel_id]
-        chosen = variant or _infer_variant(panel)
-        self.profiles = load_profiles(variant=chosen)
+    def run(self) -> tuple[PanelDefinition, list[CaptureNote]]:
         feeds = self.feeds()
         self._note_dangling_feeds()
         instances = [self._described(self.panel_id, self._panel())]
@@ -607,7 +736,7 @@ class _Mapper:
         return (
             PanelDefinition(
                 manifest=DeviceManifest(instances=tuple(instances)),
-                variant=chosen,
+                variant=self.variant,
                 bess_configs=tuple(bess_configs),
                 load_shedding=self._load_shedding(),
             ),
@@ -778,18 +907,17 @@ class _Mapper:
         ):
             md["never-backup"] = "true"
         md.update(self._wire_values(d, _circuit_wire_values))
-        if shared := md.get("shared-with-device-ids"):
-            md["shared-with-device-ids"] = ",".join(
-                self.ids.get(s, s) for s in shared.split(",") if s
-            )
+        md.pop("shared-with-device-ids", None)
+        if siblings := self.siblings.get(device_id):
+            md["shared-with-device-ids"] = ",".join(self.ids[o] for o in siblings)
         pcs = d.value("pcs/priority")
         if pcs is not None:
             md["pcs-priority"] = _int_str(pcs)
         # Hosted-circuit registers are enclosure-framed: consumption accumulates
         # exported-energy, backfeed accumulates imported-energy.
-        if (consumed := d.value("meter/exported-energy")) is not None:
+        if (consumed := self._register(device_id, "meter/exported-energy")) is not None:
             md["initial-consumed-wh"] = consumed
-        if (produced := d.value("meter/imported-energy")) is not None:
+        if (produced := self._register(device_id, "meter/imported-energy")) is not None:
             md["initial-produced-wh"] = produced
         if self.generic_names:
             name = f"Circuit {self.circuit_numbers[device_id]}"
@@ -1075,7 +1203,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         dump_definition(definition, args.output)
         if samples:
-            ticks = ticks_from_samples(tree, samples, mask=mask, root=args.root)
+            ticks = ticks_from_samples(
+                tree, samples, mask=mask, root=args.root, variant=definition.variant
+            )
             dump_ticks(ticks, args.ticks_output)
             print(f"wrote {args.ticks_output}: {len(samples)} ticks", file=sys.stderr)
     except (CaptureError, OSError, ValueError) as exc:

@@ -84,7 +84,7 @@ def load_reference_capture(name: str) -> ReferenceCapture:
     definition_file = data / f"{name}.yaml"
     if not definition_file.is_file():
         definition, notes = definition_from_tree(tree, mask=False)
-        ticks = ticks_from_samples(tree, [(0.0, tree)], mask=False)
+        ticks = ticks_from_samples(tree, [(0.0, tree)], mask=False, variant=definition.variant)
         return ReferenceCapture(
             name=name,
             definition=definition,

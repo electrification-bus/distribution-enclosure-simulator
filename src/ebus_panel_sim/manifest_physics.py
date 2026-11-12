@@ -107,6 +107,10 @@ class CircuitPhysics:
     commissioned_system: str | None = None
     # From `_circuit_wire_values`; see `WIRE_VALUE_PATHS`.
     wire_values: dict[str, str] = field(default_factory=dict)
+    # From `shared-with-device-ids`: the other circuits on this circuit's
+    # multi-load breaker, which share its meter and relay. Empty for a circuit on
+    # a breaker of its own. Defaulted, and last, for the reason `never_backup` is.
+    shared_with: tuple[str, ...] = ()
 
     @property
     def priority_locked(self) -> bool:
@@ -693,6 +697,11 @@ def _parse_circuit(inst: DeviceInstance) -> CircuitPhysics:
         pcs_priority=_opt_int(md, "pcs-priority", 0),
         initial_consumed_wh=_opt_float(md, "initial-consumed-wh", 0.0),
         initial_produced_wh=_opt_float(md, "initial-produced-wh", 0.0),
+        shared_with=tuple(
+            i.strip()
+            for i in (_opt_str(md, "shared-with-device-ids") or "").split(",")
+            if i.strip()
+        ),
     )
 
 
