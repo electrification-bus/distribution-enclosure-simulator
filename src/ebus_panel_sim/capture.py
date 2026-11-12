@@ -71,6 +71,8 @@ _MIN_EMBEDDED = 6
 # a watt of production beyond what its circuits carry: less is the rounding of the
 # published flow and readings, and a draw is no source at all.
 _PV_RESOLUTION_W = 1.0
+# The lugs roles under which the node behind a pair of lugs may produce solar.
+_SOLAR_LUGS_ROLES = frozenset({"SOLAR", "MIXED"})
 
 
 @dataclass(slots=True)
@@ -127,10 +129,12 @@ class CaptureNote:
 class _InverterPv:
     """Solar a panel reports beyond what its circuits carry, in watts, positive
     while producing, and the battery it reaches the panel through (its original
-    device ID), or None when the panel has no battery or several."""
+    device ID). ``battery`` is None where no single battery can be said to bring
+    it, and ``unattributed`` then says why."""
 
     watts: float
     battery: str | None
+    unattributed: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -334,14 +338,19 @@ def definition_from_tree(
 
     A battery is written ``inverter-type: hybrid`` when the panel's
     ``power-flows/pv`` reports a watt or more of production beyond what its circuits
-    carry, as the variant its hardware version selects books them, the tree holds
-    no ``pv`` device that could produce it, and the battery is the tree's only one.
-    That solar reaches the panel through the battery, so it is written as the PV of
-    the battery's inverter, which ``ticks_from_samples`` drives: the panel does not
-    say whether it is DC-coupled to that inverter or AC-coupled behind the
-    battery's gateway, and the two reach it alike. Such solar on a panel with no
-    battery, or with several, is reported as a note and not captured. Any other
-    battery is written ``ac-coupled``, with a note that it is not published."""
+    carry, as the variant its hardware version selects books them, nothing else in
+    the tree books solar, and the battery is the tree's only one. Something else
+    books solar where the tree holds a ``pv`` device, a circuit that variant books
+    as solar (a SOLAR circuit under span-alpha-test-b2, a circuit producing a watt
+    or more under the others) or lugs feeding a SOLAR or MIXED node. That solar
+    reaches the panel through the battery, so it is written as the PV of the
+    battery's inverter, which ``ticks_from_samples`` drives: the panel does not say
+    whether it is DC-coupled to that inverter or AC-coupled behind the battery's
+    gateway, and the two reach it alike. Such solar on any other panel is reported
+    as a note and not captured. Any other battery is written ``ac-coupled``, with a
+    note that it is not published. Where ``variant`` is not the one the hardware
+    version selects, a note says the ticks' battery PV is still derived as the
+    latter books circuits."""
     definition, notes = _Mapper(tree, mask, root, generic_names).run(variant)
     if definition.variant == "span-alpha-test-b2" and (
         unbooked := unbooked_circuit_roles(definition.manifest)
@@ -603,14 +612,54 @@ class _Mapper:
 
     def _inverter_pv(self) -> _InverterPv | None:
         """The production the tree's panel reports beyond what its circuits carry,
-        where no ``pv`` device could produce it, or None when the tree shows none."""
-        if any(d.type == "pv" for d in self.tree.values()):
-            return None
-        pv = self.inverter_pv_w(self.tree, self.circuit_powers(self.tree))
+        or None when the tree shows none.
+
+        It is the PV of a battery's inverter only where nothing else in the tree
+        books solar and the battery is the only one: a ``pv`` device, a circuit the
+        variant books as solar, or lugs feeding a SOLAR or MIXED node could be its
+        source, and a panel whose battery system meters the site itself reports
+        flows its circuits never carry."""
+        circuits = self.circuit_powers(self.tree)
+        pv = self.inverter_pv_w(self.tree, circuits)
         if pv is None or pv < _PV_RESOLUTION_W:
             return None
+        sources = self._solar_sources(circuits)
+        if sources:
+            return _InverterPv(
+                watts=pv,
+                battery=None,
+                unattributed=f"the tree also books solar ({', '.join(sources)}), so no "
+                "battery can be said to bring it",
+            )
         batteries = [i for i, d in self.tree.items() if d.type == "bess"]
-        return _InverterPv(watts=pv, battery=batteries[0] if len(batteries) == 1 else None)
+        if len(batteries) != 1:
+            return _InverterPv(
+                watts=pv,
+                battery=None,
+                unattributed=f"only a single battery could bring it to the panel, and the "
+                f"panel has {len(batteries)} batteries",
+            )
+        return _InverterPv(watts=pv, battery=batteries[0])
+
+    def _solar_sources(self, circuits: Mapping[str, float]) -> list[str]:
+        """What in the tree books solar besides a battery: ``pv`` devices, the
+        circuits the variant books as solar (SOLAR circuits under
+        span-alpha-test-b2, circuits producing a watt or more under the others), and
+        lugs feeding a SOLAR or MIXED node."""
+        sources: list[str] = []
+        if devices := sum(d.type == "pv" for d in self.tree.values()):
+            sources.append(f"{devices} pv device{'s' * (devices > 1)}")
+        if self.solar_circuits is not None:
+            if roles := len(self.solar_circuits):
+                sources.append(f"{roles} SOLAR circuit{'s' * (roles > 1)}")
+        elif circuit_solar_w(circuits, None) >= _PV_RESOLUTION_W:
+            sources.append("circuits producing solar")
+        lugs = sorted(
+            f"{role} lugs"
+            for d in self.tree.values()
+            if d.type == "lugs" and (role := d.value("connection/feeds-role")) in _SOLAR_LUGS_ROLES
+        )
+        return sources + lugs
 
     # -- ids -------------------------------------------------------------
 
@@ -667,13 +716,20 @@ class _Mapper:
         feeds = self.feeds()
         self._note_dangling_feeds()
         if self.inverter_pv is not None and self.inverter_pv.battery is None:
-            batteries = sum(d.type == "bess" for d in self.tree.values())
             self.note(
                 self.panel_id,
                 "power-flows/pv",
                 f"reports {self.inverter_pv.watts:.1f} W of solar beyond what its circuits "
-                f"carry, which only a single battery could bring to the panel, and the "
-                f"panel has {batteries} batteries; not captured",
+                f"carry; {self.inverter_pv.unattributed}; not captured",
+            )
+        inferred = _infer_variant(panel)
+        if chosen != inferred:
+            self.note(
+                self.panel_id,
+                "variant",
+                f"{chosen} requested, where the panel's hardware version selects "
+                f"{inferred}; the solar its pv reports beyond its circuits, and so any "
+                f"battery's PV in the ticks, is still taken as {inferred} books circuits",
             )
         instances = [self._described(self.panel_id, self._panel())]
         bess_configs: list[BESSConfig] = []
