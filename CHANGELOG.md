@@ -7,6 +7,11 @@
 - **A battery's own inverter can take PV.** A `bess` with `inverter-type: hybrid` adds the watts `TickInputs.bess_pv` gives it to `power-flows/pv`, to the solar its dispatch sees and to what reaches the grid, and `panel-sim-capture` writes a battery `hybrid`, with that PV in its ticks, when a panel with one battery and no other solar source reports solar beyond what its circuits carry.
 - The reference capture `r202639-f`: a panel on `spanos3/r202639/04` whose solar is DC-coupled into the inverter of its battery, upstream of the panel.
 
+### Changed
+
+- **`panel-sim-capture` notes every captured battery's coupling**: a battery it does not write `hybrid` gets the note `inverter-type: not published; using ac-coupled`, as a PV inverter already did.
+- **A captured power that is not a finite number is a `CaptureError`**: a circuit's `meter/active-power` or the panel's `power-flows/pv` that does not parse as one stops `panel-sim-capture` with an error naming the device and path.
+
 ## [0.10.0] - 2026-11-10
 
 ### Added

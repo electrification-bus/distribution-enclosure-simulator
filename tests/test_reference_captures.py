@@ -125,12 +125,11 @@ def test_the_r202639_f_solar_reaches_the_panel_through_its_battery() -> None:
     writes the battery hybrid, its tick gives that battery the panel's solar, and the
     republished pv carries it, with the four flows balanced.
 
-    The other magnitudes differ where a definition cannot follow the panel: the
-    battery's charge is clamped by its remaining headroom (300 W to the panel's
-    93 W), the panel's site takes 48.9 W that the battery system meters and no
-    circuit carries, and the panel's upstream lugs read about 0 W because they do
-    not meter behind the battery, where the emitter's lugs carry the circuits'
-    1673.3 W. The fidelity test compares their signs, which agree."""
+    The other magnitudes differ. The emitter's battery charges at 300 W, the
+    battery's remaining headroom, where the panel's charges at 93 W. The panel's
+    site reads 1722.2 W, 48.9 W more than its circuits' 1673.3 W. The panel's
+    upstream lugs read 0.2 W, where the emitter's carry the circuits' 1673.3 W.
+    The fidelity test compares their signs, which agree."""
     capture = load_reference_capture("r202639-f")
     assert not any(d.type == "pv" for d in capture.tree.values())
     assert not any(
