@@ -303,22 +303,37 @@ _AC_COUPLED = {
 def test_pv_for_a_battery_whose_inverter_takes_none_is_refused_before_anything_moves(
     rec: PahoRecorder, manifest: DeviceManifest, bess_pv: dict[str, float], match: str
 ) -> None:
+    """The refused tick publishes nothing and moves nothing: the next tick leaves
+    the energy registers and the battery's charge where an emitter that never saw
+    the refused tick has them."""
+
+    def tick(t: float, pv: dict[str, float] | None = None) -> TickInputs:
+        return TickInputs(
+            current_time=t, grid_online=True, circuits={"kitchen": 500.0}, bess_pv=pv or {}
+        )
+
     emitter = _emitter(manifest)
-    first = emitter.publish_tick(
-        TickInputs(current_time=0.0, grid_online=True, circuits={"kitchen": 500.0})
-    )
+    first = emitter.publish_tick(tick(0.0))
     published = len(rec.published)
     with pytest.raises(EmitterStateError, match=match):
-        emitter.publish_tick(
-            TickInputs(
-                current_time=3600.0,
-                grid_online=True,
-                circuits={"kitchen": 500.0},
-                bess_pv=bess_pv,
-            )
-        )
+        emitter.publish_tick(tick(3600.0, bess_pv))
     assert emitter.last_snapshot is first
     assert len(rec.published) == published
+
+    after = emitter.publish_tick(tick(7200.0))
+    untouched = _emitter(manifest)
+    untouched.publish_tick(tick(0.0))
+    expected = untouched.publish_tick(tick(7200.0))
+    assert after.circuits["kitchen"].consumed_energy_wh == pytest.approx(1000.0)
+    assert (
+        after.circuits["kitchen"].consumed_energy_wh
+        == expected.circuits["kitchen"].consumed_energy_wh
+    )
+    assert after.battery[_BESS].soe_kwh == expected.battery[_BESS].soe_kwh
+    assert after.lugs["lugs-upstream"].imported_energy_wh == (
+        expected.lugs["lugs-upstream"].imported_energy_wh
+    )
+    assert after == expected
 
 
 def test_pv_for_a_hybrid_battery_that_is_not_configured_is_refused() -> None:
