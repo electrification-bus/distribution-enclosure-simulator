@@ -2,7 +2,8 @@
 
 The producer hands the emitter a small per-tick driving signal via
 ``publish_tick(TickInputs)``: signed power per circuit/EVSE, current_time,
-grid_online, panel envelope, battery link health. The emitter resolves BESS
+grid_online, panel envelope, battery link health, the PV a hybrid battery's
+inverter takes. The emitter resolves BESS
 dispatch, gates circuit power through ``RelayResolver``, integrates energy via
 ``EnergyIntegrator``, aggregates panel-level fields via ``PanelMeter``, builds
 the internal snapshot, and publishes the Homie diff to MQTT.
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 import time
 from collections.abc import Mapping
@@ -204,6 +206,16 @@ _SITE_ROLES: Final = frozenset({"LOADS", "UNUSED"})
 _BOOKED_ROLES: Final = _SITE_ROLES | {_SOLAR_ROLE, _STORAGE_ROLE}
 
 
+def solar_circuits(variant: Variant, roles: Mapping[str, str | None]) -> frozenset[str] | None:
+    """The circuits ``variant`` takes ``power-flows/pv`` from, given each circuit's
+    feeds-role (None for none): under span-alpha-test-b2 the SOLAR circuits, as
+    r202639 firmware books them, and under any other variant None, for every
+    circuit producing (``panel_meter.circuit_solar_w``)."""
+    if variant != "span-alpha-test-b2":
+        return None
+    return frozenset(cid for cid, role in roles.items() if role == _SOLAR_ROLE)
+
+
 def unbooked_circuit_roles(manifest: DeviceManifest) -> list[tuple[str, str]]:
     """``(circuit id, role)`` for each circuit whose feeds-role span-alpha-test-b2
     has no known power-flow booking for: GENERATOR, SUBPANEL and MIXED. A circuit
@@ -275,7 +287,8 @@ class Emitter:
         if variant == "span-alpha-test-b2" and manifest.of_class("pv"):
             raise ManifestValidationError(
                 "variant 'span-alpha-test-b2' publishes no pv device; mark the circuit that feeds "
-                "the inverter with feeds-role SOLAR instead"
+                "the inverter with feeds-role SOLAR instead, or, for PV DC-coupled into a "
+                "battery's inverter, give that battery inverter-type hybrid"
             )
         remote_cts = manifest.of_class("remote-ct")
         if remote_cts and variant != "span-alpha-test-b2":
@@ -336,6 +349,11 @@ class Emitter:
         # The conventions that changed across SPAN releases, fixed once for the
         # emitter's life by the variant and the panel's own firmware-version.
         self._conventions = firmware_conventions(variant, self._physics.panel.release_build)
+        # The batteries whose own inverter takes PV. `bess_pv` may name only those
+        # that are also configured, since an unconfigured battery has no dispatch.
+        self._hybrid_bess: frozenset[str] = frozenset(
+            bid for bid, b in self._physics.all_bess().items() if b.inverter_type == "hybrid"
+        )
         self._relays = RelayResolver()
         self._energy = EnergyIntegrator()
         self._priority_overrides: dict[str, str] = {}
@@ -890,13 +908,17 @@ class Emitter:
 
     def _build_snapshot_from_tick(self, tick: TickInputs) -> EbusPanelSnapshot:
         self._validate_bess_communication(tick.bess_communication)
+        self._validate_bess_pv(tick.bess_pv)
         panel_phys = self._physics.panel
         circuits_phys = self._physics.all_circuits()
 
         # Step 1: aggregate inputs for BESS dispatch (pre-shed: use raw producer
-        # power, not gated, since shedding decisions DEPEND on BESS SOC).
+        # power, not gated, since shedding decisions DEPEND on BESS SOC). The PV a
+        # hybrid battery's own inverter takes is solar the dispatch can use like
+        # any other, though no circuit carries it.
+        inverter_pv_w = sum(tick.bess_pv.values())
         load_demand_w = sum(p for p in tick.circuits.values() if p > 0)
-        pv_available_w = -sum(p for p in tick.circuits.values() if p < 0)
+        pv_available_w = -sum(p for p in tick.circuits.values() if p < 0) + inverter_pv_w
 
         # Step 2: BESS dispatch + battery snapshots — one per configured BESS.
         # ``battery_w`` is the SUM of signed dispatch across all batteries; it
@@ -989,18 +1011,18 @@ class Emitter:
             # takes solar from SOLAR circuits, battery from STORAGE circuits and a
             # battery's own breaker, and site from the rest, as r202639 firmware
             # does; the span variant takes solar from every circuit reading
-            # negative. The variant's site would also take the upstream load its
-            # remote-ct meter measures, but this model's remote-ct reads the panel's
-            # own grid power, so it measures none. A third-party backup system
-            # that reports pv, battery and grid from its own meter is not modelled.
-            solar_circuits=(
-                frozenset(
-                    cid
+            # negative. Every variant adds the PV hybrid batteries' inverters take.
+            # The variant's site would also take the upstream load its remote-ct
+            # meter measures, but this model's remote-ct reads the panel's own grid
+            # power, so it measures none. A third-party backup system that reports
+            # grid and site from its own meter is not modelled: grid is derived
+            # from the lugs and the batteries, and site from the circuits.
+            solar_circuits=solar_circuits(
+                self._variant,
+                {
+                    cid: c.wire_values.get("connection/feeds-role")
                     for cid, c in circuits_phys.items()
-                    if c.wire_values.get("connection/feeds-role") == _SOLAR_ROLE
-                )
-                if self._variant == "span-alpha-test-b2"
-                else None
+                },
             ),
             battery_circuits=(
                 storage_circuits
@@ -1008,6 +1030,7 @@ class Emitter:
                 if self._variant == "span-alpha-test-b2"
                 else frozenset()
             ),
+            inverter_pv_w=inverter_pv_w,
         )
 
         # Cross-device connection edges. Real SPAN owns the connection index on
@@ -1388,6 +1411,22 @@ class Emitter:
                 f"TickInputs.bess_communication {invalid!r}: expected one of "
                 f"{sorted(_BESS_COMMUNICATION_STATES)!r}"
             )
+
+    def _validate_bess_pv(self, pv: Mapping[str, float]) -> None:
+        """Refuse a tick giving PV to a battery that is not configured or whose
+        inverter takes none, or a PV power that is not a finite number, before any
+        state moves. A configured battery is what values the battery flow, as
+        ``bess_communication`` names only configured batteries too."""
+        accepted = self._hybrid_bess & set(self._bess)
+        stray = sorted(set(pv) - accepted)
+        if stray:
+            raise EmitterStateError(
+                f"TickInputs.bess_pv names {stray!r}, which are not among the configured "
+                f"batteries whose inverter-type is hybrid {sorted(accepted)!r}"
+            )
+        invalid = {bid: w for bid, w in pv.items() if not math.isfinite(w)}
+        if invalid:
+            raise EmitterStateError(f"TickInputs.bess_pv {invalid!r}: expected finite watts")
 
     def _assertion_eligible(self) -> bool:
         """Whether the panel would accept an assertion now: while its link to some

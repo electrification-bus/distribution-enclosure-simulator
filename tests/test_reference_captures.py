@@ -3,8 +3,8 @@
 Each is a masked tree of a real SPAN panel with a definition and ticks that
 republish it, read from the installed package rather than from this repository,
 so a consumer can replay one from a pinned release without copying files. Most
-ship the definition and ticks recorded with the tree; one ships the tree alone
-and has both derived from it."""
+ship the definition and ticks recorded with the tree; two ship the tree alone
+and have both derived from it."""
 
 from __future__ import annotations
 
@@ -13,7 +13,9 @@ from importlib.resources import files
 import pytest
 
 from ebus_panel_sim import (
+    Emitter,
     EmitterError,
+    SetterRegistry,
     UnknownReferenceCaptureError,
     load_reference_capture,
     reference_capture_names,
@@ -33,6 +35,7 @@ def test_the_names_are_the_shipped_captures_sorted() -> None:
         "r202639-c",
         "r202639-d",
         "r202639-e",
+        "r202639-f",
     )
 
 
@@ -83,14 +86,18 @@ def test_the_upstream_pv_definition_names_devices_as_the_capture_tool_does() -> 
     }
 
 
-def test_only_the_r202633_capture_is_derived() -> None:
+_DERIVED = ["main32_r202633", "r202639-f"]
+
+
+def test_only_the_captures_shipped_as_a_tree_alone_are_derived() -> None:
     derived = [n for n in reference_capture_names() if load_reference_capture(n).derived_from_tree]
-    assert derived == ["main32_r202633"]
+    assert derived == _DERIVED
 
 
-def test_a_derived_capture_is_what_panel_sim_capture_writes_from_its_tree() -> None:
+@pytest.mark.parametrize("name", _DERIVED)
+def test_a_derived_capture_is_what_panel_sim_capture_writes_from_its_tree(name: str) -> None:
     """Unmasked, since the tree is masked already, and one tick: the captured instant."""
-    capture = load_reference_capture("main32_r202633")
+    capture = load_reference_capture(name)
     definition, notes = definition_from_tree(capture.tree, mask=False)
     assert capture.definition == definition
     assert capture.notes == tuple(notes)
@@ -112,9 +119,43 @@ def test_a_derived_capture_notes_the_upstream_lugs_a_definition_cannot_express()
     assert any(n.device == upstream.instance_id and n.key == "fed-by" for n in capture.notes)
 
 
+def test_the_r202639_f_solar_reaches_the_panel_through_its_battery() -> None:
+    """The panel reports solar with no SOLAR circuit and no pv device: it is DC-coupled
+    into the battery's inverter, upstream of the panel. So the derived definition
+    writes the battery hybrid, its tick gives that battery the panel's solar, and the
+    republished pv carries it, with the four flows balanced.
+
+    The other magnitudes differ. The emitter's battery charges at 300 W, the
+    battery's remaining headroom, where the panel's charges at 93 W. The panel's
+    site reads 1722.2 W, 48.9 W more than its circuits' 1673.3 W. The panel's
+    upstream lugs read 0.2 W, where the emitter's carry the circuits' 1673.3 W.
+    The fidelity test compares their signs, which agree."""
+    capture = load_reference_capture("r202639-f")
+    assert not any(d.type == "pv" for d in capture.tree.values())
+    assert not any(
+        d.value("connection/feeds-role") == "SOLAR"
+        for d in capture.tree.values()
+        if d.type in ("circuit", "lugs")
+    )
+    (bess,) = capture.definition.manifest.of_class("bess")
+    assert bess.metadata["inverter-type"] == "hybrid"
+    assert bess.metadata["relative-position"] == "UPSTREAM"
+    assert any(n.device == bess.instance_id and n.key == "inverter-type" for n in capture.notes)
+    (tick,) = capture.ticks
+    assert tick.bess_pv == {bess.instance_id: 3247.0}
+
+    emitter = Emitter.from_definition(capture.definition, SetterRegistry())
+    emitter.start()
+    flows = emitter.publish_tick(tick).power_flows
+    assert flows.pv == -3247.0
+    values = [flows.pv, flows.battery, flows.grid, flows.site]
+    assert all(v is not None for v in values)
+    assert sum(v for v in values if v is not None) == pytest.approx(0.0, abs=1e-9)
+
+
 def test_only_a_derived_capture_has_notes() -> None:
     captures = [load_reference_capture(n) for n in reference_capture_names()]
-    assert [c.name for c in captures if c.notes] == ["main32_r202633"]
+    assert [c.name for c in captures if c.notes] == _DERIVED
 
 
 def test_each_load_reads_afresh() -> None:
