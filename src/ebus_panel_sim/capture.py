@@ -644,7 +644,8 @@ class _Mapper:
     def _solar_sources(self, circuits: Mapping[str, float]) -> list[str]:
         """What in the tree books solar besides a battery: ``pv`` devices, the
         circuits the variant books as solar (SOLAR circuits under
-        span-alpha-test-b2, circuits producing a watt or more under the others), and
+        span-alpha-test-b2, producing circuits whose output totals a watt or more under
+        the others), and
         lugs feeding a SOLAR or MIXED node."""
         sources: list[str] = []
         if devices := sum(d.type == "pv" for d in self.tree.values()):
