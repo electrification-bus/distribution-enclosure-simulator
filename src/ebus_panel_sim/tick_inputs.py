@@ -57,7 +57,10 @@ class TickInputs:
                         shedding.
         circuits:       Mapping of circuit ``instance_id`` → signed instant
                         power in watts. Every circuit in the manifest should
-                        appear; missing entries are treated as 0 W.
+                        appear; missing entries are treated as 0 W. Circuits that
+                        share a breaker's meter (``shared-with-device-ids``, where
+                        the variant publishes it) each take their own load: the
+                        meter they all publish reads the sum.
         evse:           Mapping of EVSE ``instance_id`` → signed instant power
                         in watts. Status (``CHARGING``/``AVAILABLE``) is
                         derived from this signal in the emitter.

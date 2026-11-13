@@ -40,9 +40,10 @@ from ebus_panel_sim.native_devices import (
     LoadSheddingDevice,
     NativeTickContext,
 )
-from ebus_panel_sim.panel_meter import circuit_current_a
+from ebus_panel_sim.panel_meter import circuit_current_a, shared_meter_current_a
 from ebus_panel_sim.panel_meter import resolve as resolve_panel
 from ebus_panel_sim.relay_resolver import RelayResolver, RelayState
+from ebus_panel_sim.shared_hardware import declares_shared_breakers, shared_breakers
 from ebus_panel_sim.snapshot import (
     EbusBatterySnapshot,
     EbusCircuitSnapshot,
@@ -336,8 +337,22 @@ class Emitter:
         # The conventions that changed across SPAN releases, fixed once for the
         # emitter's life by the variant and the panel's own firmware-version.
         self._conventions = firmware_conventions(variant, self._physics.panel.release_build)
+        # Each circuit's breaker: every circuit sharing its meter and relay where
+        # the variant publishes a multi-load breaker as one device per protected
+        # circuit (`ebus_panel_sim.shared_hardware`), else the circuit alone. The
+        # first keys the breaker's one energy register, relay and priority.
+        breakers = (
+            shared_breakers(self._physics.all_circuits())
+            if declares_shared_breakers(self._profiles)
+            else {}
+        )
+        self._breakers: dict[str, tuple[str, ...]] = {
+            cid: breakers.get(cid, (cid,)) for cid in self._physics.all_circuits()
+        }
         self._relays = RelayResolver()
         self._energy = EnergyIntegrator()
+        # Operator priority overrides, by the key of each circuit's breaker:
+        # shedding acts on a breaker's one relay, so its circuits take one.
         self._priority_overrides: dict[str, str] = {}
         # The circuits whose priority is locked (never-backup or a
         # commissioned-system circuit), resolved once from the manifest the way
@@ -386,6 +401,12 @@ class Emitter:
             self._energy.register(rct_id)
         for cid, cphys in self._physics.all_circuits().items():
             self._relays.register(cid, always_on=cphys.always_on)
+        for breaker in dict.fromkeys(self._breakers.values()):
+            if len(breaker) > 1:
+                self._relays.share(breaker)  # one relay, locked alike
+        for cid, cphys in self._physics.all_circuits().items():
+            if self._breakers[cid][0] != cid:
+                continue  # the register of its breaker's meter, seeded alike
             self._energy.register(cid)
             if cphys.initial_consumed_wh or cphys.initial_produced_wh:
                 self._energy.seed(
@@ -637,9 +658,13 @@ class Emitter:
     ) -> None:
         """Overwrite an instance's energy accumulators. Typical use: producer
         reads last-known values from persistent storage and seeds at startup
-        before the first ``publish_tick`` call. Raises ``KeyError`` for unknown
-        instance IDs (caught typos before they cause silent data loss)."""
-        self._energy.seed(instance_id, consumed_wh=consumed_wh, produced_wh=produced_wh)
+        before the first ``publish_tick`` call. A circuit sharing a meter seeds that
+        meter's one register, which every circuit on it publishes. Raises
+        ``KeyError`` for unknown instance IDs (caught typos before they cause
+        silent data loss)."""
+        self._energy.seed(
+            self._breaker_key(instance_id), consumed_wh=consumed_wh, produced_wh=produced_wh
+        )
 
     def seed_bess_soe(self, instance_id: str, soe_kwh: float) -> None:
         """Overwrite a BESS device's stored SOE. Raises ``EmitterStateError``
@@ -758,7 +783,8 @@ class Emitter:
     def relays(self) -> RelayResolver:
         """Read-write access to the per-circuit relay resolver. Used by /set
         handlers (registered by the emitter for ``circuit.switch/relay``) to
-        update operator overrides."""
+        update operator overrides. The circuits on one multi-load breaker share
+        its relay there, so an override of any of them is one of all of them."""
         return self._relays
 
     @property
@@ -768,6 +794,12 @@ class Emitter:
         return self._dominant_power_source_override
 
     # ---- internal --------------------------------------------------------
+
+    def _breaker_key(self, instance_id: str) -> str:
+        """The key of the circuit's breaker, under which its shared state is held:
+        the first circuit on it, or the circuit itself."""
+        breaker = self._breakers.get(instance_id)
+        return breaker[0] if breaker else instance_id
 
     def _register_internal_setters(self, registry: SetterRegistry) -> None:
         """Register default handlers for the settable properties when the
@@ -810,7 +842,7 @@ class Emitter:
                 # routing commands into the registry itself, or a broker
                 # delivering to a topic nothing subscribed.
                 return
-            self._priority_overrides[instance_id] = str(value).upper()
+            self._priority_overrides[self._breaker_key(instance_id)] = str(value).upper()
 
         def on_asserted_islanding(
             entity_class: str,
@@ -945,7 +977,7 @@ class Emitter:
         self._relays.clear_all_shed()
         if self._load_shedding is not None:
             effective_priorities = {
-                cid: self._priority_overrides.get(cid, cphys.default_priority)
+                cid: self._priority_overrides.get(self._breaker_key(cid), cphys.default_priority)
                 for cid, cphys in circuits_phys.items()
             }
             shed_ids = self._load_shedding.decide_shed(
@@ -964,10 +996,16 @@ class Emitter:
             relay_state, _requester = self._relays.state(cid)
             gated_powers[cid] = 0.0 if relay_state == RelayState.OPEN else raw_power
 
-        # Step 4: integrate energy per circuit using gated power (if relay open,
-        # no energy flows).
-        for cid, gated in gated_powers.items():
-            self._energy.observe(cid, gated, tick.current_time)
+        # Step 4: each circuit's meter reads its gated power; a meter shared across
+        # a multi-load breaker reads the sum of its circuits' and integrates it once,
+        # in the register its first circuit keys (if relay open, no energy flows).
+        meter_powers = {
+            cid: gated_powers[cid] if len(members) == 1 else sum(gated_powers[m] for m in members)
+            for cid, members in self._breakers.items()
+        }
+        for cid, members in self._breakers.items():
+            if members[0] == cid:
+                self._energy.observe(cid, meter_powers[cid], tick.current_time)
         for eid, evse_power in tick.evse.items():
             if self._energy.known(eid):
                 self._energy.observe(eid, evse_power, tick.current_time)
@@ -1045,9 +1083,9 @@ class Emitter:
         circuit_snaps: dict[str, EbusCircuitSnapshot] = {}
         for cid, cphys in circuits_phys.items():
             relay_state, requester = self._relays.state(cid)
-            gated_p = gated_powers[cid]
-            estate = self._energy.state(cid)
-            effective_priority = self._priority_overrides.get(cid, cphys.default_priority)
+            members = self._breakers[cid]
+            estate = self._energy.state(members[0])
+            effective_priority = self._priority_overrides.get(members[0], cphys.default_priority)
             effective_name = self._name_overrides.get(
                 cid,
                 self._manifest.get("circuit", cid).display_name,
@@ -1057,7 +1095,7 @@ class Emitter:
                 circuit_id=cid,
                 name=effective_name,
                 relay_state=str(relay_state),
-                instant_power_w=gated_p,
+                instant_power_w=meter_powers[cid],
                 produced_energy_wh=estate.produced_wh,
                 consumed_energy_wh=estate.consumed_wh,
                 tabs=list(cphys.tabs),
@@ -1081,10 +1119,20 @@ class Emitter:
                 # OFF_GRID and removes `$settable` from its priority.
                 is_never_backup=cphys.never_backup,
                 is_240v=cphys.dipole,
-                current_a=circuit_current_a(
-                    gated_p,
-                    dipole=cphys.dipole,
-                    line_voltage_v=panel_phys.line_voltage_v,
+                current_a=(
+                    circuit_current_a(
+                        gated_powers[cid],
+                        dipole=cphys.dipole,
+                        line_voltage_v=panel_phys.line_voltage_v,
+                    )
+                    if len(members) == 1
+                    else shared_meter_current_a(
+                        [
+                            (gated_powers[m], circuits_phys[m].tabs, circuits_phys[m].dipole)
+                            for m in members
+                        ],
+                        panel_phys.line_voltage_v,
+                    )
                 ),
                 breaker_rating_a=cphys.breaker_rating_a,
                 always_on=cphys.always_on,
@@ -1224,16 +1272,18 @@ class Emitter:
             state=tick.envelope.door_state,
             proximity_proven=tick.envelope.proximity_proven,
         )
-        consumed_total = sum(s.consumed_energy_wh for s in circuit_snaps.values())
-        produced_total = sum(s.produced_energy_wh for s in circuit_snaps.values())
+        # Each meter's register once: every circuit sharing one publishes it.
+        registers = {cid: s for cid, s in circuit_snaps.items() if self._breakers[cid][0] == cid}
+        consumed_total = sum(s.consumed_energy_wh for s in registers.values())
+        produced_total = sum(s.produced_energy_wh for s in registers.values())
         feedthrough_consumed = sum(
             s.consumed_energy_wh
-            for cid, s in circuit_snaps.items()
+            for cid, s in registers.items()
             if circuits_phys[cid].placement == "downstream-of-lugs"
         )
         feedthrough_produced = sum(
             s.produced_energy_wh
-            for cid, s in circuit_snaps.items()
+            for cid, s in registers.items()
             if circuits_phys[cid].placement == "downstream-of-lugs"
         )
         meter_section = EbusPanelMeter(

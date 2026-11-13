@@ -45,6 +45,8 @@ from typing import TYPE_CHECKING
 from ebus_panel_sim.conventions.tab_legs import Leg
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from ebus_panel_sim.manifest_physics import CircuitPhysics, PanelPhysics
 
 
@@ -89,6 +91,30 @@ def circuit_current_a(power_w: float, dipole: bool, line_voltage_v: float) -> fl
         return 0.0
     voltage = 2 * line_voltage_v if dipole else line_voltage_v
     return abs(power_w) / voltage
+
+
+def shared_meter_current_a(
+    loads: Sequence[tuple[float, tuple[int, ...], bool]], line_voltage_v: float
+) -> float:
+    """The current one meter reads across the circuits it measures, given each
+    circuit's ``(power_w, tabs, dipole)``.
+
+    Each circuit's current lies on its own spaces: a single-pole circuit's on its
+    one space, a two-pole circuit's at line-to-line voltage on both of its. The
+    currents on a space add with their signs, and the meter reads the larger of its
+    spaces, sample by sample, as SPAN publishes a two-pole breaker's meter wherever
+    it publishes the shared lists (spanio/SPAN-API-Client-Docs#21). So a tandem in
+    one space reads the sum of its circuits' currents, and a quad or tandem-quad
+    across two reads the larger leg. A circuit measured alone reads what
+    ``circuit_current_a`` gives it."""
+    if line_voltage_v <= 0:
+        return 0.0
+    spaces: dict[int, float] = {}
+    for power_w, tabs, dipole in loads:
+        current = power_w / (2 * line_voltage_v if dipole else line_voltage_v)
+        for tab in tabs:
+            spaces[tab] = spaces.get(tab, 0.0) + current
+    return max((abs(current) for current in spaces.values()), default=0.0)
 
 
 # ---------------------------------------------------------------------------

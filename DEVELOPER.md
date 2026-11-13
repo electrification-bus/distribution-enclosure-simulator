@@ -85,7 +85,7 @@ Energy integrates over time in watt-hours:
 delta_energy = power_watts * delta_seconds / 3600
 ```
 
-Consumed and produced energy are tracked separately per circuit, seeded from producer-supplied starting values.
+Consumed and produced energy are tracked separately per meter, seeded from producer-supplied starting values: each circuit's own, or one register for the circuits that share a multi-load breaker's meter where the variant publishes one.
 
 ### Diffing
 
@@ -116,6 +116,7 @@ distribution-enclosure-simulator/
     tick_inputs.py             # TickInputs: the producer/emitter per-tick contract
     manifest.py                # Producer-supplied device identity manifest
     manifest_physics.py        # Typed accessor over device metadata (physics fields)
+    shared_hardware.py         # Circuits on one multi-load breaker: grouping and validation
     relay_resolver.py          # Per-circuit relay state with strict command precedence
     energy_integrator.py       # Per-instance watt-hour energy accumulator
     panel_meter.py             # Panel-level aggregator (pure function)
