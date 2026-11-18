@@ -92,7 +92,26 @@ class TickInputs:
                         the rest; curtailing any surplus is the producer's, as
                         generating it is. A battery left out produces 0 W. An
                         id that is not such a BESS, or a value that is not a
-                        finite number, raises ``EmitterStateError``."""
+                        finite number, raises ``EmitterStateError``.
+        pv:             Mapping of a ``pv`` instance whose manifest gives no
+                        ``feed`` → the power it produces, in watts: positive
+                        while producing (the PV's own frame), negative for a
+                        standby draw. An AC-coupled inverter upstream of the
+                        panel joins the site beside the main lugs, never
+                        through a circuit, so no circuit's power carries it. It
+                        is published in ``power-flows/pv``, offered to the
+                        battery's dispatch as solar, and leaves the site with
+                        the dispatch, which is how the grid sees it; the lugs,
+                        the circuits and ``site`` are unchanged. Off grid the
+                        battery only discharges and the emitter curtails
+                        nothing, so there the four flows balance only while the
+                        solar is no more than the load and the battery covers
+                        the rest; curtailing any surplus is the producer's, as
+                        generating it is. An inverter left out produces 0 W. An
+                        id that is not a ``pv`` instance, a ``pv`` instance
+                        that a circuit feeds (that circuit's power carries its
+                        production), or a value that is not a finite number,
+                        raises ``EmitterStateError``."""
 
     current_time: float
     grid_online: bool
@@ -101,3 +120,4 @@ class TickInputs:
     envelope: PanelEnvelopeTick = field(default_factory=PanelEnvelopeTick)
     bess_communication: dict[str, BESSCommunication] = field(default_factory=dict)
     bess_pv: dict[str, float] = field(default_factory=dict)
+    pv: dict[str, float] = field(default_factory=dict)

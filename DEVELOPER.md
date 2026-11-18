@@ -67,7 +67,7 @@ The emitter is the **publisher** half of the eBus producer/emitter split: the pr
 
 ### Per-tick flow
 
-Each tick, given `TickInputs` (signed power per circuit, current time, grid-online flag, battery link health, the PV a hybrid battery's inverter takes):
+Each tick, given `TickInputs` (signed power per circuit, current time, grid-online flag, battery link health, the PV a hybrid battery's inverter takes, the production of PV inverters no circuit feeds):
 
 1. Resolve per-circuit relay state, applying strict precedence across command sources (`relay_resolver.py`).
 2. Run native-device behaviours that own their own state (`native_devices/`): BESS dispatch (`bess.py`) and load shedding (`load_shedding.py`).

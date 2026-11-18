@@ -176,7 +176,7 @@ def test_a_hybrid_inverter_s_pv_joins_pv_and_reaches_the_grid_through_the_batter
         battery_w=-1000.0,
         grid_online=True,
         has_battery=True,
-        inverter_pv_w=3000.0,
+        uncircuited_pv_w=3000.0,
     )
     assert r.upstream_active_power_w == 500.0
     assert r.instant_grid_power_w == -1500.0
@@ -201,7 +201,7 @@ def test_circuit_solar_and_the_inverter_s_pv_are_one_pv(
         grid_online=True,
         has_battery=True,
         solar_circuits=solar_circuits,
-        inverter_pv_w=1000.0,
+        uncircuited_pv_w=1000.0,
     )
     assert r.power_flow_pv == -3000.0
     assert circuit_solar_w({"kitchen": 500.0, "solar": -2000.0}, solar_circuits) == 2000.0

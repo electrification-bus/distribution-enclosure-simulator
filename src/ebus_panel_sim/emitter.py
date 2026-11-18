@@ -367,6 +367,11 @@ class Emitter:
         self._hybrid_bess: frozenset[str] = frozenset(
             bid for bid, b in self._physics.all_bess().items() if b.inverter_type == "hybrid"
         )
+        # The `pv` devices no circuit feeds. `TickInputs.pv` may name only those:
+        # a fed one's production is already its feeding circuit's power.
+        self._uncircuited_pv: frozenset[str] = frozenset(
+            pid for pid, p in self._physics.all_pv().items() if p.feed is None
+        )
         self._relays = RelayResolver()
         self._energy = EnergyIntegrator()
         # Operator priority overrides, by the key of each circuit's breaker:
@@ -941,16 +946,18 @@ class Emitter:
     def _build_snapshot_from_tick(self, tick: TickInputs) -> EbusPanelSnapshot:
         self._validate_bess_communication(tick.bess_communication)
         self._validate_bess_pv(tick.bess_pv)
+        self._validate_pv(tick.pv)
         panel_phys = self._physics.panel
         circuits_phys = self._physics.all_circuits()
 
         # Step 1: aggregate inputs for BESS dispatch (pre-shed: use raw producer
         # power, not gated, since shedding decisions DEPEND on BESS SOC). The PV a
         # hybrid battery's own inverter takes is solar the dispatch can use like
-        # any other, though no circuit carries it.
-        inverter_pv_w = sum(tick.bess_pv.values())
+        # any other, though no circuit carries it, and so is the production of a PV
+        # inverter no circuit feeds.
+        uncircuited_pv_w = sum(tick.bess_pv.values()) + sum(tick.pv.values())
         load_demand_w = sum(p for p in tick.circuits.values() if p > 0)
-        pv_available_w = -sum(p for p in tick.circuits.values() if p < 0) + inverter_pv_w
+        pv_available_w = -sum(p for p in tick.circuits.values() if p < 0) + uncircuited_pv_w
 
         # Step 2: BESS dispatch + battery snapshots — one per configured BESS.
         # ``battery_w`` is the SUM of signed dispatch across all batteries; it
@@ -1068,7 +1075,7 @@ class Emitter:
                 if self._variant == "span-alpha-test-b2"
                 else frozenset()
             ),
-            inverter_pv_w=inverter_pv_w,
+            uncircuited_pv_w=uncircuited_pv_w,
         )
 
         # Cross-device connection edges. Real SPAN owns the connection index on
@@ -1477,6 +1484,28 @@ class Emitter:
         invalid = {bid: w for bid, w in pv.items() if not math.isfinite(w)}
         if invalid:
             raise EmitterStateError(f"TickInputs.bess_pv {invalid!r}: expected finite watts")
+
+    def _validate_pv(self, pv: Mapping[str, float]) -> None:
+        """Refuse a tick giving production to something that is not a ``pv`` device,
+        to one a circuit feeds, or a power that is not a finite number, before any
+        state moves. A fed device's production is its circuit's power, so a second
+        figure for it would count the same solar twice."""
+        devices = self._physics.all_pv()
+        stray = sorted(set(pv) - set(devices))
+        if stray:
+            raise EmitterStateError(
+                f"TickInputs.pv names {stray!r}, which are not among the pv devices no "
+                f"circuit feeds {sorted(self._uncircuited_pv)!r}"
+            )
+        for pid in pv:
+            if pid not in self._uncircuited_pv:
+                raise EmitterStateError(
+                    f"TickInputs.pv names pv device {pid!r}, which is fed by circuit "
+                    f"{devices[pid].feed!r}; that circuit's power carries its production"
+                )
+        invalid = {pid: w for pid, w in pv.items() if not math.isfinite(w)}
+        if invalid:
+            raise EmitterStateError(f"TickInputs.pv {invalid!r}: expected finite watts")
 
     def _assertion_eligible(self) -> bool:
         """Whether the panel would accept an assertion now: while its link to some
