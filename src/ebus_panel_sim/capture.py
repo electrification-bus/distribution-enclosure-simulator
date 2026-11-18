@@ -133,13 +133,41 @@ class _UncircuitedSolar:
     while producing, and where the capture writes it. Exactly one of the others is
     set: ``battery``, the battery it reaches the panel through (its original device
     ID); ``inverters``, the ``pv`` devices no circuit feeds (original device IDs),
-    each with the share of it that it produces, the shares summing to 1; or
+    in tree order, each with its share of it in proportion to its
+    ``info/nominal-power``, the shares summing to 1 to within float rounding
+    (``split`` divides a sample's solar among them so that the parts add back to
+    it exactly); or
     ``unattributed``, why it is written nowhere."""
 
     watts: float
     battery: str | None = None
     inverters: tuple[tuple[str, float], ...] = ()
     unattributed: str = ""
+
+    def split(self, remainder: float) -> dict[str, float]:
+        """``remainder`` watts divided among ``inverters`` by their shares, keyed by
+        original device ID in tree order, so that the parts add back to it exactly;
+        empty where there are no ``inverters``.
+
+        Each inverter but the one with the largest share (the first, should several
+        tie) produces its share rounded to a multiple of ``math.ulp(remainder)``,
+        and that one produces what the others leave. Every part, and every sum of
+        some of them, is then a multiple of that unit no larger in magnitude than
+        ``remainder``, which a float holds exactly, so the parts add back to
+        ``remainder`` in any order and however Python sums floats, where shares
+        each rounded on their own can miss it by a unit. Each part is its share of
+        ``remainder`` to within float rounding."""
+        if not self.inverters:
+            return {}
+        unit = math.ulp(remainder)
+        rest, _ = max(self.inverters, key=lambda inverter: inverter[1])
+        parts = {
+            device_id: round(remainder * share / unit) * unit + 0.0
+            for device_id, share in self.inverters
+            if device_id != rest
+        }
+        parts[rest] = remainder - sum(parts.values()) + 0.0
+        return {device_id: parts[device_id] for device_id, _ in self.inverters}
 
 
 # ---------------------------------------------------------------------------
@@ -497,9 +525,11 @@ def ticks_from_samples(
     hybrid``, that battery's inverter takes as its PV whatever the sample's
     ``power-flows/pv`` reports beyond what its circuits carry. Where it writes that
     solar as the production of the ``pv`` devices no circuit feeds, each of them
-    produces the share of it its ``info/nominal-power`` gives it in ``tree``. Either
-    is signed, so a sample showing a standby draw there gives a negative PV or
-    production, and a sample that publishes no pv gives none.
+    produces the share of it its ``info/nominal-power`` gives it in ``tree``, to
+    within float rounding, and the one with the largest share what the others
+    leave, so their productions add back to that solar exactly. Either is signed,
+    so a sample showing a standby draw there gives a negative PV or production,
+    and a sample that publishes no pv gives none.
 
     Only the panel's own device tree is read. A circuit feeding a battery is
     left out: the simulated battery's dispatch already accounts for that power,
@@ -549,7 +579,7 @@ def ticks_from_samples(
         ):
             if solar.battery is not None:
                 bess_pv[mapper.ids[solar.battery]] = remainder
-            pv = {mapper.ids[i]: remainder * share + 0.0 for i, share in solar.inverters}
+            pv = {mapper.ids[i]: watts for i, watts in solar.split(remainder).items()}
         evse = {
             mapper.ids[evse_id]: circuits.get(feed, 0.0)
             for evse_id, feed in feeds.items()

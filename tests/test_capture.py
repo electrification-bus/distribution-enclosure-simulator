@@ -1049,6 +1049,24 @@ def test_the_split_follows_each_inverter_s_nominal_power() -> None:
     assert tick.pv == {a: 1170.0, b: 390.0}
 
 
+def test_the_inverters_production_adds_back_to_the_solar_exactly() -> None:
+    """A third and two thirds of 1537.2 W, each rounded on its own, add up to
+    1537.1999999999998, and the smaller with what it leaves to 1537.2000000000003.
+    The smaller share is rounded to the solar's own precision and the larger is
+    what it leaves, so the two add back to the solar the panel reports, and its pv
+    republishes as it was published."""
+    tree, a, b = _upstream_pv()
+    tree[a].properties["info/nominal-power"] = "3800"
+    tree[b].properties["info/nominal-power"] = "7600"
+    _panel_of(tree).properties["power-flows/pv"] = "-1537.2"
+    definition, _, tick = _captured(tree)
+    assert tick.pv == pytest.approx({a: 512.4, b: 1024.8})
+    assert sum(tick.pv.values()) == 1537.2
+    emitter = Emitter.from_definition(definition, SetterRegistry())
+    emitter.start()
+    assert emitter.publish_tick(tick).power_flows.pv == -1537.2
+
+
 def test_a_lone_unfed_inverter_takes_all_of_it_beside_a_circuit_fed_one() -> None:
     """A circuit-fed pv device's production is already in its circuit, so it takes
     none of the remainder, and it does not keep the one no circuit feeds from taking
