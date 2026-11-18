@@ -228,6 +228,35 @@ def test_bess_without_initial_soe_returns_none() -> None:
     assert view.bess("b1").initial_soe_kwh is None
 
 
+def _bess(**md: str) -> DeviceInstance:
+    return DeviceInstance(
+        entity_class="bess",
+        instance_id="b1",
+        display_name="Battery",
+        metadata={"vendor-name": "Span", "nameplate-capacity-kwh": "13.5", **md},
+    )
+
+
+@pytest.mark.parametrize(
+    ("md", "inverter_type"),
+    [
+        ({}, "ac-coupled"),
+        ({"inverter-type": "ac-coupled"}, "ac-coupled"),
+        ({"inverter-type": "hybrid"}, "hybrid"),
+    ],
+)
+def test_a_battery_s_inverter_converts_the_battery_alone_unless_it_is_hybrid(
+    md: dict[str, str], inverter_type: str
+) -> None:
+    view = ManifestPhysicsView(DeviceManifest(instances=(_panel(), _bess(**md))))
+    assert view.bess("b1").inverter_type == inverter_type
+
+
+def test_a_battery_inverter_type_outside_the_vocabulary_is_rejected() -> None:
+    with pytest.raises(ManifestValidationError, match="bess/b1: key 'inverter-type'"):
+        ManifestPhysicsView(DeviceManifest(instances=(_panel(), _bess(**{"inverter-type": "dc"}))))
+
+
 def test_pv_inverter_type_validated() -> None:
     pv = DeviceInstance(
         entity_class="pv",

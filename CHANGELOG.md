@@ -10,8 +10,15 @@
 
 ### Added
 
+- **A battery's own inverter can take PV.** A `bess` with `inverter-type: hybrid` adds the watts `TickInputs.bess_pv` gives it to `power-flows/pv`, to the solar its dispatch sees and to what reaches the grid, and `panel-sim-capture` writes a battery `hybrid`, with that PV in its ticks, when a panel with one battery and no other solar source reports solar beyond what its circuits carry.
+- The reference capture `r202639-f`: a panel on `spanos3/r202639/04` whose solar is DC-coupled into the inverter of its battery, upstream of the panel.
 - **Circuits on one multi-load breaker share its meter and relay**: under a variant whose circuit profile declares both `shared-with-device-ids` lists, circuits naming each other in `shared-with-device-ids` each publish the breaker's combined power, energy and current, the larger leg across two spaces, and a relay or shed-priority write to one reaches them all, as SPAN publishes tandems and quads with those lists ([SPAN-API-Client-Docs#21](https://github.com/spanio/SPAN-API-Client-Docs/issues/21), [#68](https://github.com/electrification-bus/distribution-enclosure-simulator/issues/68)).
 - **New public surface for shared breakers**: `RelayResolver.share` puts circuits behind one relay, `CircuitPhysics` gains `shared_with` (default `()`), the other circuits on the circuit's breaker, and `ticks_from_samples` takes the definition's `variant`, defaulting as `definition_from_tree`'s does, since only a variant that shares breakers splits a shared reading.
+
+### Changed
+
+- **`panel-sim-capture` notes every captured battery's coupling**: a battery it does not write `hybrid` gets the note `inverter-type: not published; using ac-coupled`, as a PV inverter already did.
+- **A captured power that is not a finite number is a `CaptureError`**: a circuit's `meter/active-power` or the panel's `power-flows/pv` that does not parse as one stops `panel-sim-capture` with an error naming the device and path.
 
 ### Fixed
 

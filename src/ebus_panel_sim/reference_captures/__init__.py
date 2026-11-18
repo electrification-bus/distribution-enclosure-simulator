@@ -47,8 +47,9 @@ class ReferenceCapture:
     definition is then ``definition_from_tree(tree, mask=False)`` (the tree is
     already masked) and the ticks are one tick sampled from the tree, the captured
     instant, so they hold no more than the tree does. ``notes`` then holds what
-    ``definition_from_tree`` had to default or leave out (a battery's dispatch
-    settings, lugs fed by another enclosure); it is empty for a recorded capture."""
+    ``definition_from_tree`` had to default, leave out or read from the panel's
+    flows (a battery's dispatch settings, lugs fed by another enclosure, a battery
+    whose inverter takes the panel's solar); it is empty for a recorded capture."""
 
     name: str
     definition: PanelDefinition
