@@ -100,6 +100,17 @@ complement `CONTRIBUTING.md`'s "What done means", which they assume.
   string. A `null` in a snapshot means unpublished, not zero (#62).
 - When a fix reproduces a field panel, check it against every capture available, not only the one at hand. The firmware is not uniform even within one
   release (#69).
+- Topology comes from what a tree publishes, never from a reading. These are decided from the tree's devices, their `connection` records, their roles,
+  and which properties the panel publishes at all:
+  - which device carries a flow;
+  - whether a battery is `hybrid`;
+  - which inverters take solar that no circuit carries;
+  - which circuit is solar.
+
+  A power, current or energy value fills ticks and flows, and never decides structure. A tree captured at night therefore describes the same panel as
+  one captured at noon. A threshold on a reading ("a watt or more", "producing", "drawing") gates nothing structural; a few watts at night are real
+  production, and a standby draw is real too. Whether the panel publishes a property is structure; its value is a reading. Booking a tick's flows by a
+  reading's sign, as the `span` variant books every producing circuit as solar, computes a flow and is allowed (#83).
 
 **Specification and variants.**
 
