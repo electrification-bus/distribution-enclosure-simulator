@@ -306,6 +306,17 @@ def _finite(raw: str, device_id: str, path: str) -> float:
     return value
 
 
+def _pole_count(raw: str, device_id: str) -> int:
+    """A circuit's published ``breaker/poles``, which a split-phase panel's circuit
+    has as 1 or 2. Any other value is refused with a ``CaptureError`` naming it,
+    rather than with an error about spaces the panel did not publish."""
+    if raw not in ("1", "2"):
+        raise CaptureError(
+            f"{device_id} breaker/poles: a split-phase circuit has 1 or 2 poles ({raw!r})"
+        )
+    return int(raw)
+
+
 def _wire_str(value: object) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
@@ -1029,9 +1040,8 @@ class _Mapper:
     def _assign_tabs(self, poles: int) -> list[int]:
         """The lowest free spaces above every published one, for a circuit whose
         ``info/spaces`` is not published: one space per pole, one above the other
-        in a column. A two-pole circuit's two span both legs
-        (``conventions/tab_legs.py``); the emitter refuses any wider circuit, as
-        it does one published on three spaces."""
+        in a column, so a two-pole circuit's two span both legs
+        (``conventions/tab_legs.py``)."""
         tab = self.first_free_tab
         while True:
             tabs = [tab + 2 * pole for pole in range(poles)]
@@ -1043,7 +1053,7 @@ class _Mapper:
     def _circuit(self, device_id: str, d: Device) -> DeviceInstance:
         name = d.value("info/name") or str(d.description.get("name", device_id))
         poles = d.value("breaker/poles")
-        pole_count = 1 if poles is None else int(float(poles))
+        pole_count = 1 if poles is None else _pole_count(poles, device_id)
         tabs = _tabs(d.value("info/spaces"))
         if not tabs:
             tabs = self._assign_tabs(pole_count)

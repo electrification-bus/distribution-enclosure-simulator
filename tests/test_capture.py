@@ -159,6 +159,21 @@ def test_a_two_pole_circuit_the_layout_cannot_hold_is_a_capture_error(
         definition_from_tree(tree_from_retained(retained), mask=False)
 
 
+@pytest.mark.parametrize("poles", ["0", "3", "4", "2.0", "x"])
+def test_a_pole_count_a_split_phase_circuit_cannot_have_is_a_capture_error(
+    rec: PahoRecorder, poles: str
+) -> None:
+    """A circuit's breaker/poles is 1 or 2 on a split-phase panel. Any other value
+    is refused naming it, including where info/spaces is not published and the
+    spaces would be assigned from it."""
+    source = dataclasses.replace(_source(), variant="reference")
+    retained = _publish(rec, source)
+    topic = next(t for t in sorted(retained) if t.endswith("/breaker/poles"))
+    retained[topic] = poles
+    with pytest.raises(CaptureError, match="breaker/poles"):
+        definition_from_tree(tree_from_retained(retained), variant="reference")
+
+
 def test_masking_replaces_every_serial_and_keeps_references(rec: PahoRecorder) -> None:
     source = _source()
     original = _publish(rec, source)
