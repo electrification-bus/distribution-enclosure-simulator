@@ -8,14 +8,17 @@ and have both derived from it."""
 
 from __future__ import annotations
 
+import dataclasses
 from importlib.resources import files
 
 import pytest
 
 from ebus_panel_sim import (
+    EbusPanelPowerFlows,
     Emitter,
     EmitterError,
     SetterRegistry,
+    TickInputs,
     UnknownReferenceCaptureError,
     load_reference_capture,
     reference_capture_names,
@@ -151,6 +154,46 @@ def test_the_r202639_f_solar_reaches_the_panel_through_its_battery() -> None:
     values = [flows.pv, flows.battery, flows.grid, flows.site]
     assert all(v is not None for v in values)
     assert sum(v for v in values if v is not None) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_the_upstream_pv_capture_s_inverters_carry_its_uncircuited_solar() -> None:
+    """The panel reports 1560 W in pv that no circuit carries, and publishes two pv
+    devices that no circuit feeds: SolarEdge inverters upstream of the panel. A
+    definition and tick derived from its tree give those inverters that solar, so
+    the republished pv carries it, where it reads 0 without it, and the battery's
+    dispatch sees it: the battery discharges the 538.5 W the circuits' 2098.5 W
+    leaves, not all 2098.5 W, with the four flows balanced. The capture's recorded
+    ticks are the panel's and are left as they were, giving the inverters nothing.
+
+    The grid stays 0 with or without the solar, because the derived battery is
+    full and in self-consumption, so it covers whatever the circuits draw beyond
+    it. The test asserts the derived grid and the balance rather than holding the
+    battery idle to make the grid move; the emitter's own tests move the grid by
+    this production in isolation. The panel's own grid (-2883 W) and site (4443 W)
+    cannot be reached: that site counts about 2345 W of load outside the panel,
+    which no circuit carries and the emitter does not model."""
+    capture = load_reference_capture("main32_r202639-upstream-pv")
+    definition, _ = definition_from_tree(capture.tree, mask=False)
+    (tick,) = ticks_from_samples(capture.tree, [(0.0, capture.tree)], mask=False)
+    assert sum(tick.pv.values()) == 1560.0
+
+    def flows_of(given: TickInputs) -> EbusPanelPowerFlows:
+        emitter = Emitter.from_definition(definition, SetterRegistry())
+        emitter.start()
+        return emitter.publish_tick(given).power_flows
+
+    flows = flows_of(tick)
+    assert flows.pv == -1560.0
+    assert flows.battery == pytest.approx(-538.5)
+    assert flows.grid == pytest.approx(0.0, abs=1e-9)
+    assert flows.site == pytest.approx(2098.5)
+    values = [flows.pv, flows.battery, flows.grid, flows.site]
+    assert all(v is not None for v in values)
+    assert sum(v for v in values if v is not None) == pytest.approx(0.0, abs=1e-9)
+    without = flows_of(dataclasses.replace(tick, pv={}))
+    assert without.pv == 0.0
+    assert without.battery == pytest.approx(-2098.5)
+    assert not any(t.pv for t in capture.ticks)
 
 
 def test_only_a_derived_capture_has_notes() -> None:

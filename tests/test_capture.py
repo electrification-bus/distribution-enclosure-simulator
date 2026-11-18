@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -12,6 +13,8 @@ import pytest
 
 from ebus_panel_sim import (
     BESSConfig,
+    CaptureNote,
+    Device,
     DeviceInstance,
     DeviceManifest,
     Emitter,
@@ -948,17 +951,21 @@ def test_solar_beyond_the_circuits_without_a_single_battery_is_noted_not_capture
     assert tick.bess_pv == {}
 
 
+_UPSTREAM_PV = "main32_r202639-upstream-pv"
+
 # The solar each other capture's pv reports beyond what its circuits carry, where
 # it reports a watt or more.
-_UNCIRCUITED_PV = {"main32_r202639": "56.3", "main32_r202639-upstream-pv": "1560.0"}
+_UNCIRCUITED_PV = {"main32_r202639": "56.3"}
 
 
-@pytest.mark.parametrize("name", [n for n in reference_capture_names() if n != "r202639-f"])
+@pytest.mark.parametrize(
+    "name", [n for n in reference_capture_names() if n not in ("r202639-f", _UPSTREAM_PV)]
+)
 def test_no_other_capture_puts_solar_behind_a_battery(name: str) -> None:
-    """``main32_r202639``'s pv reports 56.3 W more than its PV circuit produces and
-    ``main32_r202639-upstream-pv``'s 1560.0 W that no circuit carries, and both
-    publish pv devices, so each gets a note and no battery is written hybrid.
-    ``r202639-c``'s pv reads 0.0, and the other captures leave it unvalued. Each
+    """``main32_r202639``'s pv reports 56.3 W more than its PV circuit produces, and
+    it publishes a pv device that circuit feeds, so it gets a note and no battery is
+    written hybrid. ``r202639-c``'s pv reads 0.0, ``main32_r202633``'s reads less
+    than its circuits produce, and the other captures leave it unvalued. Each
     battery keeps the default coupling, noted as defaulted, and no tick gives one
     PV."""
     tree = load_reference_capture(name).tree
@@ -975,3 +982,227 @@ def test_no_other_capture_puts_solar_behind_a_battery(name: str) -> None:
     else:
         assert not pv_notes
     assert all(not t.bess_pv for t in ticks_from_samples(tree, [(0.0, tree)], mask=False))
+
+
+def _upstream_pv() -> tuple[Tree, str, str]:
+    """Capture ``main32_r202639-upstream-pv``'s tree, whose pv reports 1560 W that no
+    circuit carries, and the ids of its two pv devices in tree order. No circuit
+    feeds either, and each publishes the same nominal power."""
+    tree = load_reference_capture(_UPSTREAM_PV).tree
+    a, b = [i for i, d in tree.items() if d.type == "pv"]
+    return tree, a, b
+
+
+def _panel_of(tree: Tree) -> Device:
+    (panel,) = [d for d in tree.values() if d.type == "distribution-enclosure"]
+    return panel
+
+
+def _lugs_of(tree: Tree, direction: str) -> Device:
+    (lugs,) = [
+        d for d in tree.values() if d.type == "lugs" and d.value("info/direction") == direction
+    ]
+    return lugs
+
+
+def _captured(
+    tree: Tree, *, mask: bool = False
+) -> tuple[PanelDefinition, list[CaptureNote], TickInputs]:
+    """The definition ``tree`` captures to, its notes, and the tick sampled from it."""
+    definition, notes = definition_from_tree(tree, mask=mask)
+    (tick,) = ticks_from_samples(tree, [(0.0, tree)], mask=mask)
+    return definition, notes, tick
+
+
+def _pv_note(notes: Sequence[CaptureNote]) -> str:
+    """The text of the one note on ``power-flows/pv``."""
+    (note,) = [n.note for n in notes if n.key == "power-flows/pv"]
+    return note
+
+
+def test_solar_beyond_the_circuits_is_the_production_of_the_inverters_no_circuit_feeds() -> None:
+    """The panel's pv reports 1560 W beyond what its circuits carry, and two pv
+    devices that no circuit feeds publish the same nominal power, so each is given
+    half of it as its production, and a note on the panel says the split is the
+    capture's, since the panel publishes only the total. The battery takes none of
+    it: it keeps the default coupling, noted as defaulted, and no PV of its own."""
+    tree, a, b = _upstream_pv()
+    definition, notes, tick = _captured(tree)
+    assert tick.pv == {a: 780.0, b: 780.0}
+    assert tick.bess_pv == {}
+    (bess,) = definition.manifest.of_class("bess")
+    assert "inverter-type" not in bess.metadata
+    assert [
+        n.note for n in notes if n.device == bess.instance_id and n.key == "inverter-type"
+    ] == ["not published; using ac-coupled"]
+    (note,) = [n for n in notes if n.key == "power-flows/pv"]
+    (panel,) = definition.manifest.of_class("panel")
+    assert note.device == panel.instance_id
+    assert "1560.0 W" in note.note and "info/nominal-power" in note.note
+
+
+def test_the_split_follows_each_inverter_s_nominal_power() -> None:
+    tree, a, b = _upstream_pv()
+    tree[a].properties["info/nominal-power"] = "3000"
+    tree[b].properties["info/nominal-power"] = "1000"
+    _, _, tick = _captured(tree)
+    assert tick.pv == {a: 1170.0, b: 390.0}
+
+
+def test_a_lone_unfed_inverter_takes_all_of_it_beside_a_circuit_fed_one() -> None:
+    """A circuit-fed pv device's production is already in its circuit, so it takes
+    none of the remainder, and it does not keep the one no circuit feeds from taking
+    all of it."""
+    tree, a, b = _upstream_pv()
+    consuming = next(
+        d
+        for d in tree.values()
+        if d.type == "circuit"
+        and d.declares("info/spaces")
+        and float(d.value("meter/active-power") or "0") < 0
+    )
+    consuming.properties["connection/feeds-device-id"] = b
+    definition, _, tick = _captured(tree)
+    (fed,) = [i for i in definition.manifest.of_class("pv") if i.instance_id == b]
+    assert "feed" in fed.metadata
+    assert tick.pv == {a: 1560.0}
+
+
+def test_an_inverter_the_upstream_lugs_name_is_one_no_circuit_feeds() -> None:
+    """Upstream lugs fed by a pv device put it upstream of the panel, which is where
+    the capture takes every inverter no circuit feeds to be."""
+    tree, a, b = _upstream_pv()
+    upstream = _lugs_of(tree, "UPSTREAM")
+    upstream.properties["connection/fed-by-device-id"] = a
+    upstream.properties["connection/fed-by-device-type"] = "energy.ebus.device.pv"
+    _, _, tick = _captured(tree)
+    assert tick.pv == {a: 780.0, b: 780.0}
+
+
+@pytest.mark.parametrize(
+    "power", [None, "0", "-5", "nan"], ids=["absent", "zero", "negative", "not a number"]
+)
+def test_an_inverter_without_a_usable_nominal_power_leaves_the_solar_uncaptured(
+    power: str | None,
+) -> None:
+    """Absent, the definition defaults the inverter's nominal power, which the panel
+    never published; zero, negative or not a finite number, there is nothing to
+    divide the remainder by. Either way it is noted and not captured."""
+    tree, _, b = _upstream_pv()
+    if power is None:
+        del tree[b].properties["info/nominal-power"]
+    else:
+        tree[b].properties["info/nominal-power"] = power
+    _, notes, tick = _captured(tree)
+    assert tick.pv == {}
+    note = _pv_note(notes)
+    assert "nominal-power" in note and "not captured" in note
+
+
+def _chained_upstream_pv() -> Tree:
+    """Capture ``main32_r202639-upstream-pv`` with its upstream lugs fed by another
+    enclosure."""
+    tree, _, _ = _upstream_pv()
+    _lugs_of(tree, "UPSTREAM").properties["connection/fed-by-device-type"] = (
+        "energy.ebus.device.distribution-enclosure"
+    )
+    return tree
+
+
+def _main32_r202633_by_day() -> Tree:
+    """Capture ``main32_r202633``, whose upstream lugs are fed by another enclosure
+    and whose pv device no circuit feeds, with its pv reporting 1 kW of production."""
+    tree = load_reference_capture("main32_r202633").tree
+    _panel_of(tree).properties["power-flows/pv"] = "-1000.0"
+    return tree
+
+
+@pytest.mark.parametrize(
+    "tree_of", [_chained_upstream_pv, _main32_r202633_by_day], ids=["upstream-pv", "r202633"]
+)
+def test_on_a_chained_panel_the_solar_is_noted_not_captured(tree_of: Callable[[], Tree]) -> None:
+    """On a panel fed by another enclosure, pv may report the chain's solar rather
+    than this panel's, so none of it is given to this panel's inverters."""
+    _, notes, tick = _captured(tree_of())
+    assert tick.pv == {}
+    assert tick.bess_pv == {}
+    note = _pv_note(notes)
+    assert "another enclosure" in note and "not captured" in note
+
+
+def test_downstream_lugs_feeding_a_pv_device_leave_the_solar_uncaptured() -> None:
+    """Downstream lugs naming a pv device put it on the feedthrough side, not upstream
+    of the panel, where the capture takes an inverter no circuit feeds to be."""
+    tree, a, _ = _upstream_pv()
+    _lugs_of(tree, "DOWNSTREAM").properties["connection/feeds-device-id"] = a
+    _, notes, tick = _captured(tree)
+    note = _pv_note(notes)
+    assert "downstream lugs" in note and "not captured" in note
+    assert tick.pv == {}
+
+
+@pytest.mark.parametrize("role", ["SOLAR", "MIXED"])
+def test_solar_or_mixed_lugs_leave_the_solar_uncaptured(role: str) -> None:
+    """Lugs feeding a SOLAR or MIXED node can bring solar no circuit carries, so no
+    inverter can be said to bring it."""
+    tree, _, _ = _upstream_pv()
+    _lugs_of(tree, "DOWNSTREAM").properties["connection/feeds-role"] = role
+    _, notes, tick = _captured(tree)
+    note = _pv_note(notes)
+    assert f"{role} lugs" in note and "not captured" in note
+    assert tick.pv == {}
+
+
+def test_each_sample_s_remainder_is_split_signed() -> None:
+    """The tree decides the inverters and their shares. Each sample's remainder is
+    split by them, a standby draw giving each a negative production, and a sample
+    that publishes no pv gives none."""
+    tree, a, b = _upstream_pv()
+    night = copy.deepcopy(tree)
+    _panel_of(night).properties["power-flows/pv"] = "10.0"
+    unpublished = copy.deepcopy(tree)
+    del _panel_of(unpublished).properties["power-flows/pv"]
+    ticks = ticks_from_samples(tree, [(0.0, tree), (1.0, night), (2.0, unpublished)], mask=False)
+    assert [t.pv for t in ticks] == [{a: 780.0, b: 780.0}, {a: -5.0, b: -5.0}, {}]
+
+
+def test_a_masked_capture_s_inverter_ids_are_the_published_ones() -> None:
+    """The ticks give production to the inverters the masked definition publishes,
+    and the note names them as published, never by an original id."""
+    tree, a, b = _upstream_pv()
+    definition, notes, tick = _captured(tree, mask=True)
+    assert set(tick.pv) == {i.instance_id for i in definition.manifest.of_class("pv")}
+    assert all(i in _pv_note(notes) for i in tick.pv)
+    assert not any(a in n.note or b in n.note for n in notes)
+
+
+def _fed_from_the_downstream_lugs(tree: Tree, pv: str) -> None:
+    _lugs_of(tree, "DOWNSTREAM").properties["connection/feeds-device-id"] = pv
+
+
+def _unrated(tree: Tree, pv: str) -> None:
+    del tree[pv].properties["info/nominal-power"]
+
+
+@pytest.mark.parametrize(
+    "block", [_fed_from_the_downstream_lugs, _unrated], ids=["downstream lugs", "nominal power"]
+)
+def test_a_masked_capture_s_note_names_the_inverter_in_the_way_as_published(
+    block: Callable[[Tree, str], None],
+) -> None:
+    """A note saying which inverter keeps the solar from being captured names it as
+    the masked definition publishes it, never by its original id."""
+    tree, a, b = _upstream_pv()
+    block(tree, b)
+    definition, notes, _ = _captured(tree, mask=True)
+    note = _pv_note(notes)
+    assert "not captured" in note
+    assert len([i for i in definition.manifest.of_class("pv") if i.instance_id in note]) == 1
+    assert not any(a in n.note or b in n.note for n in notes)
+
+
+@pytest.mark.parametrize("name", reference_capture_names())
+def test_only_the_upstream_pv_capture_gives_inverters_production(name: str) -> None:
+    tree = load_reference_capture(name).tree
+    ticks = ticks_from_samples(tree, [(0.0, tree)], mask=False)
+    assert any(t.pv for t in ticks) is (name == _UPSTREAM_PV)

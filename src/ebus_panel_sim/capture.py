@@ -69,8 +69,8 @@ _MASKED_SSID = "masked-ssid"
 # A shorter original ID masks a display name only when it is the whole name, so
 # an ID such as ``bess`` does not rename "Example BESS".
 _MIN_EMBEDDED = 6
-# A battery is taken to have solar behind it only where the panel reports at least
-# a watt of production beyond what its circuits carry: less is the rounding of the
+# Solar beyond what a panel's circuits carry is given to a battery or to inverters
+# only where the panel reports at least a watt of it: less is the rounding of the
 # published flow and readings, and a draw is no source at all.
 _PV_RESOLUTION_W = 1.0
 # The lugs roles under which the node behind a pair of lugs may produce solar.
@@ -128,14 +128,17 @@ class CaptureNote:
 
 
 @dataclass(frozen=True, slots=True)
-class _InverterPv:
+class _UncircuitedSolar:
     """Solar a panel reports beyond what its circuits carry, in watts, positive
-    while producing, and the battery it reaches the panel through (its original
-    device ID). ``battery`` is None where no single battery can be said to bring
-    it, and ``unattributed`` then says why."""
+    while producing, and where the capture writes it. Exactly one of the others is
+    set: ``battery``, the battery it reaches the panel through (its original device
+    ID); ``inverters``, the ``pv`` devices no circuit feeds (original device IDs),
+    each with the share of it that it produces, the shares summing to 1; or
+    ``unattributed``, why it is written nowhere."""
 
     watts: float
-    battery: str | None
+    battery: str | None = None
+    inverters: tuple[tuple[str, float], ...] = ()
     unattributed: str = ""
 
 
@@ -345,21 +348,41 @@ def definition_from_tree(
     one must each list all the others, and each is seeded with the largest register
     any of them publishes.
 
-    A battery is written ``inverter-type: hybrid`` when the panel's
-    ``power-flows/pv`` reports a watt or more of production beyond what its circuits
-    carry, as the variant its hardware version selects books them, nothing else in
-    the tree books solar, and the battery is the tree's only one. Something else
-    books solar where the tree holds a ``pv`` device, a circuit that variant books
-    as solar (a SOLAR circuit under span-alpha-test-b2, a circuit producing a watt
-    or more under the others) or lugs feeding a SOLAR or MIXED node. That solar
-    reaches the panel through the battery, so it is written as the PV of the
-    battery's inverter, which ``ticks_from_samples`` drives: the panel does not say
-    whether it is DC-coupled to that inverter or AC-coupled behind the battery's
-    gateway, and the two reach it alike. Such solar on any other panel is reported
-    as a note and not captured. Any other battery is written ``ac-coupled``, with a
-    note that it is not published. Where ``variant`` is not the one the hardware
-    version selects, a note says the ticks' battery PV is still derived as the
-    latter books circuits."""
+    Where the panel's ``power-flows/pv`` reports a watt or more of production
+    beyond what its circuits carry, as the variant its hardware version selects
+    books them, the tree alone decides where that solar is written, so a definition
+    and the ticks recorded with it agree; ``ticks_from_samples`` drives it:
+
+    - Where the tree holds ``pv`` devices that no circuit feeds, it is their
+      production. Such an inverter joins the site upstream of the main lugs, the one
+      place that is neither a circuit nor the downstream lugs, and each takes a
+      share in proportion to its published ``info/nominal-power``, with a note
+      saying so, since the panel publishes only the total. On captured SPAN
+      firmware several pv devices repeat one aggregate nominal power, so the split
+      is then equal. A circuit-fed ``pv`` device or a producing circuit does not
+      stand in the way, since its production is in the circuits already, and no
+      battery is written hybrid. The solar is reported as a note and not captured
+      where the upstream lugs' ``connection/fed-by-device-type`` is another
+      distribution enclosure, since this panel's pv may then report the chain's
+      solar; where downstream lugs name a ``pv`` device in
+      ``connection/feeds-device-id``, which puts it on the feedthrough side; where
+      lugs feed a SOLAR or MIXED node, which could bring it; or where one of those
+      inverters publishes no ``info/nominal-power``, or one that is not a finite
+      number greater than zero, to divide it by.
+    - Otherwise a battery is written ``inverter-type: hybrid`` when nothing else in
+      the tree books solar and the battery is the tree's only one. Something else
+      books solar where the tree holds a ``pv`` device, a circuit that variant books
+      as solar (a SOLAR circuit under span-alpha-test-b2, a circuit producing a watt
+      or more under the others) or lugs feeding a SOLAR or MIXED node. That solar
+      reaches the panel through the battery, so it is written as the PV of the
+      battery's inverter: the panel does not say whether it is DC-coupled to that
+      inverter or AC-coupled behind the battery's gateway, and the two reach it
+      alike. Such solar on any other panel is reported as a note and not captured.
+
+    Any other battery is written ``ac-coupled``, with a note that it is not
+    published. Where ``variant`` is not the one the hardware version selects, a
+    note says the ticks' battery PV and pv devices' production are still derived
+    as the latter books circuits."""
     definition, notes = _Mapper(tree, mask, root, generic_names, variant).run()
     if definition.variant == "span-alpha-test-b2" and (
         unbooked := unbooked_circuit_roles(definition.manifest)
@@ -468,11 +491,15 @@ def ticks_from_samples(
     (positive = consuming); an EVSE draws what the tick gives its feeding circuit; the grid
     is offline when a MID reports ``grid/islanding-state`` ``OFF_GRID`` or
     ``grid/grid-state`` ``DOWN`` or, without a MID, the panel's main relay is
-    ``OPEN``; each battery's link is its ``status/communication-state``. The
-    battery that ``definition_from_tree`` writes ``inverter-type: hybrid``, decided
-    from ``tree``, takes as its inverter's PV whatever the sample's
-    ``power-flows/pv`` reports beyond what its circuits carry, signed, so a sample
-    showing a standby draw there gives a negative PV.
+    ``OPEN``; each battery's link is its ``status/communication-state``. Where
+    ``definition_from_tree``, deciding from ``tree``, writes the solar the panel
+    reports beyond its circuits as the PV of a battery it writes ``inverter-type:
+    hybrid``, that battery's inverter takes as its PV whatever the sample's
+    ``power-flows/pv`` reports beyond what its circuits carry. Where it writes that
+    solar as the production of the ``pv`` devices no circuit feeds, each of them
+    produces the share of it its ``info/nominal-power`` gives it in ``tree``. Either
+    is signed, so a sample showing a standby draw there gives a negative PV or
+    production, and a sample that publishes no pv gives none.
 
     Only the panel's own device tree is read. A circuit feeding a battery is
     left out: the simulated battery's dispatch already accounts for that power,
@@ -508,16 +535,21 @@ def ticks_from_samples(
     circuit keeps the reading it published."""
     mapper = _Mapper(tree, mask, root, variant=variant)
     feeds = mapper.feeds()
+    solar = mapper.uncircuited_solar
     ticks: list[TickInputs] = []
     for stamp, raw_sample in samples:
         sample = {i: d for i, d in raw_sample.items() if i in mapper.ids}
         circuits = mapper.circuit_powers(sample)
         bess_pv: dict[str, float] = {}
+        pv: dict[str, float] = {}
         if (
-            mapper.inverter_pv_bess is not None
-            and (pv := mapper.inverter_pv_w(sample, circuits)) is not None
+            solar is not None
+            and (solar.battery is not None or solar.inverters)
+            and (remainder := mapper.solar_beyond_circuits_w(sample, circuits)) is not None
         ):
-            bess_pv[mapper.ids[mapper.inverter_pv_bess]] = pv
+            if solar.battery is not None:
+                bess_pv[mapper.ids[solar.battery]] = remainder
+            pv = {mapper.ids[i]: remainder * share + 0.0 for i, share in solar.inverters}
         evse = {
             mapper.ids[evse_id]: circuits.get(feed, 0.0)
             for evse_id, feed in feeds.items()
@@ -536,6 +568,7 @@ def ticks_from_samples(
                 evse=evse,
                 bess_communication=links,
                 bess_pv=bess_pv,
+                pv=pv,
             )
         )
     return ticks
@@ -652,9 +685,9 @@ class _Mapper:
             },
         )
         # Decided from the tree alone, so a definition and the ticks recorded with
-        # it agree on which battery the panel's uncircuited solar comes through.
-        self.inverter_pv = self._inverter_pv()
-        self.inverter_pv_bess = self.inverter_pv.battery if self.inverter_pv else None
+        # it agree on where the panel's uncircuited solar is written: a battery,
+        # the pv devices no circuit feeds, or nowhere.
+        self.uncircuited_solar = self._uncircuited_solar()
 
     # -- power -----------------------------------------------------------
 
@@ -678,7 +711,7 @@ class _Mapper:
                 circuits[published] = -_finite(power, device_id, "meter/active-power") + 0.0
         return _equal_shares(circuits, self.shared_meters)
 
-    def inverter_pv_w(self, sample: Tree, circuits: Mapping[str, float]) -> float | None:
+    def solar_beyond_circuits_w(self, sample: Tree, circuits: Mapping[str, float]) -> float | None:
         """The solar ``sample``'s ``power-flows/pv`` reports beyond what ``circuits``
         carry as the panel books them, positive while producing and negative where
         the panel books less than they carry, or None where it publishes no pv."""
@@ -689,43 +722,100 @@ class _Mapper:
         pv = -_finite(flow, self.panel_id, "power-flows/pv")
         return pv - circuit_solar_w(circuits, self.solar_circuits) + 0.0
 
-    def _inverter_pv(self) -> _InverterPv | None:
+    def _uncircuited_solar(self) -> _UncircuitedSolar | None:
         """The production the tree's panel reports beyond what its circuits carry,
-        or None when the tree shows none.
+        and where it is written, or None when the tree shows none.
 
-        It is the PV of a battery's inverter only where nothing else in the tree
-        books solar and the battery is the only one: a ``pv`` device, a circuit the
-        variant books as solar, or lugs feeding a SOLAR or MIXED node could be its
-        source, and a panel whose battery system meters the site itself reports
-        flows its circuits never carry."""
+        Where the tree holds ``pv`` devices that no circuit feeds, it is theirs
+        (``_inverters_solar``). Where it holds none, it is the PV of a battery's
+        inverter only where nothing else in the tree books solar and the battery is
+        the only one: a ``pv`` device, a circuit the variant books as solar, or lugs
+        feeding a SOLAR or MIXED node could be its source, and a panel whose battery
+        system meters the site itself reports flows its circuits never carry."""
         circuits = self.circuit_powers(self.tree)
-        pv = self.inverter_pv_w(self.tree, circuits)
-        if pv is None or pv < _PV_RESOLUTION_W:
+        watts = self.solar_beyond_circuits_w(self.tree, circuits)
+        if watts is None or watts < _PV_RESOLUTION_W:
             return None
+        fed = self.feeds()
+        inverters = [i for i, d in self.tree.items() if d.type == "pv" and i not in fed]
+        if inverters:
+            return self._inverters_solar(watts, inverters)
         sources = self._solar_sources(circuits)
         if sources:
-            return _InverterPv(
-                watts=pv,
-                battery=None,
+            return _UncircuitedSolar(
+                watts=watts,
                 unattributed=f"the tree also books solar ({', '.join(sources)}), so no "
                 "battery can be said to bring it",
             )
         batteries = [i for i, d in self.tree.items() if d.type == "bess"]
         if len(batteries) != 1:
-            return _InverterPv(
-                watts=pv,
-                battery=None,
+            return _UncircuitedSolar(
+                watts=watts,
                 unattributed=f"only a single battery could bring it to the panel, and the "
                 f"panel has {len(batteries)} batteries",
             )
-        return _InverterPv(watts=pv, battery=batteries[0])
+        return _UncircuitedSolar(watts=watts, battery=batteries[0])
+
+    def _inverters_solar(self, watts: float, inverters: Sequence[str]) -> _UncircuitedSolar:
+        """``watts`` as the production of ``inverters``, the tree's ``pv`` devices that
+        no circuit feeds, in tree order, each taking a share in proportion to its
+        ``info/nominal-power``. Such an inverter joins the site upstream of the main
+        lugs, the one place that is neither a circuit nor the downstream lugs. A
+        circuit-fed ``pv`` device or a producing circuit does not stand in the way,
+        since its production is in the circuits already.
+
+        It is written nowhere, with the first reason that holds, where the upstream
+        lugs are fed by another enclosure, whose solar this panel's pv may report;
+        where downstream lugs feed a ``pv`` device, which puts it on the
+        feedthrough side; where lugs feed a SOLAR or MIXED node, which could bring
+        it; or where one of ``inverters`` publishes no ``info/nominal-power``, or one
+        that is not a finite number greater than zero, to divide it by."""
+        lugs = [d for d in self.tree.values() if d.type == "lugs"]
+        # Upstream (main) lugs record what feeds them and downstream (feedthrough)
+        # lugs what they feed, so, as in _lugs and _bess, the record says which.
+        if any(
+            d.value("connection/fed-by-device-type") == _TYPE_PREFIX + "distribution-enclosure"
+            for d in lugs
+        ):
+            return _UncircuitedSolar(
+                watts=watts,
+                unattributed="the upstream lugs are fed by another enclosure, whose solar "
+                "this panel's pv may report",
+            )
+        for device in lugs:
+            target = device.value("connection/feeds-device-id")
+            if target is not None and target in self.tree and self.tree[target].type == "pv":
+                return _UncircuitedSolar(
+                    watts=watts,
+                    unattributed=f"the downstream lugs feed pv device {self.ids[target]}, "
+                    "which is not upstream of the lugs",
+                )
+        if roles := self._solar_lugs():
+            return _UncircuitedSolar(
+                watts=watts,
+                unattributed=f"the tree also books solar ({', '.join(roles)}), so no "
+                "inverter can be said to bring it",
+            )
+        ratings: list[tuple[str, float]] = []
+        for device_id in inverters:
+            rating = _nominal_power_w(self.tree[device_id])
+            if rating is None:
+                return _UncircuitedSolar(
+                    watts=watts,
+                    unattributed=f"pv device {self.ids[device_id]} publishes no usable "
+                    "info/nominal-power to divide it by",
+                )
+            ratings.append((device_id, rating))
+        total = sum(rating for _, rating in ratings)
+        return _UncircuitedSolar(
+            watts=watts, inverters=tuple((i, rating / total) for i, rating in ratings)
+        )
 
     def _solar_sources(self, circuits: Mapping[str, float]) -> list[str]:
         """What in the tree books solar besides a battery: ``pv`` devices, the
         circuits the variant books as solar (SOLAR circuits under
         span-alpha-test-b2, producing circuits whose output totals a watt or more under
-        the others), and
-        lugs feeding a SOLAR or MIXED node."""
+        the others), and lugs feeding a SOLAR or MIXED node (``_solar_lugs``)."""
         sources: list[str] = []
         if devices := sum(d.type == "pv" for d in self.tree.values()):
             sources.append(f"{devices} pv device{'s' * (devices > 1)}")
@@ -734,12 +824,16 @@ class _Mapper:
                 sources.append(f"{roles} SOLAR circuit{'s' * (roles > 1)}")
         elif circuit_solar_w(circuits, None) >= _PV_RESOLUTION_W:
             sources.append("circuits producing solar")
-        lugs = sorted(
+        return sources + self._solar_lugs()
+
+    def _solar_lugs(self) -> list[str]:
+        """``SOLAR lugs`` or ``MIXED lugs`` for each pair of lugs feeding such a node,
+        whatever their direction, sorted."""
+        return sorted(
             f"{role} lugs"
             for d in self.tree.values()
             if d.type == "lugs" and (role := d.value("connection/feeds-role")) in _SOLAR_LUGS_ROLES
         )
-        return sources + lugs
 
     # -- ids -------------------------------------------------------------
 
@@ -846,12 +940,22 @@ class _Mapper:
     def run(self) -> tuple[PanelDefinition, list[CaptureNote]]:
         feeds = self.feeds()
         self._note_dangling_feeds()
-        if self.inverter_pv is not None and self.inverter_pv.battery is None:
+        solar = self.uncircuited_solar
+        if solar is not None and solar.inverters:
             self.note(
                 self.panel_id,
                 "power-flows/pv",
-                f"reports {self.inverter_pv.watts:.1f} W of solar beyond what its circuits "
-                f"carry; {self.inverter_pv.unattributed}; not captured",
+                f"reports {solar.watts:.1f} W of solar beyond what its circuits carry; "
+                "written as the production of the pv devices no circuit feeds "
+                f"({', '.join(self.ids[i] for i, _ in solar.inverters)}), in proportion "
+                "to their info/nominal-power, since the panel publishes only the total",
+            )
+        elif solar is not None and solar.unattributed:
+            self.note(
+                self.panel_id,
+                "power-flows/pv",
+                f"reports {solar.watts:.1f} W of solar beyond what its circuits carry; "
+                f"{solar.unattributed}; not captured",
             )
         inferred = _infer_variant(self.tree[self.panel_id])
         if self.variant != inferred:
@@ -860,7 +964,8 @@ class _Mapper:
                 "variant",
                 f"{self.variant} requested, where the panel's hardware version selects "
                 f"{inferred}; the solar its pv reports beyond its circuits, and so any "
-                f"battery's PV in the ticks, is still taken as {inferred} books circuits",
+                "battery's PV or pv device's production in the ticks, is still taken as "
+                f"{inferred} books circuits",
             )
         instances = [self._described(self.panel_id, self._panel())]
         bess_configs: list[BESSConfig] = []
@@ -1143,12 +1248,13 @@ class _Mapper:
             )
         if (soe := d.value("soc/soe")) is not None:
             md["initial-soe-kwh"] = soe
-        if self.inverter_pv is not None and device_id == self.inverter_pv.battery:
+        solar = self.uncircuited_solar
+        if solar is not None and device_id == solar.battery:
             md["inverter-type"] = "hybrid"
             self.note(
                 device_id,
                 "inverter-type",
-                f"power-flows/pv reports {self.inverter_pv.watts:.1f} W of solar beyond "
+                f"power-flows/pv reports {solar.watts:.1f} W of solar beyond "
                 "what the panel's circuits carry and no pv device produces, so it reaches "
                 "the panel through this battery; written hybrid, though the panel does not "
                 "say whether it is DC-coupled to the battery's inverter or AC-coupled "
@@ -1298,6 +1404,19 @@ def _int_str(value: str) -> str:
 def _lugs_id(device: Device) -> str:
     direction = (device.value("info/direction") or "upstream").lower()
     return f"lugs-{direction}"
+
+
+def _nominal_power_w(device: Device) -> float | None:
+    """A ``pv`` device's published ``info/nominal-power``, or None where it publishes
+    none, or one that is not a finite number greater than zero."""
+    raw = device.value("info/nominal-power")
+    if raw is None:
+        return None
+    try:
+        power = float(raw)
+    except ValueError:
+        return None
+    return power if math.isfinite(power) and power > 0 else None
 
 
 # ---------------------------------------------------------------------------
