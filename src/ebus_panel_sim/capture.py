@@ -991,20 +991,28 @@ class _Mapper:
         solar = self.uncircuited_solar
         if solar is not None and (solar.inverters or solar.unattributed):
             # The tree's figure is quoted where it publishes one; it decided nothing.
-            figure = (
-                "publishes no pv flow in its tree"
-                if solar.watts is None
-                else f"reports {solar.watts:.1f} W of solar beyond what its circuits carry"
+            published = solar.watts is not None
+            lead = (
+                f"reports {solar.watts:.1f} W of solar beyond what its circuits carry"
+                if published
+                else "publishes no pv flow in its tree"
             )
             if solar.inverters:
+                subject = (
+                    "" if published else "the solar each sample reports beyond its circuits is "
+                )
                 text = (
-                    f"{figure}; written as the production of the pv devices no circuit "
+                    f"{lead}; {subject}written as the production of the pv devices no circuit "
                     f"feeds ({', '.join(self.ids[i] for i, _ in solar.inverters)}), in "
                     "proportion to their info/nominal-power, since the panel publishes "
                     "only the total"
                 )
+            elif published:
+                text = f"{lead}; {solar.unattributed}; not captured"
             else:
-                text = f"{figure}; {solar.unattributed}; not captured"
+                text = (
+                    f"{lead}; the solar beyond its circuits is not captured: {solar.unattributed}"
+                )
             self.note(self.panel_id, "power-flows/pv", text)
         inferred = _infer_variant(self.tree[self.panel_id])
         if self.variant != inferred:
