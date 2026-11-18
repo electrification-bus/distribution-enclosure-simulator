@@ -1086,6 +1086,42 @@ def test_a_lone_unfed_inverter_takes_all_of_it_beside_a_circuit_fed_one() -> Non
     assert tick.pv == {a: 1560.0}
 
 
+@pytest.mark.parametrize("feeds_b", [False, True], ids=["no feed", "feeding b"])
+def test_a_producing_circuit_leaves_the_inverters_the_solar_beyond_it(
+    rec: PahoRecorder, feeds_b: bool
+) -> None:
+    """An idle circuit now backfeeds 600 W and the panel's pv reports 2160 W. The
+    circuit carries its 600 W already, so it stands in no inverter's way: the
+    1560 W beyond it is the production of the inverters no circuit feeds, split
+    equally, or all of it the one left where that circuit feeds the other.
+    Republished, pv reads the panel's 2160 W and the four flows balance (in the
+    snapshot: the span variant publishes grid in whole watts)."""
+    tree, a, b = _upstream_pv()
+    backfeeding = next(
+        d
+        for d in tree.values()
+        if d.type == "circuit"
+        and d.declares("info/spaces")
+        and d.value("meter/active-power") == "0.0"
+    )
+    backfeeding.properties["meter/active-power"] = "600.0"
+    if feeds_b:
+        backfeeding.properties["connection/feeds-device-id"] = b
+    _panel_of(tree).properties["power-flows/pv"] = "-2160"
+    definition, notes, tick = _captured(tree)
+    assert tick.pv == ({a: 1560.0} if feeds_b else {a: 780.0, b: 780.0})
+    assert "1560.0 W" in _pv_note(notes)
+    (panel,) = definition.manifest.of_class("panel")
+    rec.reset()
+    emitter = Emitter.from_definition(definition, SetterRegistry())
+    emitter.start()
+    flows = emitter.publish_tick(tick).power_flows
+    assert float(rec.retained[f"ebus/5/{panel.instance_id}/power-flows/pv"]) == -2160.0
+    values = [flows.pv, flows.battery, flows.grid, flows.site]
+    assert all(v is not None for v in values)
+    assert sum(v for v in values if v is not None) == pytest.approx(0.0, abs=1e-9)
+
+
 def test_an_inverter_the_upstream_lugs_name_is_one_no_circuit_feeds() -> None:
     """Upstream lugs fed by a pv device put it upstream of the panel, which is where
     the capture takes every inverter no circuit feeds to be."""
