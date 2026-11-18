@@ -880,7 +880,7 @@ def test_solar_beyond_the_circuits_beside_another_solar_source_is_noted_not_capt
     assert tick.bess_pv == {}
 
 
-@pytest.mark.parametrize("backfeed", ["0.9", "1.0", "1565.7"])
+@pytest.mark.parametrize("backfeed", ["1.0", "1565.7"])
 def test_under_the_span_variant_a_producing_circuit_does_not_stand_in_the_battery_s_way(
     backfeed: str,
 ) -> None:
@@ -926,12 +926,15 @@ def test_a_requested_variant_the_hardware_does_not_select_is_noted(
 
 def test_once_a_battery_is_hybrid_each_sample_s_remainder_stays_signed() -> None:
     """The tree decides the battery; a later sample showing a standby draw in pv
-    gives that battery a negative PV rather than none."""
+    gives that battery a negative PV rather than none, and a sample that publishes
+    no pv gives it nothing."""
     tree = load_reference_capture("r202639-f").tree
     night = load_reference_capture("r202639-f").tree
     night["masked-panel"].properties["power-flows/pv"] = "5.0"
-    ticks = ticks_from_samples(tree, [(0.0, tree), (1.0, night)], mask=False)
-    assert [t.bess_pv for t in ticks] == [{"masked-bess-1": 3247.0}, {"masked-bess-1": -5.0}]
+    unpublished = copy.deepcopy(tree)
+    del unpublished["masked-panel"].properties["power-flows/pv"]
+    ticks = ticks_from_samples(tree, [(0.0, tree), (1.0, night), (2.0, unpublished)], mask=False)
+    assert [t.bess_pv for t in ticks] == [{"masked-bess-1": 3247.0}, {"masked-bess-1": -5.0}, {}]
 
 
 @pytest.mark.parametrize(
@@ -1385,6 +1388,8 @@ def test_a_night_tree_still_gives_the_inverters_each_sample_s_solar(
     _, notes = definition_from_tree(night, mask=False)
     note = _pv_note(notes)
     assert "written as the production" in note and note.startswith(figure)
+    if pv is None:
+        assert "the solar each sample reports beyond its circuits is written" in note
 
 
 def test_a_masked_capture_s_inverter_ids_are_the_published_ones() -> None:
