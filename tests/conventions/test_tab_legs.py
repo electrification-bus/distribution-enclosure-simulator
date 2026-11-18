@@ -19,7 +19,7 @@ def test_rows_alternate_down_the_panel() -> None:
     assert legs_for_tabs((42,)) == (Leg.L1,)
 
 
-def test_numbering_is_absolute_so_a_panel_starting_at_9_puts_9_and_10_on_l1() -> None:
+def test_a_panel_whose_spaces_start_at_9_puts_9_and_10_on_l1() -> None:
     assert legs_for_tabs((9,)) == (Leg.L1,)
     assert legs_for_tabs((10,)) == (Leg.L1,)
     assert legs_for_tabs((11,)) == (Leg.L2,)

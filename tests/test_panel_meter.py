@@ -377,18 +377,38 @@ def test_a_two_pole_source_offsets_both_legs() -> None:
 
 
 def test_a_leg_carrying_a_backfeed_reads_its_magnitude() -> None:
-    # An RMS reading has no sign: 10 A fed back reads 10 A, as 10 A drawn does.
+    # An RMS reading has no sign: 10 A fed back reads 10 A, as 10 A drawn does, at
+    # the downstream lugs and at the upstream lugs that carry it on.
     r = resolve(
         panel=_panel(),
-        circuits={"source": _circuit(tabs=(1,), placement="upstream-of-lugs")},
+        circuits={"source": _circuit(tabs=(1,), placement="downstream-of-lugs")},
         gated_powers={"source": -1200.0},
         battery_w=0.0,
         grid_online=True,
         has_battery=False,
     )
+    assert r.downstream_l1_current_a == pytest.approx(10.0)
+    assert r.downstream_l2_current_a == 0.0
     assert r.upstream_l1_current_a == pytest.approx(10.0)
     assert r.upstream_l2_current_a == 0.0
-    assert r.downstream_l1_current_a == 0.0
+
+
+def test_a_backfeed_past_the_feedthrough_offsets_a_load_on_its_leg() -> None:
+    # 10 A drawn in the panel and 5 A fed back past the feedthrough, both on L1.
+    circuits = {
+        "load": _circuit(tabs=(1,), placement="upstream-of-lugs"),
+        "source": _circuit(tabs=(2,), placement="downstream-of-lugs"),
+    }
+    r = resolve(
+        panel=_panel(),
+        circuits=circuits,
+        gated_powers={"load": 1200.0, "source": -600.0},
+        battery_w=0.0,
+        grid_online=True,
+        has_battery=False,
+    )
+    assert r.downstream_l1_current_a == pytest.approx(5.0)
+    assert r.upstream_l1_current_a == pytest.approx(5.0)
 
 
 # -- feedthrough -------------------------------------------------------------

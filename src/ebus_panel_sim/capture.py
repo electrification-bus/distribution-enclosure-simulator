@@ -1026,14 +1026,15 @@ class _Mapper:
             "panel", self.ids[pid], self._name(pid, str(d.description.get("name", pid))), md
         )
 
-    def _assign_tabs(self, *, two_pole: bool) -> list[int]:
+    def _assign_tabs(self, poles: int) -> list[int]:
         """The lowest free spaces above every published one, for a circuit whose
-        ``info/spaces`` is not published: one space for a single-pole circuit, and
-        for a two-pole one two spaces one above the other in a column, which span
-        both legs (``conventions/tab_legs.py``)."""
+        ``info/spaces`` is not published: one space per pole, one above the other
+        in a column. A two-pole circuit's two span both legs
+        (``conventions/tab_legs.py``); the emitter refuses any wider circuit, as
+        it does one published on three spaces."""
         tab = self.first_free_tab
         while True:
-            tabs = [tab, tab + 2] if two_pole else [tab]
+            tabs = [tab + 2 * pole for pole in range(poles)]
             if self.assigned_tabs.isdisjoint(tabs):
                 self.assigned_tabs.update(tabs)
                 return tabs
@@ -1041,9 +1042,11 @@ class _Mapper:
 
     def _circuit(self, device_id: str, d: Device) -> DeviceInstance:
         name = d.value("info/name") or str(d.description.get("name", device_id))
+        poles = d.value("breaker/poles")
+        pole_count = 1 if poles is None else int(float(poles))
         tabs = _tabs(d.value("info/spaces"))
         if not tabs:
-            tabs = self._assign_tabs(two_pole=d.value("breaker/poles") == "2")
+            tabs = self._assign_tabs(pole_count)
             self.note(device_id, "tab-numbers", f"info/spaces not published; using {tabs}")
         md: dict[str, str] = {
             "tab-numbers": ",".join(str(t) for t in tabs),
@@ -1055,9 +1058,8 @@ class _Mapper:
             self.note(device_id, "breaker-rating-a", "not published; using 20")
         else:
             md["breaker-rating-a"] = rating
-        poles = d.value("breaker/poles")
         if poles is not None:
-            md["dipole"] = "true" if int(float(poles)) > 1 else "false"
+            md["dipole"] = "true" if pole_count > 1 else "false"
         priority = d.value("load-shed/priority")
         if priority is None:
             priority = "NEVER"

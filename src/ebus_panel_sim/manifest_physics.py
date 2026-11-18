@@ -633,13 +633,13 @@ def _parse_circuit(inst: DeviceInstance) -> CircuitPhysics:
         raise ManifestValidationError(
             f"dipole=false but {len(tabs)} tabs declared; single-tab circuits only"
         )
-    # A 240 V circuit needs both legs (``conventions/tab_legs.py``): two spaces of
-    # one row, or two rows apart in one column, share a leg.
-    if len(tabs) > 1 and len(set(legs)) == 1:
+    # A two-pole breaker takes two spaces one above the other in a column, which
+    # span both legs (``conventions/tab_legs.py``). Any other footprint is not one
+    # in this layout: one space, two of one row, which share a leg, or three.
+    if dipole_declared and (len(tabs) != 2 or abs(tabs[1] - tabs[0]) != 2):
         raise ManifestValidationError(
-            f"key 'tab-numbers': a two-pole circuit on {raw_tabs!r} has every tab on "
-            f"{legs[0]}; it must span both legs, as two spaces one above the other in a "
-            "column do (e.g. '1,3')"
+            f"key 'tab-numbers': a two-pole circuit takes two spaces one above the "
+            f"other in a column, such as '1,3', which span both legs; got {raw_tabs!r}"
         )
 
     priority = _require(md, "default-priority")

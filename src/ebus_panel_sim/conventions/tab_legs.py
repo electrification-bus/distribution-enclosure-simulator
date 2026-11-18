@@ -7,12 +7,13 @@ on L1 again. A 240 V two-pole breaker takes two spaces one above the other in a
 column (e.g. 1 and 3), so it spans both legs. Every two-pole circuit in the
 reference captures sits on spaces n and n + 2, as this layout requires.
 
-Numbering is absolute: a panel whose spaces start at 9, as the MAIN 16 and MAIN 40
-captures' do, puts 9 and 10 on L1. The eBus specification leaves the numbering to
-the manufacturer, "typically odd positions on the left bus and even on the right,
-or sequential" (distribution-enclosure.md, "Enclosure-specific: physical
-position"). This module implements the first; a panel numbered sequentially down
-one column is not modelled.
+A tab's leg follows from its number alone: on a panel whose spaces start at 9, as
+the MAIN 16 and MAIN 40 captures' do, 9 and 10 are on L1. The eBus specification
+leaves the numbering to the manufacturer, "typically odd positions on the left bus
+and even on the right, or sequential" (distribution-enclosure.md, "Enclosure-specific:
+physical position"). This module implements the first. A panel numbered
+sequentially down one column is not modelled: a definition numbered that way puts
+its two-pole circuits on consecutive spaces, which ``ManifestPhysicsView`` refuses.
 
 This module is the single source of truth for that convention. The lugs' per-leg
 currents in ``PanelMeter`` go through ``legs_for_tabs`` rather than computing a

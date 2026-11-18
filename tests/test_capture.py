@@ -138,6 +138,27 @@ def test_assigned_tabs_put_a_two_pole_circuit_across_both_legs(rec: PahoRecorder
     assert len(every) == len(set(every))
 
 
+@pytest.mark.parametrize(
+    "spaces",
+    [
+        pytest.param("39,40", id="one row, as a panel numbered sequentially publishes it"),
+        pytest.param("39", id="one space"),
+    ],
+)
+def test_a_two_pole_circuit_the_layout_cannot_hold_is_a_capture_error(
+    rec: PahoRecorder, spaces: str
+) -> None:
+    """A two-pole circuit published on two spaces of one row has no 240 V across it
+    in the layout the emitter models, and one on a single space is no two-pole
+    breaker, so the definition the tree maps to is refused rather than given legs
+    the panel does not have."""
+    retained = _publish(rec, _source())
+    (topic,) = (t for t, v in retained.items() if t.endswith("/info/spaces") and v == "32,34")
+    retained[topic] = spaces
+    with pytest.raises(CaptureError, match=r"tab-numbers.*both legs"):
+        definition_from_tree(tree_from_retained(retained), mask=False)
+
+
 def test_masking_replaces_every_serial_and_keeps_references(rec: PahoRecorder) -> None:
     source = _source()
     original = _publish(rec, source)

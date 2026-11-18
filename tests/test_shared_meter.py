@@ -381,12 +381,6 @@ def _with(manifest: DeviceManifest, cid: str, **md: str) -> DeviceManifest:
             ),
             "spaces 34, 36, 38",
         ),
-        (
-            _manifest(
-                _circuit("left", "34", "15", "wide"), _circuit("wide", "34,36,38", "30", "left")
-            ),
-            "spaces 34, 36, 38",
-        ),
     ],
 )
 def test_a_shared_breaker_that_cannot_be_one_device_is_rejected(
@@ -471,8 +465,8 @@ def test_a_panel_with_a_shared_breaker_captures_and_rebuilds(
 ) -> None:
     """Each circuit's share of the breaker's reading republishes it exactly: in one
     space, or across two where every circuit is two-pole, the meter reads the same
-    however the load is split, and with both circuits drawing the same way so do the
-    flows and lugs."""
+    however the load is split, and so do the flows and lugs, a leg's currents adding
+    with their signs."""
     assert _round_trip(rec, manifest, loads) == {}
 
 
