@@ -369,7 +369,7 @@ class Emitter:
         )
         # The `pv` devices no circuit feeds. `TickInputs.pv` may name only those:
         # a fed one's production is already its feeding circuit's power.
-        self._uncircuited_pv: frozenset[str] = frozenset(
+        self._unfed_pv: frozenset[str] = frozenset(
             pid for pid, p in self._physics.all_pv().items() if p.feed is None
         )
         self._relays = RelayResolver()
@@ -1494,11 +1494,11 @@ class Emitter:
         stray = sorted(set(pv) - set(devices))
         if stray:
             raise EmitterStateError(
-                f"TickInputs.pv names {stray!r}, which are not among the pv devices no "
-                f"circuit feeds {sorted(self._uncircuited_pv)!r}"
+                f"TickInputs.pv names {stray!r}, which are not pv devices; the pv devices "
+                f"no circuit feeds are {sorted(self._unfed_pv)!r}"
             )
         for pid in pv:
-            if pid not in self._uncircuited_pv:
+            if pid not in self._unfed_pv:
                 raise EmitterStateError(
                     f"TickInputs.pv names pv device {pid!r}, which is fed by circuit "
                     f"{devices[pid].feed!r}; that circuit's power carries its production"
