@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -19,10 +20,13 @@ from ebus_panel_sim import (
     PanelDefinition,
     SetterRegistry,
     TickInputs,
+    Tree,
+    Variant,
     dump_ticks,
     load_definition,
     load_reference_capture,
     load_ticks,
+    reference_capture_names,
 )
 from ebus_panel_sim.capture import (
     CaptureError,
@@ -664,3 +668,310 @@ def test_a_role_the_variant_cannot_book_is_captured_with_a_note(role: str) -> No
     assert role in note.note and "cannot book" in note.note
     with pytest.raises(ManifestValidationError, match=f"{circuits[0].instance_id}.*{role}"):
         Emitter.from_definition(definition, SetterRegistry())
+
+
+def _hybrid_variant_source() -> PanelDefinition:
+    """The span-alpha-test-b2 source with its battery's inverter taking PV and no
+    SOLAR circuit, the inverter circuit's role dropped, and the dispatch settings
+    capture defaults to, so a rebuilt panel dispatches alike."""
+    source = _variant_source()
+
+    def adapted(inst: DeviceInstance) -> DeviceInstance:
+        if inst.entity_class == "bess":
+            return dataclasses.replace(inst, metadata={**inst.metadata, "inverter-type": "hybrid"})
+        if inst.metadata.get("feeds-role") == "SOLAR":
+            md = {k: v for k, v in inst.metadata.items() if k != "feeds-role"}
+            return dataclasses.replace(inst, metadata=md)
+        return inst
+
+    return dataclasses.replace(
+        source,
+        manifest=DeviceManifest(instances=tuple(adapted(i) for i in source.manifest.instances)),
+        bess_configs=(
+            BESSConfig(
+                instance_id="bess",
+                nameplate_capacity_kwh=13.5,
+                max_charge_w=5000.0,
+                max_discharge_w=5000.0,
+            ),
+        ),
+    )
+
+
+# 2 kW from the battery's own inverter, while circuit-4, with no role, backfeeds
+# 300 W: the variant books that to the site, where the span variant would book
+# every producing circuit as solar.
+_HYBRID_TICK = TickInputs(
+    current_time=0.0,
+    grid_online=True,
+    circuits={"circuit-1": 121.0, "circuit-2": 60.0, "circuit-3": 0.0, "circuit-4": -300.0},
+    evse={"evse": 0.0},
+    bess_pv={"bess": 2000.0},
+)
+
+
+@pytest.mark.parametrize("mask", [False, True])
+def test_solar_beyond_the_circuits_comes_through_the_only_battery_and_replays(
+    rec: PahoRecorder, mask: bool
+) -> None:
+    """With nothing else in the tree booking solar, the panel's pv less what its
+    circuits carry, as the variant books them, is the PV of the battery's
+    inverter: the definition writes the battery hybrid, its tick drives that PV,
+    and the rebuilt panel publishes the tree the source did."""
+    original = _run(rec, _hybrid_variant_source(), [_HYBRID_TICK])
+    tree = tree_from_retained(original[-1])
+    assert float(tree["example-b2-001"].properties["power-flows/pv"]) == -2000.0
+    captured, notes = definition_from_tree(tree, mask=mask)
+    (bess,) = captured.manifest.of_class("bess")
+    assert bess.metadata["inverter-type"] == "hybrid"
+    (note,) = [n for n in notes if n.device == bess.instance_id and n.key == "inverter-type"]
+    assert "2000.0 W" in note.note and "written hybrid" in note.note
+    (tick,) = ticks_from_samples(tree, [(0.0, tree)], mask=mask)
+    assert tick.bess_pv == {bess.instance_id: 2000.0}
+    replay = _run(rec, captured, [tick])
+    if not mask:
+        assert [_stable(r) for r in replay] == [_stable(r) for r in original]
+
+
+@pytest.mark.parametrize(("pv", "hybrid"), [("-0.9", False), ("-1.0", True)])
+def test_a_watt_of_solar_beyond_the_circuits_is_the_least_a_battery_takes(
+    pv: str, hybrid: bool
+) -> None:
+    tree = load_reference_capture("r202639-f").tree
+    tree["masked-panel"].properties["power-flows/pv"] = pv
+    definition, notes = definition_from_tree(tree, mask=False)
+    (bess,) = definition.manifest.of_class("bess")
+    assert (bess.metadata.get("inverter-type") == "hybrid") is hybrid
+    assert not any(n.key == "power-flows/pv" for n in notes)
+    (tick,) = ticks_from_samples(tree, [(0.0, tree)], mask=False)
+    assert tick.bess_pv == ({"masked-bess-1": 1.0} if hybrid else {})
+
+
+def _r202639_c_with_pv() -> Tree:
+    """Capture ``r202639-c``, a panel with a battery and no SOLAR circuit, reporting
+    a 3 W draw in pv."""
+    tree = load_reference_capture("r202639-c").tree
+    (panel,) = [d for d in tree.values() if d.type == "distribution-enclosure"]
+    panel.properties["power-flows/pv"] = "3.0"
+    return tree
+
+
+def _with_solar_circuit(pv: str) -> Tree:
+    """Capture ``r202639-f`` with one circuit given the SOLAR role and producing
+    1.5 kW, the panel reporting ``pv``."""
+    tree = load_reference_capture("r202639-f").tree
+    tree["masked-circuit-19"].properties["connection/feeds-role"] = "SOLAR"
+    tree["masked-circuit-19"].properties["meter/active-power"] = "1500.0"
+    tree["masked-panel"].properties["power-flows/pv"] = pv
+    return tree
+
+
+@pytest.mark.parametrize(
+    "tree_of", [_r202639_c_with_pv, lambda: _with_solar_circuit("-1400.0")], ids=["draw", "short"]
+)
+def test_a_draw_beyond_the_circuits_puts_no_solar_behind_a_battery(
+    tree_of: Callable[[], Tree],
+) -> None:
+    """Only production beyond what the circuits carry is solar behind a battery: a
+    pv reading a draw, or booking less than the circuits produce, leaves the
+    battery's coupling to the default, with the note every defaulted value gets."""
+    tree = tree_of()
+    definition, notes = definition_from_tree(tree, mask=False)
+    (bess,) = definition.manifest.of_class("bess")
+    assert "inverter-type" not in bess.metadata
+    assert [
+        n.note for n in notes if n.device == bess.instance_id and n.key == "inverter-type"
+    ] == ["not published; using ac-coupled"]
+    assert not any(n.key == "power-flows/pv" for n in notes)
+    (tick,) = ticks_from_samples(tree, [(0.0, tree)], mask=False)
+    assert tick.bess_pv == {}
+
+
+def _with_solar_lugs(role: str) -> Tree:
+    tree = load_reference_capture("r202639-f").tree
+    tree["masked-lugs-downstream"].properties["connection/feeds-role"] = role
+    return tree
+
+
+def _main32_without_its_pv_device() -> Tree:
+    """Capture ``main32_r202639`` with its pv device and the edge to it removed: its
+    battery system meters the site, and its pv reports 56.3 W more than its PV
+    circuit produces."""
+    tree = load_reference_capture("main32_r202639").tree
+    pv_ids = [i for i, d in tree.items() if d.type == "pv"]
+    for device_id in pv_ids:
+        del tree[device_id]
+    for device in tree.values():
+        children = device.description.get("children")
+        if isinstance(children, list):
+            device.description["children"] = [c for c in children if c not in pv_ids]
+        if device.value("connection/feeds-device-id") in pv_ids:
+            for key in [k for k in device.properties if k.startswith("connection/feeds-device")]:
+                del device.properties[key]
+    return tree
+
+
+@pytest.mark.parametrize(
+    ("tree_of", "watts", "source"),
+    [
+        (lambda: _with_solar_circuit("-3500.0"), "2000.0", "1 SOLAR circuit"),
+        (lambda: _with_solar_lugs("SOLAR"), "3247.0", "SOLAR lugs"),
+        (lambda: _with_solar_lugs("MIXED"), "3247.0", "MIXED lugs"),
+        (_main32_without_its_pv_device, "56.3", "circuits producing solar"),
+    ],
+    ids=["solar circuit", "solar lugs", "mixed lugs", "main32 producing circuit"],
+)
+def test_solar_beyond_the_circuits_beside_another_solar_source_is_noted_not_captured(
+    tree_of: Callable[[], Tree], watts: str, source: str
+) -> None:
+    """A battery is written hybrid only where nothing else in the tree books solar:
+    a SOLAR circuit, lugs feeding a SOLAR or MIXED node, or, under the span
+    variant, a producing circuit could be the source, and a battery system that
+    meters the site itself reports flows its circuits never carry."""
+    tree = tree_of()
+    definition, notes = definition_from_tree(tree, mask=False)
+    assert not any(
+        i.metadata.get("inverter-type") == "hybrid" for i in definition.manifest.of_class("bess")
+    )
+    (note,) = [n for n in notes if n.key == "power-flows/pv"]
+    assert f"{watts} W" in note.note and source in note.note and "not captured" in note.note
+    (tick,) = ticks_from_samples(tree, [(0.0, tree)], mask=False)
+    assert tick.bess_pv == {}
+
+
+@pytest.mark.parametrize(("backfeed", "hybrid"), [("0.9", True), ("1.0", False)])
+def test_under_the_span_variant_a_watt_of_backfeed_is_a_solar_source(
+    backfeed: str, hybrid: bool
+) -> None:
+    """The span variant books every producing circuit as solar, so a circuit
+    backfeeding a watt or more could be the source of the panel's uncircuited
+    solar; less is rounding, as for the solar itself. Here the stripped MAIN 32's
+    PV circuit reads 0 and another circuit ``backfeed``."""
+    tree = _main32_without_its_pv_device()
+    circuits = sorted(
+        i for i, d in tree.items() if d.type == "circuit" and d.declares("info/spaces")
+    )
+    pv_circuit, other = (
+        next(i for i in circuits if tree[i].value("meter/active-power") == "1565.7"),
+        next(i for i in circuits if tree[i].value("meter/active-power") != "1565.7"),
+    )
+    tree[pv_circuit].properties["meter/active-power"] = "0.0"
+    tree[other].properties["meter/active-power"] = backfeed
+    definition, notes = definition_from_tree(tree, mask=False)
+    (bess,) = definition.manifest.of_class("bess")
+    assert (bess.metadata.get("inverter-type") == "hybrid") is hybrid
+    assert any(n.key == "power-flows/pv" for n in notes) is not hybrid
+
+
+@pytest.mark.parametrize(
+    ("variant", "noted"), [(None, False), ("span-alpha-test-b2", False), ("span", True)]
+)
+def test_a_requested_variant_the_hardware_does_not_select_is_noted(
+    variant: Variant | None, noted: bool
+) -> None:
+    """The ticks' battery PV is derived as the hardware's variant books circuits,
+    whatever variant the definition is written for, so a note says so."""
+    tree = load_reference_capture("r202639-f").tree
+    _, notes = definition_from_tree(tree, mask=False, variant=variant)
+    variant_notes = [n.note for n in notes if n.key == "variant"]
+    assert bool(variant_notes) is noted
+    if noted:
+        assert "span requested" in variant_notes[0]
+        assert "span-alpha-test-b2" in variant_notes[0]
+
+
+def test_once_a_battery_is_hybrid_each_sample_s_remainder_stays_signed() -> None:
+    """The tree decides the battery; a later sample showing a standby draw in pv
+    gives that battery a negative PV rather than none."""
+    tree = load_reference_capture("r202639-f").tree
+    night = load_reference_capture("r202639-f").tree
+    night["masked-panel"].properties["power-flows/pv"] = "5.0"
+    ticks = ticks_from_samples(tree, [(0.0, tree), (1.0, night)], mask=False)
+    assert [t.bess_pv for t in ticks] == [{"masked-bess-1": 3247.0}, {"masked-bess-1": -5.0}]
+
+
+@pytest.mark.parametrize(
+    ("device", "path", "raw"),
+    [
+        ("masked-panel", "power-flows/pv", "sunny"),
+        ("masked-panel", "power-flows/pv", "nan"),
+        ("masked-circuit-1", "meter/active-power", "inf"),
+    ],
+)
+def test_a_power_that_is_not_a_finite_number_is_a_capture_error(
+    device: str, path: str, raw: str
+) -> None:
+    tree = load_reference_capture("r202639-f").tree
+    tree[device].properties[path] = raw
+    with pytest.raises(CaptureError, match=f"{device} {path}: not a finite number"):
+        definition_from_tree(tree, mask=False)
+    with pytest.raises(CaptureError, match=f"{device} {path}: not a finite number"):
+        ticks_from_samples(tree, [(0.0, tree)], mask=False)
+
+
+def _r202639_f_with_batteries(count: int) -> Tree:
+    """Capture ``r202639-f``'s tree with its one battery removed, or copied until the
+    panel has ``count``."""
+    tree = load_reference_capture("r202639-f").tree
+    panel = tree["masked-panel"]
+    children: list[str] = panel.description["children"]
+    if count == 0:
+        for device_id in ("masked-bess-1", "masked-mid-1"):
+            del tree[device_id]
+        children.remove("masked-bess-1")
+    for n in range(2, count + 1):
+        copy = dataclasses.replace(
+            tree["masked-bess-1"],
+            description={**tree["masked-bess-1"].description, "children": []},
+        )
+        tree[f"masked-bess-{n}"] = copy
+        children.append(f"masked-bess-{n}")
+    return tree
+
+
+@pytest.mark.parametrize("batteries", [0, 2])
+def test_solar_beyond_the_circuits_without_a_single_battery_is_noted_not_captured(
+    batteries: int,
+) -> None:
+    """Only a single battery can be said to bring it to the panel, so with none or
+    several the definition writes no battery hybrid, no tick drives it, and a note
+    says so."""
+    tree = _r202639_f_with_batteries(batteries)
+    definition, notes = definition_from_tree(tree, mask=False)
+    assert not any(
+        i.metadata.get("inverter-type") == "hybrid" for i in definition.manifest.of_class("bess")
+    )
+    (note,) = [n for n in notes if n.key == "power-flows/pv"]
+    assert note.device == "masked-panel"
+    assert "3247.0 W" in note.note and f"has {batteries} batteries" in note.note
+    (tick,) = ticks_from_samples(tree, [(0.0, tree)], mask=False)
+    assert tick.bess_pv == {}
+
+
+# The solar each other capture's pv reports beyond what its circuits carry, where
+# it reports a watt or more.
+_UNCIRCUITED_PV = {"main32_r202639": "56.3", "main32_r202639-upstream-pv": "1560.0"}
+
+
+@pytest.mark.parametrize("name", [n for n in reference_capture_names() if n != "r202639-f"])
+def test_no_other_capture_puts_solar_behind_a_battery(name: str) -> None:
+    """``main32_r202639``'s pv reports 56.3 W more than its PV circuit produces and
+    ``main32_r202639-upstream-pv``'s 1560.0 W that no circuit carries, and both
+    publish pv devices, so each gets a note and no battery is written hybrid.
+    ``r202639-c``'s pv reads 0.0, and the other captures leave it unvalued. Each
+    battery keeps the default coupling, noted as defaulted, and no tick gives one
+    PV."""
+    tree = load_reference_capture(name).tree
+    definition, notes = definition_from_tree(tree, mask=False)
+    for bess in definition.manifest.of_class("bess"):
+        assert "inverter-type" not in bess.metadata
+        assert [
+            n.note for n in notes if n.device == bess.instance_id and n.key == "inverter-type"
+        ] == ["not published; using ac-coupled"]
+    pv_notes = [n.note for n in notes if n.key == "power-flows/pv"]
+    if name in _UNCIRCUITED_PV:
+        (note,) = pv_notes
+        assert f"reports {_UNCIRCUITED_PV[name]} W" in note and "pv device" in note
+    else:
+        assert not pv_notes
+    assert all(not t.bess_pv for t in ticks_from_samples(tree, [(0.0, tree)], mask=False))

@@ -1,13 +1,15 @@
 """Each reference capture, republished from its own definition, against the capture.
 
-Each ``r202639-<handle>`` reference capture (``load_reference_capture``) is a
-masked tree of a SPAN panel on ``spanos3/r202639/03`` with the definition and the
-60 one-second ticks recorded with it. The three MAIN 32 captures are held to the
-same bar: ``main32_r202639`` and ``main32_r202639-upstream-pv`` (its PV inverters
-and battery upstream of the panel) with their definitions and ticks, and the
-r202633 capture ``main32_r202633``, which has neither, through the definition
-``panel-sim-capture`` writes from it and one tick sampled from it, as the
-accessor derives them.
+Each ``r202639-<handle>`` reference capture (``load_reference_capture``) but one
+is a masked tree of a SPAN panel on ``spanos3/r202639/03`` with the definition and
+the 60 one-second ticks recorded with it. ``r202639-f``, a panel on
+``spanos3/r202639/04`` whose solar is DC-coupled into its battery's inverter, is
+the tree alone. The three MAIN 32 captures are held to the same bar:
+``main32_r202639`` and ``main32_r202639-upstream-pv`` (its PV inverters and
+battery upstream of the panel) with their definitions and ticks, and the r202633
+capture ``main32_r202633``, which has neither. A capture that is the tree alone is
+republished through the definition ``panel-sim-capture`` writes from it and one
+tick sampled from it, as the accessor derives them.
 
 The emitter publishes the definition through every tick, and the retained tree
 is compared with the capture device by device: ``$description`` keys, type and
@@ -55,6 +57,14 @@ from .conftest import PahoRecorder
 _MAIN32_R202639 = "main32_r202639"
 _MAIN32_R202633 = "main32_r202633"
 _MAIN32_R202639_UPSTREAM_PV = "main32_r202639-upstream-pv"
+_R202639_F = "r202639-f"
+_R202639_04_SHED_FORECAST = (
+    "On spanos3/r202639/04 the panel values four shed-forecast estimates (the total "
+    "and priority-shed times, from now and from a full charge) that both captures "
+    "with a battery on /03 leave unvalued, as the variant does. One capture does not "
+    "show whether that firmware always values them, or how it estimates them, so the "
+    "variant keeps them unvalued."
+)
 _FEEDTHROUGH = (
     "The panel feeds a sub-panel through its downstream lugs (2700.6 W in the "
     "capture), which a definition cannot express, so the emitter's site lacks that "
@@ -97,6 +107,17 @@ _EXCEPTIONS: dict[str, dict[str, str]] = {
             _FED_BY_ENCLOSURE
         )
         for key in ("id", "status", "type")
+    },
+    _R202639_F: {
+        f"distribution-enclosure #1: shed-forecast/{key}: valued only by the capture": (
+            _R202639_04_SHED_FORECAST
+        )
+        for key in (
+            "full-charge-time-to-priority-shed",
+            "full-charge-total-time-remaining",
+            "time-to-priority-shed",
+            "total-time-remaining",
+        )
     },
 }
 _NOT_COMPARED = frozenset({"connection/count"})

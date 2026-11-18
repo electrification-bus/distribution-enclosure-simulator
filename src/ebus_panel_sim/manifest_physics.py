@@ -125,6 +125,12 @@ class BessPhysics:
     firmware_version: str | None
     relative_position: str | None
     feed: str | None
+    # From `inverter-type`: "hybrid" when the battery's own inverter also takes PV
+    # on its DC side, which `TickInputs.bess_pv` then drives, and "ac-coupled" when
+    # it converts the battery alone. Defaulted, and last, for the reason
+    # `CircuitPhysics.never_backup` is: this dataclass is exported, and a caller
+    # constructing one by hand predates the field.
+    inverter_type: Literal["ac-coupled", "hybrid"] = "ac-coupled"
 
 
 @dataclass(frozen=True, slots=True)
@@ -709,11 +715,22 @@ def _feed(md: dict[str, str]) -> str | None:
     return _opt_str(md, "feed") or _opt_str(md, "feed-circuit-id")
 
 
+def _inverter_type(raw: str) -> str:
+    """An ``inverter-type`` value, which a PV inverter and a battery share: ``hybrid``
+    converts both a battery and PV, ``ac-coupled`` only its own source."""
+    if raw not in _VALID_INVERTER_TYPES:
+        raise ManifestValidationError(
+            f"key 'inverter-type': must be one of {sorted(_VALID_INVERTER_TYPES)}, got {raw!r}"
+        )
+    return raw
+
+
 def _parse_bess(inst: DeviceInstance) -> BessPhysics:
     md = inst.metadata
     initial_soe: float | None = None
     if "initial-soe-kwh" in md:
         initial_soe = _opt_float(md, "initial-soe-kwh", 0.0)
+    hybrid = _inverter_type(_opt_str(md, "inverter-type") or "ac-coupled") == "hybrid"
     return BessPhysics(
         vendor_name=_require(md, "vendor-name"),
         nameplate_capacity_kwh=_req_float(md, "nameplate-capacity-kwh"),
@@ -724,21 +741,16 @@ def _parse_bess(inst: DeviceInstance) -> BessPhysics:
         firmware_version=_opt_str(md, "firmware-version") or _opt_str(md, "software-version"),
         relative_position=_opt_str(md, "relative-position") or "UPSTREAM",
         feed=_feed(md),
+        inverter_type="hybrid" if hybrid else "ac-coupled",
     )
 
 
 def _parse_pv(inst: DeviceInstance) -> PvPhysics:
     md = inst.metadata
-    inverter_type = _require(md, "inverter-type")
-    if inverter_type not in _VALID_INVERTER_TYPES:
-        raise ManifestValidationError(
-            f"key 'inverter-type': must be one of {sorted(_VALID_INVERTER_TYPES)}, "
-            f"got {inverter_type!r}"
-        )
     return PvPhysics(
         vendor_name=_require(md, "vendor-name"),
         nominal_power_w=_req_float(md, "nominal-power-w"),
-        inverter_type=inverter_type,
+        inverter_type=_inverter_type(_require(md, "inverter-type")),
         model=_opt_str(md, "model"),
         serial_number=_opt_str(md, "serial-number"),
         firmware_version=_opt_str(md, "firmware-version") or _opt_str(md, "software-version"),

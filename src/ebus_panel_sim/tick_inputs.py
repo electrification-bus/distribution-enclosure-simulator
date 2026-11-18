@@ -72,7 +72,24 @@ class TickInputs:
                         decides whether the panel accepts an
                         ``asserted-islanding-state`` write. An id that is not a
                         configured BESS, or a value outside
-                        ``BESSCommunication``, raises ``EmitterStateError``."""
+                        ``BESSCommunication``, raises ``EmitterStateError``.
+        bess_pv:        Mapping of a configured BESS ``instance_id`` whose
+                        manifest gives ``inverter-type: hybrid`` → the power its
+                        inverter's PV input produces, in watts: positive while
+                        producing (the PV's own frame), negative for a standby
+                        draw. Solar DC-coupled into a battery's inverter reaches
+                        the panel through the battery, never through a circuit,
+                        so no circuit's power carries it. It is published in
+                        ``power-flows/pv``, offered to the battery's dispatch as
+                        solar, and leaves the battery's AC terminals with its
+                        dispatch, which is how the grid sees it. Off grid the
+                        battery only discharges and the emitter curtails
+                        nothing, so there the four flows balance only while the
+                        solar is no more than the load and the battery covers
+                        the rest; curtailing any surplus is the producer's, as
+                        generating it is. A battery left out produces 0 W. An
+                        id that is not such a BESS, or a value that is not a
+                        finite number, raises ``EmitterStateError``."""
 
     current_time: float
     grid_online: bool
@@ -80,3 +97,4 @@ class TickInputs:
     evse: dict[str, float] = field(default_factory=dict)
     envelope: PanelEnvelopeTick = field(default_factory=PanelEnvelopeTick)
     bess_communication: dict[str, BESSCommunication] = field(default_factory=dict)
+    bess_pv: dict[str, float] = field(default_factory=dict)
