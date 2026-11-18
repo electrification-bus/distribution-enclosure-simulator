@@ -4,9 +4,11 @@ US residential load centers alternate breaker slots between L1 and L2: odd-numbe
 tabs land on L1, even-numbered tabs land on L2. A 240 V dipole circuit occupies
 two adjacent tabs (e.g. 1 and 2) — one per leg.
 
-This module is the single source of truth for that convention. Per-leg current
-calculations in ``PanelMeter`` and the per-circuit ``current_a`` derivation go
-through ``legs_for_tabs`` rather than reaching for ``tab % 2`` directly.
+This module is the single source of truth for that convention. The lugs' per-leg
+currents in ``PanelMeter`` go through ``legs_for_tabs`` rather than reaching for
+``tab % 2`` directly. A circuit's meter current does not depend on legs: a circuit
+alone reads its power over its voltage, and circuits sharing a breaker's meter read
+it per breaker space (``panel_meter.shared_meter_current_a``).
 
 Future support for non-US panels (European single-phase, 3-phase commercial) lands
 here as an additional ``Convention`` enum + dispatch, without touching call sites."""

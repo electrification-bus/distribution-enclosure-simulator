@@ -58,8 +58,8 @@ When the grid is offline the policy returns the circuit instance-ids whose prior
 
 | Entity class | Property | Effect |
 |---|---|---|
-| circuit | `switch/relay` | Updates the `RelayResolver` user override |
-| circuit | `load-shed/priority` | Updates the emitter's per-circuit priority override (refused on a never-backup or commissioned-system circuit) |
+| circuit | `switch/relay` | Updates the `RelayResolver` user override, which the circuits on a multi-load breaker share (`RelayResolver.share`) where the variant publishes one as a device per protected circuit |
+| circuit | `load-shed/priority` | Updates the emitter's priority override, held once for the circuits on such a breaker (refused on a never-backup or commissioned-system circuit) |
 | panel | `shed/asserted-islanding-state` | Updates the consumer-asserted islanding override, accepted only while a battery link is not `OK` (under `span-alpha-test-b2`, only while it is `LOST` or `DEGRADED`; see below) |
 | evse | `config/user-max-charge-current` | Sets the per-EVSE user charge-current ceiling, which is unpublished until first set (published at `max-current-a` from the start by the span variant under firmware before release 202639; see [Firmware-keyed conventions](#firmware-keyed-conventions)); an integer, clamped into `[6, max-charge-current]` (the advertised `$format`), anything else refused |
 
@@ -83,11 +83,11 @@ The internal handler for `shed/asserted-islanding-state` does what a SPAN panel 
 
 ## Energy integration
 
-`EnergyIntegrator` accumulates per-circuit (and per-EVSE) `consumed_wh` / `produced_wh` across ticks using `dt = current_time - last_tick_time` per instance. Seed values at startup with `emitter.seed_energy("kitchen", consumed_wh=12345.0, produced_wh=0.0)`, or via the manifest `initial-consumed-wh` / `initial-produced-wh` keys. Either path adds a new circuit to a running deployment without zeroing existing accumulators.
+`EnergyIntegrator` accumulates per-circuit (and per-EVSE) `consumed_wh` / `produced_wh` across ticks using `dt = current_time - last_tick_time` per instance. Circuits that share a multi-load breaker's meter, where the variant publishes them as one device each, share one register, which integrates the sum of their loads once and which every one of them publishes; seeding any of them seeds it. Seed values at startup with `emitter.seed_energy("kitchen", consumed_wh=12345.0, produced_wh=0.0)`, or via the manifest `initial-consumed-wh` / `initial-produced-wh` keys. Either path adds a new circuit to a running deployment without zeroing existing accumulators.
 
 ## Tab-to-leg convention
 
-`legs_for_tabs((tab, ...)) -> tuple[Leg, ...]` in `ebus_panel_sim.conventions.tab_legs` is the single source of truth for the US residential split-phase convention: odd-numbered tabs land on L1, even-numbered on L2, and a 240 V circuit occupies tabs on both legs. It is isolated so non-US / 3-phase support can land there later without touching `PanelMeter` or the per-leg current calculations.
+`legs_for_tabs((tab, ...)) -> tuple[Leg, ...]` in `ebus_panel_sim.conventions.tab_legs` is the single source of truth for the US residential split-phase convention: odd-numbered tabs land on L1, even-numbered on L2, and a 240 V circuit occupies tabs on both legs. The lugs' per-leg currents go through it. A circuit's meter current does not: a circuit alone reads its power over line-to-neutral voltage, or line-to-line if two-pole, and circuits sharing a breaker's meter read it per breaker space, a single-pole circuit's current lying on its own space and a two-pole circuit's on both (`panel_meter.shared_meter_current_a`). It is isolated so non-US / 3-phase support can land there later without touching `PanelMeter` or the per-leg current calculations.
 
 ## Snapshot read-back
 

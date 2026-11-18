@@ -33,6 +33,10 @@ class EbusCircuitSnapshot:
     name: str
 
     relay_state: str  # OPEN | CLOSED | UNKNOWN
+    # What the circuit's meter reads, as published: its own load, or, for
+    # circuits sharing a multi-load breaker's meter, the breaker's sum of theirs
+    # and its one register, which each of them carries (so do not add them up).
+    # `current_a` likewise.
     instant_power_w: float  # Positive = consumption, negative = production
     produced_energy_wh: float
     consumed_energy_wh: float

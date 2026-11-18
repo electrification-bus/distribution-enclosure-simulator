@@ -121,3 +121,75 @@ def test_known_returns_true_after_register() -> None:
     assert rr.known("c1") is False
     rr.register("c1", always_on=False)
     assert rr.known("c1") is True
+
+
+def _tandem(*, locked: bool = False) -> RelayResolver:
+    """``hall`` and ``porch`` behind one relay, ``other`` behind its own."""
+    rr = RelayResolver()
+    for cid in ("hall", "porch", "other"):
+        rr.register(cid, always_on=locked and cid != "other")
+    rr.share(("hall", "porch"))
+    return rr
+
+
+@pytest.mark.parametrize("written", ["hall", "porch"])
+def test_an_override_of_one_circuit_on_a_shared_relay_is_one_of_all(written: str) -> None:
+    rr = _tandem()
+    rr.set_user_override(written, RelayState.OPEN)
+    assert rr.state("hall") == rr.state("porch") == (RelayState.OPEN, RelayRequester.USER)
+    assert rr.state("other") == (RelayState.CLOSED, RelayRequester.NONE)
+    rr.clear_user_override("hall" if written == "porch" else "porch")
+    assert rr.state("hall") == rr.state("porch") == (RelayState.CLOSED, RelayRequester.NONE)
+
+
+def test_a_shed_of_one_circuit_on_a_shared_relay_sheds_all() -> None:
+    rr = _tandem()
+    rr.set_shed("porch", open_relay=True)
+    assert rr.state("hall") == rr.state("porch") == (RelayState.OPEN, RelayRequester.LOAD_SHED)
+    assert rr.state("other") == (RelayState.CLOSED, RelayRequester.NONE)
+    rr.clear_all_shed()
+    assert rr.state("hall") == (RelayState.CLOSED, RelayRequester.NONE)
+
+
+def test_a_locked_shared_relay_ignores_every_circuit_s_commands() -> None:
+    rr = _tandem(locked=True)
+    rr.set_user_override("hall", RelayState.OPEN)
+    rr.set_shed("porch", open_relay=True)
+    assert (
+        rr.state("hall") == rr.state("porch") == (RelayState.CLOSED, RelayRequester.CONFIGURATION)
+    )
+
+
+def test_a_shared_relay_keeps_the_first_circuit_s_state() -> None:
+    rr = RelayResolver()
+    rr.register("hall", always_on=False)
+    rr.register("porch", always_on=False)
+    rr.set_user_override("hall", RelayState.OPEN)
+    rr.set_user_override("porch", RelayState.CLOSED)
+    rr.share(("hall", "porch"))
+    assert rr.state("porch") == (RelayState.OPEN, RelayRequester.USER)
+
+
+def test_re_registering_a_circuit_on_a_shared_relay_changes_the_relay_s_lock() -> None:
+    rr = _tandem()
+    rr.register("porch", always_on=True)
+    assert rr.state("hall") == (RelayState.CLOSED, RelayRequester.CONFIGURATION)
+    assert rr.known("hall") and rr.known("porch")
+
+
+def test_circuits_that_cannot_share_a_relay_are_refused() -> None:
+    rr = RelayResolver()
+    rr.register("hall", always_on=False)
+    rr.register("porch", always_on=True)
+    rr.register("attic", always_on=False)
+    with pytest.raises(KeyError, match="nowhere"):
+        rr.share(("hall", "nowhere"))
+    with pytest.raises(ValueError, match="lock"):
+        rr.share(("hall", "porch"))
+    with pytest.raises(ValueError, match="of its own"):
+        rr.share(("hall", "hall"))
+    rr.share(("hall", "attic"))
+    rr.register("cellar", always_on=False)
+    for group in (("attic", "cellar"), ("hall", "cellar")):
+        with pytest.raises(ValueError, match="of its own"):
+            rr.share(group)
