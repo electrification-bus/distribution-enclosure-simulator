@@ -166,6 +166,8 @@ for tick in load_ticks("ticks.yaml"):
     emitter.publish_tick(tick)
 ```
 
+A tick entry's keys are `current_time` and `grid_online` (both required), `circuits` and `evse` (watts by id), and, written only where the tick gives them, `bess_communication` (a battery's link state by id), `bess_pv` (the watts a hybrid battery's PV input produces, by battery id) and `pv` (the watts a `pv` device that no circuit feeds produces, by the device's instance id, positive while producing and negative for a standby draw). A key outside these, or a value that is not a finite number (or, for a link, not a link state), is a `ManifestValidationError`.
+
 Under a variant whose circuit profile declares both `shared-with-device-ids` lists, a panel publishes a shared breaker's one reading on each of its circuits and nothing of each circuit's own load, so the capture gives each an equal share, of their mean should the readings differ, read a moment apart. The shares add back to the reading, to within float rounding, so the breaker's meter republishes its power and energy, and its current in one space or across two where every circuit on it is two-pole. On a tandem or quad whose circuits all draw the same way and book into the same flow, the flows and lugs, which the emitter takes from each circuit's own load, republish too. What depends on how the load divides cannot be reproduced:
 
 - circuits drawing opposite ways, one backfeeding while another consumes: the lugs add each circuit's current whatever its direction, so they read the net current instead of the two;

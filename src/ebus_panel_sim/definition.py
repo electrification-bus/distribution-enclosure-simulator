@@ -106,7 +106,8 @@ def _read_yaml(path: Path | str) -> object:
 def dump_ticks(ticks: Sequence[TickInputs], path: Path | str) -> None:
     """Write a tick recording (``schema: panel-sim-ticks/1``): each tick's time,
     grid flag, circuit and EVSE powers, and, where a tick gives them, its battery
-    links and the PV hybrid batteries' inverters take."""
+    links, the PV hybrid batteries' inverters take and the production of ``pv``
+    devices no circuit feeds."""
     body = {
         "schema": TICKS_SCHEMA,
         "ticks": [
@@ -121,6 +122,7 @@ def dump_ticks(ticks: Sequence[TickInputs], path: Path | str) -> None:
                     else {}
                 ),
                 **({"bess_pv": dict(t.bess_pv)} if t.bess_pv else {}),
+                **({"pv": dict(t.pv)} if t.pv else {}),
             }
             for t in ticks
         ],
@@ -142,7 +144,15 @@ def load_ticks(path: Path | str) -> list[TickInputs]:
 
 
 _TICK_KEYS = frozenset(
-    {"current_time", "grid_online", "circuits", "evse", "bess_communication", "bess_pv"}
+    {
+        "current_time",
+        "grid_online",
+        "circuits",
+        "evse",
+        "bess_communication",
+        "bess_pv",
+        "pv",
+    }
 )
 
 
@@ -176,6 +186,10 @@ def _tick(entry: object, at: str) -> TickInputs:
         bess_pv={
             str(k): _coerce(v, float, at, f"bess_pv[{k!r}]")
             for k, v in _mapping(entry.get("bess_pv"), at, "bess_pv").items()
+        },
+        pv={
+            str(k): _coerce(v, float, at, f"pv[{k!r}]")
+            for k, v in _mapping(entry.get("pv"), at, "pv").items()
         },
     )
 
