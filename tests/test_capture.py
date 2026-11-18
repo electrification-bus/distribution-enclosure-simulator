@@ -33,6 +33,7 @@ from ebus_panel_sim import (
 )
 from ebus_panel_sim.capture import (
     CaptureError,
+    _nominal_power_w,
     capture_live,
     definition_from_tree,
     main,
@@ -1080,7 +1081,9 @@ def test_an_inverter_the_upstream_lugs_name_is_one_no_circuit_feeds() -> None:
 
 
 @pytest.mark.parametrize(
-    "power", [None, "0", "-5", "nan"], ids=["absent", "zero", "negative", "not a number"]
+    "power",
+    [None, "0", "-5", "nan", "inf", "-inf"],
+    ids=["absent", "zero", "negative", "not a number", "infinite", "negative infinite"],
 )
 def test_an_inverter_without_a_usable_nominal_power_leaves_the_solar_uncaptured(
     power: str | None,
@@ -1097,6 +1100,16 @@ def test_an_inverter_without_a_usable_nominal_power_leaves_the_solar_uncaptured(
     assert tick.pv == {}
     note = _pv_note(notes)
     assert "nominal-power" in note and "not captured" in note
+
+
+def test_a_nominal_power_that_does_not_parse_is_no_rating_to_divide_by() -> None:
+    """A capture whose pv publishes text there fails in the manifest it writes, so
+    only the rating itself shows that the share is not computed from it."""
+    tree, _, b = _upstream_pv()
+    tree[b].properties["info/nominal-power"] = "sunny"
+    assert _nominal_power_w(tree[b]) is None
+    tree[b].properties["info/nominal-power"] = "3600"
+    assert _nominal_power_w(tree[b]) == 3600.0
 
 
 def _chained_upstream_pv() -> Tree:
