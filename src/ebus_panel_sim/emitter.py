@@ -3,10 +3,11 @@
 The producer hands the emitter a small per-tick driving signal via
 ``publish_tick(TickInputs)``: signed power per circuit/EVSE, current_time,
 grid_online, panel envelope, battery link health, the PV a hybrid battery's
-inverter takes. The emitter resolves BESS
-dispatch, gates circuit power through ``RelayResolver``, integrates energy via
-``EnergyIntegrator``, aggregates panel-level fields via ``PanelMeter``, builds
-the internal snapshot, and publishes the Homie diff to MQTT.
+inverter takes, the production of ``pv`` devices no circuit feeds. The emitter
+resolves BESS dispatch, gates circuit power through ``RelayResolver``,
+integrates energy via ``EnergyIntegrator``, aggregates panel-level fields via
+``PanelMeter``, builds the internal snapshot, and publishes the Homie diff to
+MQTT.
 
 The internal snapshot type (``EbusPanelSnapshot`` and friends) is used for the
 diff cache and read-back via ``last_snapshot``; producers do not construct it."""
@@ -1056,12 +1057,14 @@ class Emitter:
             # takes solar from SOLAR circuits, battery from STORAGE circuits and a
             # battery's own breaker, and site from the rest, as r202639 firmware
             # does; the span variant takes solar from every circuit reading
-            # negative. Every variant adds the PV hybrid batteries' inverters take.
-            # The variant's site would also take the upstream load its remote-ct
-            # meter measures, but this model's remote-ct reads the panel's own grid
-            # power, so it measures none. A third-party backup system that reports
-            # grid and site from its own meter is not modelled: grid is derived
-            # from the lugs and the batteries, and site from the circuits.
+            # negative. Every variant adds the PV that reaches the site through no
+            # circuit: what hybrid batteries' inverters take and what pv devices no
+            # circuit feeds produce. The variant's site would also take the
+            # upstream load its remote-ct meter measures, but this model's
+            # remote-ct reads the panel's own grid power, so it measures none. A
+            # third-party backup system that reports grid and site from its own
+            # meter is not modelled: grid is derived from the lugs, the batteries
+            # and that PV, and site from the circuits.
             solar_circuits=solar_circuits(
                 self._variant,
                 {
@@ -1183,7 +1186,10 @@ class Emitter:
             )
 
         # Step 7: PV snapshots — one entry per PV instance in the manifest.
-        # Per-PV power telemetry comes from the producer's circuit feed; the
+        # A PV device publishes no power of its own: a circuit-fed one's
+        # production is its feeding circuit's power, and one no circuit feeds
+        # produces what `TickInputs.pv` gives it, which is counted only in the
+        # panel's `power-flows/pv`, the battery's dispatch and the grid. The
         # snapshot here carries the static identity from manifest physics.
         pv_snaps: dict[str, EbusPvSnapshot] = {}
         for pv_id, pv_phys in self._physics.all_pv().items():

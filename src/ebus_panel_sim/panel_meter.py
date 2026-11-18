@@ -14,8 +14,9 @@ is a reading taken by one meter, about itself:
 - ``uncircuited_pv_w``: the PV that reaches the site through no circuit, positive =
   producing, which is the PV's own frame rather than a load's. It is what a
   battery's own (hybrid) inverter takes on its DC side and what a PV inverter no
-  circuit feeds produces, upstream of the panel. No circuit meters it: it joins
-  the site beside the main lugs, as ``battery_w`` does.
+  circuit feeds produces, which is taken to be upstream of the main lugs. No
+  circuit meters it: it joins the site beside the main lugs, as ``battery_w``
+  does.
 - ``instant_grid_power_w``: positive = importing from grid, negative = exporting.
 - ``upstream_active_power_w``: net power through the panel-side upstream lugs,
   before any upstream BESS contribution is removed.

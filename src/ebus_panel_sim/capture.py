@@ -382,21 +382,24 @@ def definition_from_tree(
     and the ticks recorded with it agree; ``ticks_from_samples`` drives it:
 
     - Where the tree holds ``pv`` devices that no circuit feeds, it is their
-      production. Such an inverter joins the site upstream of the main lugs, the one
-      place that is neither a circuit nor the downstream lugs, and each takes a
-      share in proportion to its published ``info/nominal-power``, with a note
-      saying so, since the panel publishes only the total. On captured SPAN
-      firmware several pv devices repeat one aggregate nominal power, so the split
-      is then equal. A circuit-fed ``pv`` device or a producing circuit does not
-      stand in the way, since its production is in the circuits already, and no
-      battery is written hybrid. The solar is reported as a note and not captured
-      where the upstream lugs' ``connection/fed-by-device-type`` is another
-      distribution enclosure, since this panel's pv may then report the chain's
-      solar; where downstream lugs name a ``pv`` device in
-      ``connection/feeds-device-id``, which puts it on the feedthrough side; where
-      lugs feed a SOLAR or MIXED node, which could bring it; or where one of those
-      inverters publishes no ``info/nominal-power``, or one that is not a finite
-      number greater than zero, to divide it by.
+      production. Such an inverter is taken to join the site upstream of the main
+      lugs, the one place that is neither a circuit nor the downstream lugs, and
+      each takes a share in proportion to its published ``info/nominal-power``,
+      with a note saying so, since the panel publishes only the total. Inverters
+      publishing the same figure split it equally, as capture
+      ``main32_r202639-upstream-pv`` shows, whose two inverters each publish 11680.
+      A circuit-fed ``pv`` device or a producing circuit does not stand in the
+      way, since its production is in the circuits already, and no battery is
+      written hybrid. The solar is reported as a note and not captured where the
+      upstream lugs' ``connection/fed-by-device-type`` is another distribution
+      enclosure, since this panel's pv may then report the chain's solar; where
+      downstream lugs name a ``pv`` device in ``connection/feeds-device-id``,
+      which puts it on the feedthrough side; where lugs feed a SOLAR or MIXED
+      node, which could bring it; or where one of those inverters publishes no
+      ``info/nominal-power``, or one that is not a finite number greater than
+      zero, to divide it by. One that does not parse as a number at all raises
+      ``CaptureError`` instead, since the definition's ``nominal-power-w`` is then
+      one the emitter refuses.
     - Otherwise a battery is written ``inverter-type: hybrid`` when nothing else in
       the tree books solar and the battery is the tree's only one. Something else
       books solar where the tree holds a ``pv`` device, a circuit that variant books
@@ -789,10 +792,10 @@ class _Mapper:
     def _inverters_solar(self, watts: float, inverters: Sequence[str]) -> _UncircuitedSolar:
         """``watts`` as the production of ``inverters``, the tree's ``pv`` devices that
         no circuit feeds, in tree order, each taking a share in proportion to its
-        ``info/nominal-power``. Such an inverter joins the site upstream of the main
-        lugs, the one place that is neither a circuit nor the downstream lugs. A
-        circuit-fed ``pv`` device or a producing circuit does not stand in the way,
-        since its production is in the circuits already.
+        ``info/nominal-power``. Such an inverter is taken to join the site upstream
+        of the main lugs, the one place that is neither a circuit nor the downstream
+        lugs. A circuit-fed ``pv`` device or a producing circuit does not stand in
+        the way, since its production is in the circuits already.
 
         It is written nowhere, with the first reason that holds, where the upstream
         lugs are fed by another enclosure, whose solar this panel's pv may report;
