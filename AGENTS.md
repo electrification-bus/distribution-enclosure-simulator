@@ -107,10 +107,12 @@ complement `CONTRIBUTING.md`'s "What done means", which they assume.
   - which inverters take solar that no circuit carries;
   - which circuit is solar.
 
-  A power, current or energy value fills ticks and flows, and never decides structure. A tree captured at night therefore describes the same panel as
-  one captured at noon. A threshold on a reading ("a watt or more", "producing", "drawing") gates nothing structural; a few watts at night are real
-  production, and a standby draw is real too. Whether the panel publishes a property is structure; its value is a reading. Booking a tick's flows by a
-  reading's sign, as the `span` variant books every producing circuit as solar, computes a flow and is allowed (#83).
+  A power, current or energy value fills ticks and flows, and never decides structure. A device's `info` nameplate values (a rating, a model, a
+  hardware version) describe what it is and do not vary with the instant of capture, so they are structure, not readings. A tree captured at night
+  therefore describes the same panel as one captured at noon. A threshold on a reading ("a watt or more", "producing", "drawing") gates nothing
+  structural; a few watts at night are real production, and a standby draw is real too. Whether the panel publishes a property is structure; its value
+  is a reading. Booking a tick's flows by a reading's sign, as the `span` variant books every producing circuit as solar, computes a flow and is
+  allowed (#83).
 
 **Specification and variants.**
 
