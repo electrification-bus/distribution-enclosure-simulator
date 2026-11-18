@@ -4,7 +4,7 @@ Internals of the emitter. For what it is and how to run/configure it, see [READM
 
 ## The per-tick pipeline
 
-The producer builds a `DeviceManifest` (identity plus physics keys per device) at startup and hands it to `Emitter` together with a `SetterRegistry`, an `mqtt_cfg` (the broker coordinates ebus-sdk connects with), zero or more `BESSConfig`s, and an optional `LoadSheddingConfig`. Each tick the producer builds a `TickInputs` (signed power per circuit, current time, grid-online flag, panel envelope, and optionally the health of the panel's link to each battery and the PV a battery's own inverter takes) and calls `emitter.publish_tick(tick_inputs)`. Inside, the emitter:
+The producer builds a `DeviceManifest` (identity plus physics keys per device) at startup and hands it to `Emitter` together with a `SetterRegistry`, an `mqtt_cfg` (the broker coordinates ebus-sdk connects with), zero or more `BESSConfig`s, and an optional `LoadSheddingConfig`. Each tick the producer builds a `TickInputs` (signed power per circuit, current time, grid-online flag, panel envelope, and optionally the health of the panel's link to each battery and the PV a battery's own inverter takes, and the production of PV inverters no circuit feeds) and calls `emitter.publish_tick(tick_inputs)`. Inside, the emitter:
 
 1. Resolves BESS dispatch (charge/discharge/idle) for every native BESS.
 2. Decides load-shedding (which circuits open when off-grid).
