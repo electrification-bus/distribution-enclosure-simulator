@@ -48,11 +48,14 @@ def _circuit(cid: str, tab: int, **md: str) -> DeviceInstance:
     )
 
 
-def _manifest(*, bess: dict[str, str] | None = None, pv_devices: bool = True) -> DeviceManifest:
+def _manifest(
+    *, bess: dict[str, str] | None = None, battery: bool = True, pv_devices: bool = True
+) -> DeviceManifest:
     """A panel with two load circuits and a SOLAR circuit, its upstream lugs, an
     AC-coupled battery upstream of them (unless ``bess`` replaces its metadata), and
     two ``pv`` devices: ``pv-up``, which no circuit feeds, and ``pv-roof``, which the
-    SOLAR circuit does. Without ``pv_devices`` there is no ``pv`` instance."""
+    SOLAR circuit does. Without ``battery`` there is no ``bess`` instance, and without
+    ``pv_devices`` no ``pv`` instance."""
     pv = (
         [
             DeviceInstance(
@@ -102,18 +105,24 @@ def _manifest(*, bess: dict[str, str] | None = None, pv_devices: bool = True) ->
             _circuit("kitchen", 1),
             _circuit("laundry", 2),
             _circuit("solar", 5, **{"feeds-role": "SOLAR"}),
-            DeviceInstance(
-                "bess",
-                _BESS,
-                "Battery",
-                metadata=bess
-                if bess is not None
-                else {
-                    "vendor-name": "Example",
-                    "nameplate-capacity-kwh": "13.5",
-                    "relative-position": "UPSTREAM",
-                    "inverter-type": "ac-coupled",
-                },
+            *(
+                [
+                    DeviceInstance(
+                        "bess",
+                        _BESS,
+                        "Battery",
+                        metadata=bess
+                        if bess is not None
+                        else {
+                            "vendor-name": "Example",
+                            "nameplate-capacity-kwh": "13.5",
+                            "relative-position": "UPSTREAM",
+                            "inverter-type": "ac-coupled",
+                        },
+                    )
+                ]
+                if battery
+                else []
             ),
             *pv,
         )
@@ -121,11 +130,17 @@ def _manifest(*, bess: dict[str, str] | None = None, pv_devices: bool = True) ->
 
 
 def _emitter(manifest: DeviceManifest, variant: Variant = "span") -> Emitter:
-    """Charging and discharging at up to 1 kW, half full."""
+    """Its battery, where ``manifest`` has one, charging and discharging at up to
+    1 kW, half full."""
     config = BESSConfig(
         instance_id=_BESS, nameplate_capacity_kwh=13.5, max_charge_w=1000.0, max_discharge_w=1000.0
     )
-    emitter = Emitter(manifest, SetterRegistry(), bess_configs=(config,), variant=variant)
+    emitter = Emitter(
+        manifest,
+        SetterRegistry(),
+        bess_configs=(config,) if manifest.of_class("bess") else (),
+        variant=variant,
+    )
     emitter.start()
     return emitter
 
@@ -206,7 +221,8 @@ def test_the_battery_charges_from_an_uncircuited_inverter() -> None:
     assert without.battery[_BESS].active_power_w == 500.0
 
 
-def test_uncircuited_pv_and_a_hybrid_battery_s_pv_add_up() -> None:
+@pytest.mark.parametrize("variant", PV_VARIANTS)
+def test_uncircuited_pv_and_a_hybrid_battery_s_pv_add_up(variant: Variant) -> None:
     """A hybrid battery's inverter and an upstream inverter are two sources of the
     one pv, and both leave beside the lugs."""
     manifest = _manifest(
@@ -217,7 +233,7 @@ def test_uncircuited_pv_and_a_hybrid_battery_s_pv_add_up() -> None:
             "inverter-type": "hybrid",
         }
     )
-    snapshot = _emitter(manifest).publish_tick(
+    snapshot = _emitter(manifest, variant).publish_tick(
         TickInputs(
             current_time=0.0,
             grid_online=True,
@@ -235,6 +251,7 @@ def test_uncircuited_pv_and_a_hybrid_battery_s_pv_add_up() -> None:
     assert _sum(snapshot.power_flows) == pytest.approx(0.0, abs=1e-9)
 
 
+@pytest.mark.parametrize("variant", PV_VARIANTS)
 @pytest.mark.parametrize(
     ("pv", "match"),
     [
@@ -246,7 +263,7 @@ def test_uncircuited_pv_and_a_hybrid_battery_s_pv_add_up() -> None:
     ],
 )
 def test_uncircuited_pv_that_is_refused_moves_nothing(
-    rec: PahoRecorder, pv: dict[str, float], match: str
+    rec: PahoRecorder, pv: dict[str, float], match: str, variant: Variant
 ) -> None:
     """The refused tick publishes nothing and moves nothing: the next tick leaves
     the energy registers and the battery's charge where an emitter that never saw
@@ -258,7 +275,7 @@ def test_uncircuited_pv_that_is_refused_moves_nothing(
         )
 
     manifest = _manifest()
-    emitter = _emitter(manifest)
+    emitter = _emitter(manifest, variant)
     first = emitter.publish_tick(tick(0.0))
     published = len(rec.published)
     with pytest.raises(EmitterStateError, match=match):
@@ -267,7 +284,7 @@ def test_uncircuited_pv_that_is_refused_moves_nothing(
     assert len(rec.published) == published
 
     after = emitter.publish_tick(tick(7200.0))
-    untouched = _emitter(manifest)
+    untouched = _emitter(manifest, variant)
     untouched.publish_tick(tick(0.0))
     expected = untouched.publish_tick(tick(7200.0))
     assert after.circuits["kitchen"].consumed_energy_wh == pytest.approx(1000.0)
@@ -299,23 +316,57 @@ def test_uncircuited_pv_is_refused_where_the_variant_has_no_pv_device() -> None:
 
 
 @pytest.mark.parametrize("variant", PV_VARIANTS)
-def test_a_cancelling_uncircuited_pv_never_publishes_negative_zero(
+@pytest.mark.parametrize(
+    ("circuits", "pv"),
+    [
+        ({"kitchen": 300.0, "solar": -300.0}, {"pv-up": -300.0}),
+        ({"kitchen": 300.0}, {"pv-up": 0.0}),
+    ],
+    ids=["cancelling", "zero"],
+)
+def test_a_zero_or_cancelling_uncircuited_pv_never_publishes_negative_zero(
+    rec: PahoRecorder, variant: Variant, circuits: dict[str, float], pv: dict[str, float]
+) -> None:
+    """The solar circuit's output and the inverter's standby draw cancel, or the
+    inverter is given 0 W beside no other solar: pv reads zero, never -0.0, which
+    the reference variant, writing numbers as they are, would publish if it negated
+    a sum that came to zero."""
+    _emitter(_manifest(), variant).publish_tick(
+        TickInputs(current_time=0.0, grid_online=True, circuits=circuits, pv=pv)
+    )
+    published = rec.retained["ebus/5/panel/power-flows/pv"]
+    assert published != "-0.0"
+    assert float(published) == 0.0
+
+
+@pytest.mark.parametrize("variant", PV_VARIANTS)
+def test_without_a_battery_the_grid_takes_what_the_uncircuited_pv_leaves(
     rec: PahoRecorder, variant: Variant
 ) -> None:
-    """The solar circuit's output and the inverter's standby draw cancel: pv reads
-    zero, never -0.0, which the reference variant, writing numbers as they are,
-    would publish if it negated a sum that cancelled."""
-    _emitter(_manifest(), variant).publish_tick(
+    """With no battery to charge, the 1.5 kW the inverter produces beyond the load is
+    exported: the grid is the lugs less this PV alone, and the four flows balance.
+    The lugs carry only the circuits."""
+    emitter = _emitter(_manifest(battery=False), variant)
+    emitter.publish_tick(
         TickInputs(
             current_time=0.0,
             grid_online=True,
-            circuits={"kitchen": 300.0, "solar": -300.0},
-            pv={"pv-up": -300.0},
+            circuits={"kitchen": 1200.0, "laundry": 300.0},
+            pv={"pv-up": 3000.0},
         )
     )
-    pv = rec.retained["ebus/5/panel/power-flows/pv"]
-    assert pv != "-0.0"
-    assert float(pv) == 0.0
+    retained = rec.retained
+
+    def published(device: str, path: str) -> float:
+        return float(retained[f"ebus/5/{device}/{path}"])
+
+    flows = {
+        flow: published("panel", f"power-flows/{flow}")
+        for flow in ("pv", "battery", "grid", "site")
+    }
+    assert flows == {"pv": -3000.0, "battery": 0.0, "grid": 1500.0, "site": 1500.0}
+    assert sum(flows.values()) == 0.0
+    assert published("lugs-upstream", "meter/active-power") == 1500.0
 
 
 def test_off_grid_uncircuited_pv_covers_load_before_the_battery() -> None:
