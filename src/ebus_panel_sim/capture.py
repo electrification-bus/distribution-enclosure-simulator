@@ -487,13 +487,11 @@ def ticks_from_samples(
     to the reading, to within float rounding, as a tick's circuits on one meter add
     up to what it reads. That reproduces the meter's power and energy, and its
     current in one space or across two with every circuit two-pole. On a tandem or
-    quad whose circuits all draw the same way and book into the same flow, the
-    flows and lugs, which the emitter takes from each circuit's own load,
-    reproduce too. What depends on how the load divides, which the panel does not
-    publish, cannot:
+    quad whose circuits book into the same flow, the flows and lugs, which the
+    emitter takes from each circuit's own load, reproduce too, whichever way each
+    circuit draws, since a leg's currents add with their signs. What depends on
+    how the load divides, which the panel does not publish, cannot:
 
-    - circuits drawing opposite ways: the lugs add each circuit's current whatever
-      its direction, so they read the net current instead of the two;
     - circuits whose roles book them into different flows, such as a SOLAR circuit
       sharing a breaker with a load: ``power-flows/pv`` and ``site`` each take half
       the net reading, and the lugs and busbar follow them;
@@ -633,10 +631,12 @@ class _Mapper:
         # The circuits behind each shared meter, by published ID, where the variant
         # shares one; under any other, each circuit's reading is its own.
         self.shared_meters = self._shared_meters() if self.shares_breakers else []
-        # Where tabs are not published, circuits get the next free ones.
-        self.next_tab = 1 + max(
+        # Where tabs are not published, circuits get the lowest free ones above
+        # every published tab (`_assign_tabs`).
+        self.first_free_tab = 1 + max(
             (t for d in self.tree.values() for t in _tabs(d.value("info/spaces"))), default=0
         )
+        self.assigned_tabs: set[int] = set()
         # The circuits feeding a battery, by published ID.
         self.battery_circuits = frozenset(
             feed for der, feed in self.feeds().items() if self.tree[der].type == "bess"
@@ -1026,13 +1026,24 @@ class _Mapper:
             "panel", self.ids[pid], self._name(pid, str(d.description.get("name", pid))), md
         )
 
+    def _assign_tabs(self, *, two_pole: bool) -> list[int]:
+        """The lowest free spaces above every published one, for a circuit whose
+        ``info/spaces`` is not published: one space for a single-pole circuit, and
+        for a two-pole one two spaces one above the other in a column, which span
+        both legs (``conventions/tab_legs.py``)."""
+        tab = self.first_free_tab
+        while True:
+            tabs = [tab, tab + 2] if two_pole else [tab]
+            if self.assigned_tabs.isdisjoint(tabs):
+                self.assigned_tabs.update(tabs)
+                return tabs
+            tab += 1
+
     def _circuit(self, device_id: str, d: Device) -> DeviceInstance:
         name = d.value("info/name") or str(d.description.get("name", device_id))
         tabs = _tabs(d.value("info/spaces"))
         if not tabs:
-            width = 2 if d.value("breaker/poles") == "2" else 1
-            tabs = list(range(self.next_tab, self.next_tab + width))
-            self.next_tab += width
+            tabs = self._assign_tabs(two_pole=d.value("breaker/poles") == "2")
             self.note(device_id, "tab-numbers", f"info/spaces not published; using {tabs}")
         md: dict[str, str] = {
             "tab-numbers": ",".join(str(t) for t in tabs),

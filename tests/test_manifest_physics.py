@@ -99,26 +99,23 @@ def test_circuit_dipole_spans_legs() -> None:
         DeviceManifest(
             instances=(
                 _panel(),
-                _circuit("hvac", **{"tab-numbers": "1,2", "breaker-rating-a": "40"}),
+                _circuit("hvac", **{"tab-numbers": "1,3", "breaker-rating-a": "40"}),
             )
         )
     )
     c = view.circuit("hvac")
-    assert c.tabs == (1, 2)
+    assert c.tabs == (1, 3)
     assert c.legs == (Leg.L1, Leg.L2)
     assert c.dipole is True
 
 
-def test_circuit_dipole_on_same_leg_is_allowed() -> None:
-    """Real SPAN panels gang two adjacent same-leg tabs as dipole feeds, so we
-    don't enforce the spans-both-legs rule on the dipole flag. The legs tuple
-    just reports the truth."""
-    inst = _circuit("hvac", **{"tab-numbers": "1,3", "dipole": "true"})
-    view = ManifestPhysicsView(DeviceManifest(instances=(_panel(), inst)))
-    c = view.circuit("hvac")
-    assert c.tabs == (1, 3)
-    assert c.dipole is True
-    assert c.legs == (Leg.L1, Leg.L1)
+@pytest.mark.parametrize("tabs", ["1,2", "1,5", "20,24"])
+def test_a_two_pole_circuit_whose_tabs_share_a_leg_is_refused(tabs: str) -> None:
+    """A 240 V circuit needs both legs. Two spaces of one row, or two a row apart
+    in one column, share a leg, so a two-pole circuit on them has no 240 V across it."""
+    inst = _circuit("hvac", **{"tab-numbers": tabs, "dipole": "true"})
+    with pytest.raises(ManifestValidationError, match=r"tab-numbers.*both legs"):
+        ManifestPhysicsView(DeviceManifest(instances=(_panel(), inst)))
 
 
 def test_circuit_multi_tab_without_dipole_flag_raises() -> None:
