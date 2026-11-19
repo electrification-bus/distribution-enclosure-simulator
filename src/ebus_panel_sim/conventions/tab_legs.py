@@ -8,7 +8,7 @@ column (e.g. 1 and 3), so it spans both legs. Every two-pole circuit in the
 reference captures sits on spaces n and n + 2, as this layout requires.
 
 A tab's leg follows from its number alone: on a panel whose spaces start at 9, as
-the MAIN 16 and MAIN 40 captures' do, 9 and 10 are on L1. The eBus specification
+the MAIN 16 capture's do, 9 and 10 are on L1. The eBus specification
 leaves the numbering to the manufacturer, "typically odd positions on the left bus
 and even on the right, or sequential" (distribution-enclosure.md, "Enclosure-specific:
 physical position"). This module implements the first. A panel numbered
