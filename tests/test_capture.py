@@ -1076,20 +1076,24 @@ _UPSTREAM_PV = "main32_r202639-upstream-pv"
 _UNCIRCUITED_PV = {
     "main32_r202639": ("reports 56.3 W", "pv device"),
     "main32_r202633": ("another enclosure", "not captured"),
+    "main32_r202645": ("reports -2.9 W", "pv device"),
+    "main32_r202645-cascade": ("another enclosure", "not captured"),
 }
 
 
 @pytest.mark.parametrize(
     "name",
-    [n for n in reference_capture_names() if n not in ("r202639-c", "r202639-f", _UPSTREAM_PV)],
+    [n for n in reference_capture_names() if n not in ("r202639-c", "r202639-f", "r202645-g", _UPSTREAM_PV)],
 )
 def test_no_other_capture_puts_solar_behind_a_battery(name: str) -> None:
     """``main32_r202639``'s pv reports 56.3 W more than its PV circuit produces, and
     it publishes a pv device that circuit feeds, so it gets a note and no battery is
     written hybrid. ``main32_r202633``'s pv reads 0, and its pv device no circuit
     feeds sits on a panel whose upstream lugs are fed by another enclosure, so it
-    gets the chained panel's note whatever its tree reads. The other captures leave
-    pv unvalued. Each battery keeps the default coupling, noted as defaulted, and no
+    gets the chained panel's note whatever its tree reads, as does
+    ``main32_r202645-cascade``'s. ``main32_r202645``'s pv reports -2.9 W beyond
+    what its PV circuit produces, and it gets ``main32_r202639``'s note. The other
+    captures leave pv unvalued. Each battery keeps the default coupling, noted as defaulted, and no
     tick gives one PV."""
     tree = load_reference_capture(name).tree
     definition, notes = definition_from_tree(tree, mask=False)
@@ -1108,10 +1112,10 @@ def test_no_other_capture_puts_solar_behind_a_battery(name: str) -> None:
 
 
 def test_the_batteries_written_hybrid_are_the_powerwall_3_captures() -> None:
-    """``r202639-c`` and ``r202639-f`` each publish one battery whose
+    """``r202639-c``, ``r202639-f`` and ``r202645-g`` each publish one battery whose
     ``info/model`` is Powerwall 3, a battery with its own solar inverter, and
     nothing else that could bring solar to the panel, so each is written hybrid:
-    ``r202639-f`` reports 3247 W beyond its circuits and ``r202639-c`` 0.0 W, and
+    ``r202639-f`` reports 3247 W beyond its circuits and the other two 0.0 W, and
     it is the tree's topology that decides, not that reading. ``r202639-d``'s one
     battery (vendor Lucid) stays ac-coupled because its panel publishes no pv flow,
     so there is no solar beyond its circuits to write anywhere."""
@@ -1123,7 +1127,7 @@ def test_the_batteries_written_hybrid_are_the_powerwall_3_captures() -> None:
         ].manifest.of_class("bess")
         if bess.metadata.get("inverter-type") == "hybrid"
     }
-    assert set(hybrid) == {"r202639-c", "r202639-f"}
+    assert set(hybrid) == {"r202639-c", "r202639-f", "r202645-g"}
     assert set(hybrid.values()) == {"Powerwall 3"}
 
 

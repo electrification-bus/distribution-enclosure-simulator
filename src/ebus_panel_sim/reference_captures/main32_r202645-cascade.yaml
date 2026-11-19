@@ -1,0 +1,227 @@
+schema: panel-sim-definition/1
+variant: span
+devices:
+- class: panel
+  id: masked-panel
+  name: SPAN Panel eBus Adapter
+  metadata:
+    vendor-name: SPAN
+    serial-number: MASKED-PANEL
+    firmware-version: spanos3/r202645/02
+    hardware-version: '1.2'
+    panel-model: MAIN_32
+    panel-size: '32'
+    main-breaker-rating-a: '200'
+    postal-code: '00000'
+    time-zone: America/Los_Angeles
+    line-voltage-v: '121.0'
+    service-voltage-v: '242.0'
+    islandable: 'true'
+    unvalued: pcs/operator-import-limit,pcs/operator-import-limit-active,pcs/operator-import-limit-enablement
+- class: lugs
+  id: lugs-upstream
+  name: Upstream lugs
+  description_name: lugs-upstream
+  metadata:
+    direction: upstream
+- class: lugs
+  id: lugs-downstream
+  name: Downstream lugs
+  description_name: lugs-downstream
+  metadata:
+    direction: downstream
+- class: bess
+  id: bess-1
+  name: bess-1
+  metadata:
+    vendor-name: Tesla
+    model: Powerwall 2 AC
+    part-number: 1232100-00-E
+    firmware-version: 26.34.2 56d7ba06
+    serial-number: MASKED-BESS-1
+    nameplate-capacity-kwh: '81'
+    relative-position: IN_PANEL
+    initial-soe-kwh: '81.0'
+- class: pv
+  id: pv-1
+  name: pv-1
+  metadata:
+    vendor-name: Enphase Energy
+    model: IQ7PLUS-72-x-US-&
+    nominal-power-w: '6000'
+    inverter-type: ac-coupled
+    relative-position: IN_PANEL
+- class: circuit
+  id: circuit-7
+  name: Driveway-Outlet & Spare
+  description_name: circuit-7
+  metadata:
+    tab-numbers: 17,19
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    initial-consumed-wh: '141348.0'
+    initial-produced-wh: '7438.5'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-1
+  name: Basement-Ventilation-Fan
+  description_name: circuit-1
+  metadata:
+    tab-numbers: '1'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    initial-consumed-wh: '1027457.7'
+    initial-produced-wh: '6407.5'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-9
+  name: Attic-Back-1 & Spare
+  description_name: circuit-9
+  metadata:
+    tab-numbers: 22,24
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '1408613.1'
+    initial-produced-wh: '581.1'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-6
+  name: AV-Rack-2 & Spare
+  description_name: circuit-6
+  metadata:
+    tab-numbers: 14,16
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    initial-consumed-wh: '1820585.2'
+    initial-produced-wh: '209.9'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-2
+  name: Server-Rack-1 & Spare
+  description_name: circuit-2
+  metadata:
+    tab-numbers: 2,4
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: NEVER
+    relay-behavior: non-controllable
+    initial-consumed-wh: '5815202.0'
+    initial-produced-wh: '12173.2'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-4
+  name: Server-Rack-2 & Spare
+  description_name: circuit-4
+  metadata:
+    tab-numbers: 6,8
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    initial-consumed-wh: '5864100.7'
+    initial-produced-wh: '13550.5'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-10
+  name: EV-Charger-Circuit-1
+  description_name: circuit-10
+  metadata:
+    tab-numbers: 25,27
+    placement: upstream-of-lugs
+    breaker-rating-a: '60'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    initial-consumed-wh: '1744178.0'
+    initial-produced-wh: '129.5'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-5
+  name: AV-Rack-1 & Spare
+  description_name: circuit-5
+  metadata:
+    tab-numbers: 10,12
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: SOC_THRESHOLD
+    relay-behavior: controllable
+    initial-consumed-wh: '1241329.3'
+    initial-produced-wh: '24740.3'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-8
+  name: Attic-Front & Spare
+  description_name: circuit-8
+  metadata:
+    tab-numbers: 18,20
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '447677.2'
+    initial-produced-wh: '1198.9'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-3
+  name: Smoke-Detectors
+  description_name: circuit-3
+  metadata:
+    tab-numbers: '3'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: non-controllable
+    initial-consumed-wh: '80124.2'
+    initial-produced-wh: '80.3'
+    unvalued: pcs/priority
+- class: circuit
+  id: circuit-11
+  name: Attic-Back-2 & Spare
+  description_name: circuit-11
+  metadata:
+    tab-numbers: 26,28
+    placement: upstream-of-lugs
+    breaker-rating-a: '30'
+    dipole: 'true'
+    default-priority: NEVER
+    relay-behavior: controllable
+    initial-consumed-wh: '2895.9'
+    initial-produced-wh: '2533.5'
+    unvalued: pcs/priority
+- class: mid
+  id: mid-1
+  name: mid-1
+  metadata:
+    vendor-name: Tesla
+    serial-number: MASKED-MID-1
+bess:
+- instance_id: bess-1
+  nameplate_capacity_kwh: 81.0
+  max_charge_w: 5000.0
+  max_discharge_w: 5000.0
+  charge_efficiency: 0.95
+  discharge_efficiency: 0.95
+  backup_reserve_pct: 20.0
+  charge_mode: self-consumption
+  charge_hours: []
+  discharge_hours: []
+  initial_soc_pct: 100.0
+load_shedding:
+  soc_threshold_pct: 49.0
