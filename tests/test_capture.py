@@ -1248,6 +1248,51 @@ def test_the_inverters_production_adds_back_to_the_solar_exactly() -> None:
     assert emitter.publish_tick(tick).power_flows.pv == -1537.2
 
 
+def _three_upstream_inverters(powers: tuple[str, str, str]) -> tuple[Tree, tuple[str, str, str]]:
+    """``main32_r202639-upstream-pv``'s tree with a third pv device no circuit feeds, a
+    copy of its second listed after it, the three rated ``powers`` in tree order."""
+    tree, a, b = _upstream_pv()
+    c = f"{b}-third"
+    tree[c] = copy.deepcopy(tree[b])
+    children = _panel_of(tree).description["children"]
+    children.insert(children.index(b) + 1, c)
+    for device_id, power in zip((a, b, c), powers, strict=True):
+        tree[device_id].properties["info/nominal-power"] = power
+    return tree, (a, b, c)
+
+
+@pytest.mark.parametrize(
+    ("powers", "solar", "production"),
+    [
+        pytest.param(
+            ("3800", "7600", "3800"),
+            "-1537.2",
+            (384.29999999999995, 768.6000000000001, 384.29999999999995),
+            id="the largest share",
+        ),
+        pytest.param(
+            ("1000", "1000", "1000"),
+            "-100.0",
+            (33.33333333333334, 33.33333333333333, 33.33333333333333),
+            id="the first of a tie",
+        ),
+    ],
+)
+def test_of_three_inverters_the_largest_share_produces_what_the_others_leave(
+    powers: tuple[str, str, str], solar: str, production: tuple[float, float, float]
+) -> None:
+    """Each inverter but one produces its share rounded to the solar's own precision,
+    and the one with the largest share, the first of several tied, produces what the
+    others leave. Split 1:2:1, 1537.2 W gives the 7600 W inverter 768.6000000000001 W;
+    split three ways, 100 W gives the first inverter 33.33333333333334 W. Either way
+    the three add back to the solar exactly."""
+    tree, ids = _three_upstream_inverters(powers)
+    _panel_of(tree).properties["power-flows/pv"] = solar
+    _, _, tick = _captured(tree)
+    assert tick.pv == dict(zip(ids, production, strict=True))
+    assert sum(tick.pv.values()) == -float(solar)
+
+
 def test_a_lone_unfed_inverter_takes_all_of_it_beside_a_circuit_fed_one() -> None:
     """A circuit-fed pv device's production is already in its circuit, so it takes
     none of the remainder, and it does not keep the one no circuit feeds from taking
@@ -1336,16 +1381,42 @@ def test_an_inverter_without_a_usable_nominal_power_leaves_the_solar_uncaptured(
     assert "nominal-power" in note and "not captured" in note
 
 
-def test_a_nominal_power_that_is_not_a_number_is_a_capture_error_and_gives_no_production() -> None:
-    """Text where the rating should be is no rating to divide the solar by: the
-    definition is refused as a ``CaptureError`` and the ticks give no production,
-    rather than a bare ``ValueError`` escaping from either."""
+@pytest.mark.parametrize("power", ["0", "-5", "nan", "inf", "-inf", "sunny"])
+def test_an_unusable_nominal_power_is_written_as_the_default_and_noted(power: str) -> None:
+    """A published nominal power that is not a finite number greater than zero is no
+    rating, so the definition writes the default it writes where none is published,
+    and notes the value it could not use, rather than a rating the emitter refuses."""
     tree, _, b = _upstream_pv()
-    tree[b].properties["info/nominal-power"] = "sunny"
-    with pytest.raises(CaptureError):
-        definition_from_tree(tree)
-    (tick,) = ticks_from_samples(tree, [(0.0, tree)])
+    tree[b].properties["info/nominal-power"] = power
+    definition, notes, tick = _captured(tree)
+    (pv,) = [i for i in definition.manifest.of_class("pv") if i.instance_id == b]
+    assert pv.metadata["nominal-power-w"] == "5000"
+    assert [n.note for n in notes if n.device == b and n.key == "nominal-power-w"] == [
+        f"{power!r} is not a finite number greater than 0; using 5000"
+    ]
     assert tick.pv == {}
+
+
+def test_a_circuit_fed_inverter_s_unusable_nominal_power_is_written_as_the_default_too() -> None:
+    """The default is the definition's, whatever feeds the inverter: a circuit-fed pv
+    device publishing a rating of 0 gets it, with the same note."""
+    tree, _, b = _upstream_pv()
+    consuming = next(
+        d
+        for d in tree.values()
+        if d.type == "circuit"
+        and d.declares("info/spaces")
+        and float(d.value("meter/active-power") or "0") < 0
+    )
+    consuming.properties["connection/feeds-device-id"] = b
+    tree[b].properties["info/nominal-power"] = "0"
+    definition, notes, _ = _captured(tree)
+    (fed,) = [i for i in definition.manifest.of_class("pv") if i.instance_id == b]
+    assert "feed" in fed.metadata
+    assert fed.metadata["nominal-power-w"] == "5000"
+    assert [n.note for n in notes if n.device == b and n.key == "nominal-power-w"] == [
+        "'0' is not a finite number greater than 0; using 5000"
+    ]
 
 
 def _chained_upstream_pv() -> Tree:
@@ -1388,6 +1459,21 @@ def test_a_chained_panel_is_noted_whatever_its_tree_reads() -> None:
     _, notes, tick = _captured(tree)
     note = _pv_note(notes)
     assert "another enclosure" in note and "not captured" in note
+    assert tick.pv == {}
+
+
+def test_a_chained_panel_that_publishes_no_pv_flow_notes_the_solar_beyond_its_circuits() -> None:
+    """With no pv flow in its tree there is no figure to quote, so the note says the
+    panel publishes none, and that the solar beyond its circuits is not captured, and
+    why."""
+    tree = _chained_upstream_pv()
+    del _panel_of(tree).properties["power-flows/pv"]
+    _, notes, tick = _captured(tree)
+    note = _pv_note(notes)
+    assert note.startswith(
+        "publishes no pv flow in its tree; the solar beyond its circuits is not captured: "
+    )
+    assert "another enclosure" in note
     assert tick.pv == {}
 
 

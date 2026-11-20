@@ -400,7 +400,8 @@ def definition_from_tree(
       one place that is neither a circuit nor the downstream lugs, and each takes
       a share in proportion to its published ``info/nominal-power``, with a note
       saying so, since the panel publishes only the total. Inverters publishing
-      the same figure split it equally, as capture ``main32_r202639-upstream-pv``
+      the same figure split it equally, to within float rounding, as capture
+      ``main32_r202639-upstream-pv``
       shows, whose two inverters each publish 11680. A circuit-fed ``pv`` device
       or a producing circuit does not stand in the way, since its production is
       in the circuits already, and no battery is written hybrid. Whatever the tree
@@ -411,9 +412,9 @@ def definition_from_tree(
       which puts it on the feedthrough side; where lugs feed a SOLAR or MIXED
       node, which could bring it; or where one of those inverters publishes no
       ``info/nominal-power``, or one that is not a finite number greater than
-      zero, to divide it by. One that does not parse as a number at all raises
-      ``CaptureError`` instead, since the definition's ``nominal-power-w`` is then
-      one the emitter refuses.
+      zero, to divide it by. The definition then gives that inverter the default
+      ``nominal-power-w`` it gives one that publishes none, noting the value it
+      could not use.
     - Otherwise, where the tree's panel publishes ``power-flows/pv``, whatever its
       value, a battery is written ``inverter-type: hybrid`` when nothing else in
       the tree could bring solar to the panel and the battery is the tree's only
@@ -1365,11 +1366,18 @@ class _Mapper:
     def _pv(self, device_id: str, d: Device, feeds: dict[str, str]) -> DeviceInstance:
         md = self._identity("pv", device_id, d)
         md.setdefault("vendor-name", "unknown")
-        power = d.value("info/nominal-power")
-        if power is None:
-            power = "5000"
-            self.note(device_id, "nominal-power-w", "not published; using 5000")
-        md["nominal-power-w"] = power
+        published = d.value("info/nominal-power")
+        if _nominal_power_w(d) is not None and published is not None:
+            md["nominal-power-w"] = published
+        else:
+            md["nominal-power-w"] = "5000"
+            self.note(
+                device_id,
+                "nominal-power-w",
+                "not published; using 5000"
+                if published is None
+                else f"{published!r} is not a finite number greater than 0; using 5000",
+            )
         md["inverter-type"] = "ac-coupled"
         self.note(device_id, "inverter-type", "not published; using ac-coupled")
         md["relative-position"] = "IN_PANEL"
