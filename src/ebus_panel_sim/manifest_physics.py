@@ -635,7 +635,9 @@ def _parse_circuit(inst: DeviceInstance) -> CircuitPhysics:
         )
     # A two-pole breaker takes two spaces one above the other in a column, which
     # span both legs (``conventions/tab_legs.py``). Any other footprint is not one
-    # in this layout: one space, two of one row, which share a leg, or three.
+    # in this layout: one space; two of one row, which share a leg; two of one
+    # column that are not adjacent, as 1,5 (one leg) or 1,7 are; two in different
+    # columns, as 2,3 or 1,4 are; or three or more.
     if dipole_declared and (len(tabs) != 2 or abs(tabs[1] - tabs[0]) != 2):
         raise ManifestValidationError(
             f"key 'tab-numbers': a two-pole circuit takes two spaces one above the "
