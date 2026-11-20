@@ -15,6 +15,7 @@ from ebus_panel_sim import (
     DeviceInstance,
     DeviceManifest,
     Emitter,
+    Leg,
     LoadSheddingConfig,
     ManifestValidationError,
     PanelDefinition,
@@ -23,6 +24,7 @@ from ebus_panel_sim import (
     Tree,
     Variant,
     dump_ticks,
+    legs_for_tabs,
     load_definition,
     load_reference_capture,
     load_ticks,
@@ -116,6 +118,76 @@ def test_a_reference_tree_captures_with_assigned_tabs(rec: PahoRecorder) -> None
         return sum(t.endswith("/$description") for t in tree)
 
     assert descriptions(retained) == descriptions(original)
+
+
+def test_assigned_tabs_put_a_two_pole_circuit_across_both_legs(rec: PahoRecorder) -> None:
+    """Where info/spaces is not published, a two-pole circuit is given two spaces
+    one above the other, which span both legs, and no space is given twice."""
+    source = dataclasses.replace(_source(), variant="reference")
+    captured, _ = definition_from_tree(
+        tree_from_retained(_publish(rec, source)), variant="reference"
+    )
+    tabs = [
+        tuple(int(t) for t in i.metadata["tab-numbers"].split(","))
+        for i in captured.manifest.of_class("circuit")
+    ]
+    two_pole = [t for t in tabs if len(t) == 2]
+    assert two_pole
+    assert all(set(legs_for_tabs(t)) == {Leg.L1, Leg.L2} for t in two_pole)
+    every = [tab for t in tabs for tab in t]
+    assert len(every) == len(set(every))
+
+
+@pytest.mark.parametrize(
+    "spaces",
+    [
+        pytest.param("39,40", id="one row, as a panel numbered sequentially publishes it"),
+        pytest.param("39", id="one space"),
+    ],
+)
+def test_a_two_pole_circuit_the_layout_cannot_hold_is_a_capture_error(
+    rec: PahoRecorder, spaces: str
+) -> None:
+    """A two-pole circuit published on two spaces of one row has no 240 V across it
+    in the layout the emitter models, and one on a single space is no two-pole
+    breaker, so the definition the tree maps to is refused rather than given legs
+    the panel does not have."""
+    retained = _publish(rec, _source())
+    (topic,) = (t for t, v in retained.items() if t.endswith("/info/spaces") and v == "32,34")
+    retained[topic] = spaces
+    with pytest.raises(CaptureError, match=r"tab-numbers.*both legs"):
+        definition_from_tree(tree_from_retained(retained), mask=False)
+
+
+@pytest.mark.parametrize("poles", ["0", "3", "4", "2.0", "x"])
+def test_a_pole_count_a_split_phase_circuit_cannot_have_is_a_capture_error(
+    rec: PahoRecorder, poles: str
+) -> None:
+    """A circuit's breaker/poles is 1 or 2 on a split-phase panel. Any other value
+    is refused naming it, including where info/spaces is not published and the
+    spaces would be assigned from it."""
+    source = dataclasses.replace(_source(), variant="reference")
+    retained = _publish(rec, source)
+    topic = next(t for t in sorted(retained) if t.endswith("/breaker/poles"))
+    retained[topic] = poles
+    with pytest.raises(CaptureError, match="breaker/poles"):
+        definition_from_tree(tree_from_retained(retained), variant="reference")
+
+
+@pytest.mark.parametrize("poles", ["0", "3", "4", "2.0", "x"])
+def test_a_pole_count_a_split_phase_circuit_cannot_have_is_refused_on_published_spaces(
+    rec: PahoRecorder, poles: str
+) -> None:
+    """Where the panel publishes ``info/spaces``, a pole count other than 1 or 2 is
+    refused too, rather than captured on those spaces as the two-pole circuit they
+    could hold, as the two-pole circuit on 32,34 would be."""
+    retained = _publish(rec, _source())
+    (spaces,) = (t for t, v in retained.items() if t.endswith("/info/spaces") and v == "32,34")
+    topic = spaces.removesuffix("/info/spaces") + "/breaker/poles"
+    assert retained[topic] == "2"
+    retained[topic] = poles
+    with pytest.raises(CaptureError, match="breaker/poles"):
+        definition_from_tree(tree_from_retained(retained), mask=False)
 
 
 def test_masking_replaces_every_serial_and_keeps_references(rec: PahoRecorder) -> None:

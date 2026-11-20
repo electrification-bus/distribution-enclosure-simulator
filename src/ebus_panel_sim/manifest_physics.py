@@ -629,14 +629,19 @@ def _parse_circuit(inst: DeviceInstance) -> CircuitPhysics:
     except ValueError as exc:
         raise ManifestValidationError(f"key 'tab-numbers': {exc}") from exc
     dipole_declared = _opt_bool(md, "dipole", default=len(tabs) > 1)
-    # NOTE: ``dipole`` + leg-spanning is not strictly validated. Real SPAN panels
-    # use slot numberings where two adjacent breaker positions on the same leg
-    # can still be ganged as a "240 V" feed (e.g. tabs 20+22). The convention
-    # in ``conventions/tab_legs.py`` is informational for per-leg current
-    # calculation; producers are trusted to declare dipole correctly.
     if not dipole_declared and len(tabs) > 1:
         raise ManifestValidationError(
             f"dipole=false but {len(tabs)} tabs declared; single-tab circuits only"
+        )
+    # A two-pole breaker takes two spaces one above the other in a column, which
+    # span both legs (``conventions/tab_legs.py``). Any other footprint is not one
+    # in this layout: one space; two of one row, which share a leg; two of one
+    # column that are not adjacent, as 1,5 (one leg) or 1,7 are; two in different
+    # columns, as 2,3 or 1,4 are; or three or more.
+    if dipole_declared and (len(tabs) != 2 or abs(tabs[1] - tabs[0]) != 2):
+        raise ManifestValidationError(
+            f"key 'tab-numbers': a two-pole circuit takes two spaces one above the "
+            f"other in a column, such as '1,3', which span both legs; got {raw_tabs!r}"
         )
 
     priority = _require(md, "default-priority")

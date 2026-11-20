@@ -624,7 +624,7 @@ def test_dipole_circuit_per_leg_currents() -> None:
     manifest = DeviceManifest(
         instances=(
             _panel_inst(),
-            _circuit_inst("hvac", tabs="1,2"),
+            _circuit_inst("hvac", tabs="1,3"),
         )
     )
     em = Emitter(manifest, _registry())

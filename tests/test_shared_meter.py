@@ -381,12 +381,6 @@ def _with(manifest: DeviceManifest, cid: str, **md: str) -> DeviceManifest:
             ),
             "spaces 34, 36, 38",
         ),
-        (
-            _manifest(
-                _circuit("left", "34", "15", "wide"), _circuit("wide", "34,36,38", "30", "left")
-            ),
-            "spaces 34, 36, 38",
-        ),
     ],
 )
 def test_a_shared_breaker_that_cannot_be_one_device_is_rejected(
@@ -471,23 +465,21 @@ def test_a_panel_with_a_shared_breaker_captures_and_rebuilds(
 ) -> None:
     """Each circuit's share of the breaker's reading republishes it exactly: in one
     space, or across two where every circuit is two-pole, the meter reads the same
-    however the load is split, and with both circuits drawing the same way so do the
-    flows and lugs."""
+    however the load is split, and so do the flows and lugs, a leg's currents adding
+    with their signs."""
     assert _round_trip(rec, manifest, loads) == {}
 
 
 @pytest.mark.spec_only
-def test_a_tandem_drawing_both_ways_rebuilds_its_meter_but_not_the_lugs_current(
+def test_a_tandem_drawing_both_ways_rebuilds_its_meter_and_the_lugs_current(
     rec: PahoRecorder,
 ) -> None:
     """121 W drawn and 300 W backfed behind one CT read 179 W backfed, which the
-    split gives as 89.5 W on each circuit. The meters and the flows republish, but
-    the lugs, adding each circuit's current whatever its direction, read the net
-    1.5 A on the tandem's leg instead of the 1.0 A and 2.5 A it carried."""
+    split gives as 89.5 W on each circuit. The meters and the flows republish, and
+    so do the lugs: the 1.0 A drawn and 2.5 A backfed on the tandem's leg net to
+    the 1.5 A the two shares carry."""
     loads = {"hall": 121.0, "porch": -300.0, "other": 0.0}
-    assert _round_trip(rec, _tandem(), loads) == {
-        "ebus/5/lugs-upstream/meter/current-b": ("3.5", "1.5")
-    }
+    assert _round_trip(rec, _tandem(), loads) == {}
 
 
 def _tandem_tree(rec: PahoRecorder, **seeds: str) -> dict[str, str]:
