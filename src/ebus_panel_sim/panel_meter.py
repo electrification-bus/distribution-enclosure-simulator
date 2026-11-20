@@ -11,9 +11,12 @@ METER frame — positive = consumption, negative = production. Every field below
 is a reading taken by one meter, about itself:
 - Per-circuit ``power_w``: positive = consume, negative = produce (PV/V2G).
 - ``battery_w``: positive = discharging (battery → panel), negative = charging.
-- ``inverter_pv_w``: the PV a battery's own (hybrid) inverter takes on its DC
-  side, positive = producing, which is the PV's own frame rather than a load's.
-  No circuit meters it: it leaves the battery's AC terminals with ``battery_w``.
+- ``uncircuited_pv_w``: the PV that reaches the site through no circuit, positive =
+  producing, which is the PV's own frame rather than a load's. It is what a
+  battery's own (hybrid) inverter takes on its DC side and what a PV inverter no
+  circuit feeds produces, which is taken to be upstream of the main lugs. No
+  circuit meters it: it joins the site beside the main lugs, as ``battery_w``
+  does.
 - ``instant_grid_power_w``: positive = importing from grid, negative = exporting.
 - ``upstream_active_power_w``: net power through the panel-side upstream lugs,
   before any upstream BESS contribution is removed.
@@ -158,7 +161,7 @@ def resolve(
     has_battery: bool,
     solar_circuits: frozenset[str] | None = None,
     battery_circuits: frozenset[str] = frozenset(),
-    inverter_pv_w: float = 0.0,  # positive = producing
+    uncircuited_pv_w: float = 0.0,  # positive = producing
 ) -> PanelMeterReading:
     """Build the panel-level reading from per-circuit gated powers + battery + grid.
 
@@ -171,11 +174,11 @@ def resolve(
     Without it every negative reading counts as solar and every positive one as
     site. The upstream flow is every circuit either way.
 
-    ``inverter_pv_w`` is the PV the batteries' own (hybrid) inverters take on their
-    DC side. ``pv`` adds it to the circuits' solar, and since it reaches the panel
-    through the batteries' AC terminals rather than through any circuit, the grid
-    is the upstream flow less what those terminals deliver: the dispatch and this
-    PV together."""
+    ``uncircuited_pv_w`` is the PV that reaches the site through no circuit: what the
+    batteries' own (hybrid) inverters take on their DC side and what PV inverters no
+    circuit feeds produce. ``pv`` adds it to the circuits' solar, and since it joins
+    the site beside the main lugs rather than through any circuit, the grid is the
+    upstream flow less what arrives that way: the dispatch and this PV together."""
 
     pv_available_w = circuit_solar_w(gated_powers, solar_circuits)
     if solar_circuits is None:
@@ -195,7 +198,7 @@ def resolve(
         # Upstream lugs see the panel-side net flow. Utility grid flow is on the
         # other side of an upstream BESS, so remove the BESS contribution to get
         # what the utility is actually supplying or absorbing.
-        grid_w = _grid_power_from_lugs_and_bess(upstream_active_w, battery_w + inverter_pv_w)
+        grid_w = _grid_power_from_lugs_and_bess(upstream_active_w, battery_w + uncircuited_pv_w)
         grid_state: str | None = "ON_GRID"
         dsm_state = _DSM_ON
         current_run_config = _RUN_ON
@@ -256,11 +259,13 @@ def resolve(
         # Node frame — see the module docstring. Each of these is the meter-frame
         # quantity above it, restated as "power leaving the panel node", which is
         # what makes the four sum to zero.
-        # Without inverter PV, pv is the circuits' solar negated, exactly as before
+        # Without uncircuited PV, pv is the circuits' solar negated, exactly as before
         # (the reference variant writes it as it is, so 0 stays 0). With some, the
         # sum is a float, and `+ 0.0` keeps one that cancels from reading -0.0.
         power_flow_pv=(
-            -pv_available_w if inverter_pv_w == 0 else -(pv_available_w + inverter_pv_w) + 0.0
+            -pv_available_w
+            if uncircuited_pv_w == 0
+            else -(pv_available_w + uncircuited_pv_w) + 0.0
         ),
         power_flow_battery=battery_circuits_w - battery_w,
         power_flow_grid=-grid_w,
@@ -271,11 +276,12 @@ def resolve(
 def _grid_power_from_lugs_and_bess(upstream_active_w: float, bess_ac_w: float) -> float:
     """Return utility-side grid power from panel-side lugs and BESS power.
 
-    ``bess_ac_w`` is what the batteries' AC terminals deliver, positive out of them:
-    their dispatch (positive = discharging, negative = charging) plus any PV their
-    own inverters take. The BESS sits upstream of the lugs, so whatever it supplies
-    the utility does not have to, and whatever it absorbs the utility must: one
-    subtraction, in both directions.
+    ``bess_ac_w`` is what reaches the site beside the lugs, positive toward it: the
+    batteries' dispatch (positive = discharging, negative = charging) plus the PV
+    that joins there, which a hybrid battery's own inverter takes and a PV inverter
+    no circuit feeds produces. The BESS and that PV sit upstream of the lugs, so
+    whatever they supply the utility does not have to, and whatever the BESS absorbs
+    the utility must: one subtraction, in both directions.
 
     Charging used to be credited only against the PV surplus visible at the lugs, so
     that a charging BESS "never creates extra grid import". That clamp is gone. It

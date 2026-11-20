@@ -92,7 +92,35 @@ class TickInputs:
                         the rest; curtailing any surplus is the producer's, as
                         generating it is. A battery left out produces 0 W. An
                         id that is not such a BESS, or a value that is not a
-                        finite number, raises ``EmitterStateError``."""
+                        finite number, raises ``EmitterStateError``.
+        pv:             Mapping of a ``pv`` instance whose manifest gives no
+                        ``feed`` → the power it produces, in watts: positive
+                        while producing (the PV's own frame), negative for a
+                        standby draw. A ``pv`` instance with no ``feed`` is
+                        taken to join the site upstream of the main lugs,
+                        whatever its ``relative-position`` or
+                        ``inverter-type``, as AC-coupled solar behind a battery
+                        gateway does: that is the one place in this model that
+                        is neither a circuit nor the downstream lugs, which
+                        carry only downstream-of-lugs circuits. So no circuit's
+                        power carries its production and no relay gates it.
+                        It is published in ``power-flows/pv`` and offered to
+                        the battery's dispatch as solar, and the grid is the
+                        upstream lugs less the batteries' dispatch, any hybrid
+                        battery's PV (``bess_pv``) and this production; the
+                        lugs, the circuits and ``site`` are unchanged, and the
+                        device itself still publishes only its ``info``. Off
+                        grid the battery only discharges and the emitter
+                        curtails nothing, so there the four flows balance only
+                        while the solar is no more than the load and the
+                        battery covers the rest; curtailing any surplus is the
+                        producer's, as generating it is. An inverter left out
+                        produces 0 W. An id that is not a ``pv`` instance
+                        (under ``span-alpha-test-b2``, which rejects ``pv``
+                        instances, any id), a ``pv`` instance that a circuit
+                        feeds (that circuit's power carries its production),
+                        or a value that is not a finite number, raises
+                        ``EmitterStateError`` before any state moves."""
 
     current_time: float
     grid_online: bool
@@ -101,3 +129,4 @@ class TickInputs:
     envelope: PanelEnvelopeTick = field(default_factory=PanelEnvelopeTick)
     bess_communication: dict[str, BESSCommunication] = field(default_factory=dict)
     bess_pv: dict[str, float] = field(default_factory=dict)
+    pv: dict[str, float] = field(default_factory=dict)

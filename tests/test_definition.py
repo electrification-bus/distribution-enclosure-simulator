@@ -242,7 +242,7 @@ def test_tick_fields_are_converted_strictly(tmp_path: Path) -> None:
     path = _ticks_file(
         tmp_path,
         "  - {current_time: 60, grid_online: false, circuits: {c1: 120}, "
-        "bess_communication: {b: LOST}, bess_pv: {b: 3247}}\n",
+        "bess_communication: {b: LOST}, bess_pv: {b: 3247}, pv: {p: 780}}\n",
     )
     (tick,) = load_ticks(path)
     assert tick.grid_online is False
@@ -250,6 +250,7 @@ def test_tick_fields_are_converted_strictly(tmp_path: Path) -> None:
     assert tick.circuits == {"c1": 120.0}
     assert tick.bess_communication == {"b": "LOST"}
     assert tick.bess_pv == {"b": 3247.0}
+    assert tick.pv == {"p": 780.0}
 
 
 def test_a_tick_s_battery_pv_round_trips_through_a_file(tmp_path: Path) -> None:
@@ -263,6 +264,24 @@ def test_a_tick_s_battery_pv_round_trips_through_a_file(tmp_path: Path) -> None:
     assert load_ticks(path) == ticks
     written = yaml.safe_load(path.read_text())["ticks"]
     assert ["bess_pv" in t for t in written] == [False, True]
+
+
+def test_a_tick_s_uncircuited_pv_round_trips_through_a_file(tmp_path: Path) -> None:
+    """Written only where a tick gives it, so a recording without it is unchanged."""
+    ticks = [
+        TickInputs(current_time=0.0, grid_online=True, circuits={"c1": 1.0}, pv={}),
+        TickInputs(
+            current_time=1.0,
+            grid_online=True,
+            circuits={},
+            pv={"pv-1": 780.0, "pv-2": -5.0},
+        ),
+    ]
+    path = tmp_path / "ticks.yaml"
+    dump_ticks(ticks, path)
+    assert load_ticks(path) == ticks
+    written = yaml.safe_load(path.read_text())["ticks"]
+    assert ["pv" in t for t in written] == [False, True]
 
 
 @pytest.mark.parametrize(
@@ -279,6 +298,11 @@ def test_a_tick_s_battery_pv_round_trips_through_a_file(tmp_path: Path) -> None:
             r"bess_pv\['b'\] must be float",
         ),
         ("  - {current_time: 0, grid_online: true, bess_pv: [1]}\n", "bess_pv must be"),
+        (
+            "  - {current_time: 0, grid_online: true, pv: {p: sunny}}\n",
+            r"pv\['p'\] must be float",
+        ),
+        ("  - {current_time: 0, grid_online: true, pv: [1]}\n", "pv must be"),
         ("  - {grid_online: true}\n", "missing 'current_time'"),
     ],
 )

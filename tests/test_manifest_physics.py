@@ -271,6 +271,22 @@ def test_a_battery_inverter_type_outside_the_vocabulary_is_rejected() -> None:
         ManifestPhysicsView(DeviceManifest(instances=(_panel(), _bess(**{"inverter-type": "dc"}))))
 
 
+@pytest.mark.parametrize("power", ["0", "-5", "nan", "inf", "-inf"])
+def test_a_pv_nominal_power_that_is_not_a_finite_number_above_zero_is_refused(power: str) -> None:
+    pv = DeviceInstance(
+        entity_class="pv",
+        instance_id="pv1",
+        display_name="Solar",
+        metadata={
+            "vendor-name": "Enphase",
+            "nominal-power-w": power,
+            "inverter-type": "ac-coupled",
+        },
+    )
+    with pytest.raises(ManifestValidationError, match="pv/pv1: key 'nominal-power-w'"):
+        ManifestPhysicsView(DeviceManifest(instances=(_panel(), pv)))
+
+
 def test_pv_inverter_type_validated() -> None:
     pv = DeviceInstance(
         entity_class="pv",

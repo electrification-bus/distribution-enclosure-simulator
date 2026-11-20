@@ -761,9 +761,15 @@ def _parse_bess(inst: DeviceInstance) -> BessPhysics:
 
 def _parse_pv(inst: DeviceInstance) -> PvPhysics:
     md = inst.metadata
+    nominal_power_w = _req_float(md, "nominal-power-w")
+    if not (math.isfinite(nominal_power_w) and nominal_power_w > 0):
+        raise ManifestValidationError(
+            "key 'nominal-power-w': must be a finite number greater than 0, "
+            f"got {md['nominal-power-w']!r}"
+        )
     return PvPhysics(
         vendor_name=_require(md, "vendor-name"),
-        nominal_power_w=_req_float(md, "nominal-power-w"),
+        nominal_power_w=nominal_power_w,
         inverter_type=_inverter_type(_require(md, "inverter-type")),
         model=_opt_str(md, "model"),
         serial_number=_opt_str(md, "serial-number"),
