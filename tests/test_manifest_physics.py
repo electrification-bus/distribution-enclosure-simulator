@@ -117,6 +117,7 @@ def test_circuit_dipole_spans_legs() -> None:
         pytest.param("20,24", id="two rows apart, one leg, right column"),
         pytest.param("2,3", id="across the columns"),
         pytest.param("1,4", id="across the columns, a row apart"),
+        pytest.param("1,7", id="one column, not adjacent, both legs"),
         pytest.param("5", id="one space"),
         pytest.param("1,3,5", id="three spaces"),
     ],
@@ -127,7 +128,8 @@ def test_a_two_pole_circuit_not_on_two_spaces_one_above_the_other_is_refused(
     """A two-pole breaker takes two spaces one above the other in a column, which
     span both legs. Two spaces of one row, or two rows apart, share a leg, so a
     two-pole circuit there has no 240 V across it; and no other footprint is a
-    two-pole breaker in this layout."""
+    two-pole breaker in this layout, not even two spaces of one column that span both
+    legs but are not adjacent, as 1 and 7 are."""
     inst = _circuit("hvac", **{"tab-numbers": tabs, "dipole": "true"})
     with pytest.raises(ManifestValidationError, match=r"tab-numbers.*both legs"):
         ManifestPhysicsView(DeviceManifest(instances=(_panel(), inst)))

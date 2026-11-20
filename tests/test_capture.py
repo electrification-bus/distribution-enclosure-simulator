@@ -174,6 +174,22 @@ def test_a_pole_count_a_split_phase_circuit_cannot_have_is_a_capture_error(
         definition_from_tree(tree_from_retained(retained), variant="reference")
 
 
+@pytest.mark.parametrize("poles", ["0", "3", "4", "2.0", "x"])
+def test_a_pole_count_a_split_phase_circuit_cannot_have_is_refused_on_published_spaces(
+    rec: PahoRecorder, poles: str
+) -> None:
+    """Where the panel publishes ``info/spaces``, a pole count other than 1 or 2 is
+    refused too, rather than captured on those spaces as the two-pole circuit they
+    could hold, as the two-pole circuit on 32,34 would be."""
+    retained = _publish(rec, _source())
+    (spaces,) = (t for t, v in retained.items() if t.endswith("/info/spaces") and v == "32,34")
+    topic = spaces.removesuffix("/info/spaces") + "/breaker/poles"
+    assert retained[topic] == "2"
+    retained[topic] = poles
+    with pytest.raises(CaptureError, match="breaker/poles"):
+        definition_from_tree(tree_from_retained(retained), mask=False)
+
+
 def test_masking_replaces_every_serial_and_keeps_references(rec: PahoRecorder) -> None:
     source = _source()
     original = _publish(rec, source)
