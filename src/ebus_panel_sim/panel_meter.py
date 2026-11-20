@@ -302,25 +302,26 @@ def _per_leg_current(
     *,
     line_voltage_v: float,
 ) -> tuple[float, float]:
-    """Sum per-circuit current contribution onto L1 and L2.
+    """The current a pair of lugs reads on L1 and L2, from the circuits behind them.
 
-    Single-tab circuit on tab N → all current to legs_for_tabs((N,))[0].
-    Dipole circuit (one tab per leg) → equal current on both legs at line-to-line
-    voltage (2 * line_voltage_v)."""
+    Each circuit's current lies on its legs with its sign, positive while it
+    consumes: a single-tab circuit on tab N puts ``power / line_voltage_v`` on
+    ``legs_for_tabs((N,))[0]``, and a two-pole circuit puts ``power / (2 *
+    line_voltage_v)`` on each leg. A leg's currents add with their signs, so a
+    circuit feeding back offsets the loads on its leg, and each leg reads the
+    magnitude of its sum: eBus ``current-{a,b}`` is the RMS current on the
+    conductor (meter.md), which has no direction."""
     l1_a = 0.0
     l2_a = 0.0
     for cid, power in powers.items():
         cphys = circuits[cid]
         if cphys.dipole:
-            i = abs(power) / (2 * line_voltage_v)
-            # Dipole spans both legs — same current on each leg.
+            i = power / (2 * line_voltage_v)
+            # A two-pole circuit spans both legs: the same current on each.
             l1_a += i
             l2_a += i
+        elif cphys.legs[0] == Leg.L1:
+            l1_a += power / line_voltage_v
         else:
-            i = abs(power) / line_voltage_v
-            leg = cphys.legs[0]
-            if leg == Leg.L1:
-                l1_a += i
-            else:
-                l2_a += i
-    return l1_a, l2_a
+            l2_a += power / line_voltage_v
+    return abs(l1_a), abs(l2_a)

@@ -315,7 +315,7 @@ def test_per_leg_currents_single_tab_split_l1_l2() -> None:
     panel = _panel()
     circuits = {
         "a": _circuit(tabs=(1,)),  # L1
-        "b": _circuit(tabs=(2,)),  # L2
+        "b": _circuit(tabs=(3,)),  # L2: the row below, in the same column
     }
     powers = {"a": 1200.0, "b": 2400.0}  # 10 A on L1, 20 A on L2
     r = resolve(
@@ -332,7 +332,7 @@ def test_per_leg_currents_single_tab_split_l1_l2() -> None:
 
 def test_per_leg_currents_dipole_appears_on_both() -> None:
     panel = _panel()
-    circuits = {"hvac": _circuit(tabs=(1, 2))}
+    circuits = {"hvac": _circuit(tabs=(1, 3))}
     powers = {"hvac": 4800.0}  # 4800 W / 240 V = 20 A on each leg
     r = resolve(
         panel=panel,
@@ -344,6 +344,71 @@ def test_per_leg_currents_dipole_appears_on_both() -> None:
     )
     assert r.upstream_l1_current_a == pytest.approx(20.0)
     assert r.upstream_l2_current_a == pytest.approx(20.0)
+
+
+def test_a_single_pole_source_offsets_the_load_on_its_leg() -> None:
+    # Spaces 1 and 2 share L1: 10 A drawn there and 5 A fed back net to 5 A.
+    circuits = {"load": _circuit(tabs=(1,)), "source": _circuit(tabs=(2,))}
+    r = resolve(
+        panel=_panel(),
+        circuits=circuits,
+        gated_powers={"load": 1200.0, "source": -600.0},
+        battery_w=0.0,
+        grid_online=True,
+        has_battery=False,
+    )
+    assert r.upstream_l1_current_a == pytest.approx(5.0)
+    assert r.upstream_l2_current_a == 0.0
+
+
+def test_a_two_pole_source_offsets_both_legs() -> None:
+    # 2400 W fed back at 240 V is 10 A against the load on each leg.
+    circuits = {"load": _circuit(tabs=(1,)), "pv": _circuit(tabs=(2, 4))}
+    r = resolve(
+        panel=_panel(),
+        circuits=circuits,
+        gated_powers={"load": 1200.0, "pv": -2400.0},
+        battery_w=0.0,
+        grid_online=True,
+        has_battery=False,
+    )
+    assert r.upstream_l1_current_a == pytest.approx(0.0)
+    assert r.upstream_l2_current_a == pytest.approx(10.0)
+
+
+def test_a_leg_carrying_a_backfeed_reads_its_magnitude() -> None:
+    # An RMS reading has no sign: 10 A fed back reads 10 A, as 10 A drawn does, at
+    # the downstream lugs and at the upstream lugs that carry it on.
+    r = resolve(
+        panel=_panel(),
+        circuits={"source": _circuit(tabs=(1,), placement="downstream-of-lugs")},
+        gated_powers={"source": -1200.0},
+        battery_w=0.0,
+        grid_online=True,
+        has_battery=False,
+    )
+    assert r.downstream_l1_current_a == pytest.approx(10.0)
+    assert r.downstream_l2_current_a == 0.0
+    assert r.upstream_l1_current_a == pytest.approx(10.0)
+    assert r.upstream_l2_current_a == 0.0
+
+
+def test_a_backfeed_past_the_feedthrough_offsets_a_load_on_its_leg() -> None:
+    # 10 A drawn in the panel and 5 A fed back past the feedthrough, both on L1.
+    circuits = {
+        "load": _circuit(tabs=(1,), placement="upstream-of-lugs"),
+        "source": _circuit(tabs=(2,), placement="downstream-of-lugs"),
+    }
+    r = resolve(
+        panel=_panel(),
+        circuits=circuits,
+        gated_powers={"load": 1200.0, "source": -600.0},
+        battery_w=0.0,
+        grid_online=True,
+        has_battery=False,
+    )
+    assert r.downstream_l1_current_a == pytest.approx(5.0)
+    assert r.upstream_l1_current_a == pytest.approx(5.0)
 
 
 # -- feedthrough -------------------------------------------------------------
@@ -376,7 +441,7 @@ def test_feedthrough_per_leg_currents() -> None:
     panel = _panel()
     circuits = {
         "upstream": _circuit(tabs=(1,), placement="upstream-of-lugs"),
-        "down_l1": _circuit(tabs=(3,), placement="downstream-of-lugs"),
+        "down_l1": _circuit(tabs=(2,), placement="downstream-of-lugs"),
         "down_l2": _circuit(tabs=(4,), placement="downstream-of-lugs"),
     }
     powers = {"upstream": 1200.0, "down_l1": 600.0, "down_l2": 1200.0}

@@ -336,6 +336,17 @@ def _finite(raw: str, device_id: str, path: str) -> float:
     return value
 
 
+def _pole_count(raw: str, device_id: str) -> int:
+    """A circuit's published ``breaker/poles``, which a split-phase panel's circuit
+    has as 1 or 2. Any other value is refused with a ``CaptureError`` naming it,
+    rather than with an error about spaces the panel did not publish."""
+    if raw not in ("1", "2"):
+        raise CaptureError(
+            f"{device_id} breaker/poles: a split-phase circuit has 1 or 2 poles ({raw!r})"
+        )
+    return int(raw)
+
+
 def _wire_str(value: object) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
@@ -556,13 +567,11 @@ def ticks_from_samples(
     to the reading, to within float rounding, as a tick's circuits on one meter add
     up to what it reads. That reproduces the meter's power and energy, and its
     current in one space or across two with every circuit two-pole. On a tandem or
-    quad whose circuits all draw the same way and book into the same flow, the
-    flows and lugs, which the emitter takes from each circuit's own load,
-    reproduce too. What depends on how the load divides, which the panel does not
-    publish, cannot:
+    quad whose circuits book into the same flow, the flows and lugs, which the
+    emitter takes from each circuit's own load, reproduce too, whichever way each
+    circuit draws, since a leg's currents add with their signs. What depends on
+    how the load divides, which the panel does not publish, cannot:
 
-    - circuits drawing opposite ways: the lugs add each circuit's current whatever
-      its direction, so they read the net current instead of the two;
     - circuits whose roles book them into different flows, such as a SOLAR circuit
       sharing a breaker with a load: ``power-flows/pv`` and ``site`` each take half
       the net reading, and the lugs and busbar follow them;
@@ -708,10 +717,12 @@ class _Mapper:
         # The circuits behind each shared meter, by published ID, where the variant
         # shares one; under any other, each circuit's reading is its own.
         self.shared_meters = self._shared_meters() if self.shares_breakers else []
-        # Where tabs are not published, circuits get the next free ones.
-        self.next_tab = 1 + max(
+        # Where tabs are not published, circuits get the lowest free ones above
+        # every published tab (`_assign_tabs`).
+        self.first_free_tab = 1 + max(
             (t for d in self.tree.values() for t in _tabs(d.value("info/spaces"))), default=0
         )
+        self.assigned_tabs: set[int] = set()
         # The circuits feeding a battery, by published ID.
         self.battery_circuits = frozenset(
             feed for der, feed in self.feeds().items() if self.tree[der].type == "bess"
@@ -1188,13 +1199,26 @@ class _Mapper:
             "panel", self.ids[pid], self._name(pid, str(d.description.get("name", pid))), md
         )
 
+    def _assign_tabs(self, poles: int) -> list[int]:
+        """The lowest free spaces above every published one, for a circuit whose
+        ``info/spaces`` is not published: one space per pole, one above the other
+        in a column, so a two-pole circuit's two span both legs
+        (``conventions/tab_legs.py``)."""
+        tab = self.first_free_tab
+        while True:
+            tabs = [tab + 2 * pole for pole in range(poles)]
+            if self.assigned_tabs.isdisjoint(tabs):
+                self.assigned_tabs.update(tabs)
+                return tabs
+            tab += 1
+
     def _circuit(self, device_id: str, d: Device) -> DeviceInstance:
         name = d.value("info/name") or str(d.description.get("name", device_id))
+        poles = d.value("breaker/poles")
+        pole_count = 1 if poles is None else _pole_count(poles, device_id)
         tabs = _tabs(d.value("info/spaces"))
         if not tabs:
-            width = 2 if d.value("breaker/poles") == "2" else 1
-            tabs = list(range(self.next_tab, self.next_tab + width))
-            self.next_tab += width
+            tabs = self._assign_tabs(pole_count)
             self.note(device_id, "tab-numbers", f"info/spaces not published; using {tabs}")
         md: dict[str, str] = {
             "tab-numbers": ",".join(str(t) for t in tabs),
@@ -1206,9 +1230,8 @@ class _Mapper:
             self.note(device_id, "breaker-rating-a", "not published; using 20")
         else:
             md["breaker-rating-a"] = rating
-        poles = d.value("breaker/poles")
         if poles is not None:
-            md["dipole"] = "true" if int(float(poles)) > 1 else "false"
+            md["dipole"] = "true" if pole_count > 1 else "false"
         priority = d.value("load-shed/priority")
         if priority is None:
             priority = "NEVER"
