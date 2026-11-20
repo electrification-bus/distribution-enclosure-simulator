@@ -35,7 +35,6 @@ from typing import Any, cast, get_args
 from ebus_panel_sim.definition import PanelDefinition, dump_definition, dump_ticks
 from ebus_panel_sim.emitter import Emitter, solar_circuits, unbooked_circuit_roles
 from ebus_panel_sim.exceptions import ManifestValidationError
-from ebus_panel_sim.firmware import release_build
 from ebus_panel_sim.manifest import DeviceInstance, DeviceManifest
 from ebus_panel_sim.manifest_physics import (
     _circuit_wire_values,
@@ -690,14 +689,22 @@ class _Mapper:
         # The definition's variant, and whether it publishes a multi-load breaker
         # as one circuit device per protected circuit, which share its meter.
         self.variant: Variant = variant or _infer_variant(self.tree[self.panel_id])
-        self.profiles = load_profiles(
-            variant=self.variant,
-            release=release_build(self.tree[self.panel_id].value("info/firmware-version")),
-        )
+        self.profiles = load_profiles(variant=self.variant)
         self.shares_breakers = declares_shared_breakers(self.profiles)
         # A circuit device the panel only measures is a remote-ct, not a branch circuit.
         self.remote_cts = {i for i, d in self.tree.items() if _is_remote_ct(d)}
         self.ids = self._id_map()
+        for i in sorted(self.remote_cts):
+            extra = sorted(
+                set(self.tree[i].description.get("nodes", {})) - {"meter", "connection"}
+            )
+            if extra:
+                self.note(
+                    i,
+                    "connection-point",
+                    f"MONITORED, so captured as a remote-ct; its {', '.join(extra)} "
+                    f"{'node is' if len(extra) == 1 else 'nodes are'} not captured",
+                )
         self.circuit_numbers = {
             cid: n
             for n, cid in enumerate(
@@ -1470,12 +1477,20 @@ class _EchoKeys(dict[str, str]):
 
 def _is_remote_ct(device: Device) -> bool:
     """A circuit device the panel only measures: ``connection/connection-point``
-    ``MONITORED`` from release 202645, and before it a circuit with only a meter."""
+    ``MONITORED`` from release 202645, and before it a circuit with only a meter.
+    A ``connection-point`` other than ``BRANCH`` or ``MONITORED`` is a
+    ``CaptureError``, since it says neither."""
     if device.type != "circuit":
         return False
-    if (point := device.value("connection/connection-point")) is not None:
-        return point == "MONITORED"
-    return set(device.description.get("nodes", {})) == {"meter"}
+    point = device.value("connection/connection-point")
+    if point is None:
+        return set(device.description.get("nodes", {})) == {"meter"}
+    if point not in ("BRANCH", "MONITORED"):
+        raise CaptureError(
+            f"a circuit publishes connection/connection-point {point!r}, which is neither "
+            "BRANCH nor MONITORED"
+        )
+    return point == "MONITORED"
 
 
 def _infer_variant(panel: Device) -> Variant:

@@ -1,0 +1,11 @@
+{
+  "capabilities": {
+    "info": {
+      "properties": {
+        "nameplate-capacity": {
+          "literal": "1dp"
+        }
+      }
+    }
+  }
+}

@@ -3,18 +3,18 @@
   "xg-4932-86brs": {
    "description": {
     "children": [
-     "xg-4932-86brs-5f58361d5b1bc59d-1-21-2",
-     "xg-4932-86brs-5f58361d5b1bc59d-1-16-1",
-     "xg-4932-86brs-5f58361d5b1bc59d-1-16-2",
-     "xg-4932-86brs-5f58361d5b1bc59d-1-16-3",
-     "xg-4932-86brs-5f58361d5b1bc59d-1-16-4",
-     "xg-4932-86brs-5f58361d5b1bc59d-1-16-5",
-     "xg-4932-86brs-5f58361d5b1bc59d-1-16-6",
-     "xg-4932-86brs-5f58361d5b1bc59d-1-16-7",
-     "xg-4932-86brs-5f58361d5b1bc59d-1-16-8",
-     "xg-4932-86brs-5f58361d5b1bc59d-1-16-9",
-     "xg-4932-86brs-5f58361d5b1bc59d-1-16-10",
-     "xg-4932-86brs-5f58361d5b1bc59d-1-16-11",
+     "xg-4932-86brs-b0ec9cea4cb9cdbb-1-21-2",
+     "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-1",
+     "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-2",
+     "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-3",
+     "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-4",
+     "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-5",
+     "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-6",
+     "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-7",
+     "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-8",
+     "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-9",
+     "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-10",
+     "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-11",
      "xg-4932-86brs-dt-8991-y1u48",
      "xg-4932-86brs-tg083827807xtx"
     ],
@@ -383,12 +383,12 @@
     "status/wifi-ssid": "masked-ssid"
    }
   },
-  "xg-4932-86brs-5f58361d5b1bc59d-1-16-1": {
+  "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-1": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-4932-86brs-5f58361d5b1bc59d-1-16-1",
+    "name": "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-1",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -601,12 +601,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-4932-86brs-5f58361d5b1bc59d-1-16-10": {
+  "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-10": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-4932-86brs-5f58361d5b1bc59d-1-16-10",
+    "name": "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-10",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -821,12 +821,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-4932-86brs-5f58361d5b1bc59d-1-16-11": {
+  "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-11": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-4932-86brs-5f58361d5b1bc59d-1-16-11",
+    "name": "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-11",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -1045,12 +1045,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-4932-86brs-5f58361d5b1bc59d-1-16-2": {
+  "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-2": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-4932-86brs-5f58361d5b1bc59d-1-16-2",
+    "name": "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-2",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -1265,12 +1265,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-4932-86brs-5f58361d5b1bc59d-1-16-3": {
+  "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-3": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-4932-86brs-5f58361d5b1bc59d-1-16-3",
+    "name": "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-3",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -1483,12 +1483,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-4932-86brs-5f58361d5b1bc59d-1-16-4": {
+  "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-4": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-4932-86brs-5f58361d5b1bc59d-1-16-4",
+    "name": "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-4",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -1702,12 +1702,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-4932-86brs-5f58361d5b1bc59d-1-16-5": {
+  "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-5": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-4932-86brs-5f58361d5b1bc59d-1-16-5",
+    "name": "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-5",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -1923,12 +1923,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-4932-86brs-5f58361d5b1bc59d-1-16-6": {
+  "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-6": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-4932-86brs-5f58361d5b1bc59d-1-16-6",
+    "name": "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-6",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -2144,12 +2144,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-4932-86brs-5f58361d5b1bc59d-1-16-7": {
+  "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-7": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-4932-86brs-5f58361d5b1bc59d-1-16-7",
+    "name": "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-7",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -2364,12 +2364,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-4932-86brs-5f58361d5b1bc59d-1-16-8": {
+  "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-8": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-4932-86brs-5f58361d5b1bc59d-1-16-8",
+    "name": "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-8",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -2584,12 +2584,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-4932-86brs-5f58361d5b1bc59d-1-16-9": {
+  "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-9": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-4932-86brs-5f58361d5b1bc59d-1-16-9",
+    "name": "xg-4932-86brs-b0ec9cea4cb9cdbb-1-16-9",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -2805,12 +2805,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-4932-86brs-5f58361d5b1bc59d-1-21-2": {
+  "xg-4932-86brs-b0ec9cea4cb9cdbb-1-21-2": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-4932-86brs-5f58361d5b1bc59d-1-21-2",
+    "name": "xg-4932-86brs-b0ec9cea4cb9cdbb-1-21-2",
     "nodes": {
      "connection": {
       "name": "connection",

@@ -1083,7 +1083,11 @@ _UNCIRCUITED_PV = {
 
 @pytest.mark.parametrize(
     "name",
-    [n for n in reference_capture_names() if n not in ("r202639-c", "r202639-f", "r202645-g", _UPSTREAM_PV)],
+    [
+        n
+        for n in reference_capture_names()
+        if n not in ("r202639-c", "r202639-f", "r202645-g", _UPSTREAM_PV)
+    ],
 )
 def test_no_other_capture_puts_solar_behind_a_battery(name: str) -> None:
     """``main32_r202639``'s pv reports 56.3 W more than its PV circuit produces, and

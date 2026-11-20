@@ -3,45 +3,45 @@
   "xg-7814-15i6h": {
    "description": {
     "children": [
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-21-2",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-1",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-2",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-3",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-5",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-7",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-9",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-10",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-11",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-12",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-13",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-14",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-15",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-16",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-17",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-18",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-19",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-20",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-21",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-22",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-23",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-24",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-25",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-26",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-27",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-28",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-29",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-30",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-31",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-32",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-33",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-34",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-35",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-36",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-37",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-38",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-39",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-40",
-     "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-42"
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-21-2",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-1",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-2",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-3",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-5",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-7",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-9",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-10",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-11",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-12",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-13",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-14",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-15",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-16",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-17",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-18",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-19",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-20",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-21",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-22",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-23",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-24",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-25",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-26",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-27",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-28",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-29",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-30",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-31",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-32",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-33",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-34",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-35",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-36",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-37",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-38",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-39",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-40",
+     "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-42"
     ],
     "extensions": [],
     "homie": "5.0",
@@ -352,12 +352,12 @@
     "status/wifi-ssid": "masked-ssid"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-1": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-1": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-1",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-1",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -571,12 +571,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-10": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-10": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-10",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-10",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -790,12 +790,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-11": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-11": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-11",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-11",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -1009,12 +1009,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-12": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-12": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-12",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-12",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -1228,12 +1228,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-13": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-13": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-13",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-13",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -1447,12 +1447,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-14": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-14": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-14",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-14",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -1666,12 +1666,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-15": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-15": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-15",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-15",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -1885,12 +1885,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-16": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-16": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-16",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-16",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -2104,12 +2104,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-17": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-17": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-17",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-17",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -2323,12 +2323,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-18": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-18": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-18",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-18",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -2542,12 +2542,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-19": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-19": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-19",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-19",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -2761,12 +2761,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-2": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-2": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-2",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-2",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -2980,12 +2980,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-20": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-20": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-20",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-20",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -3199,12 +3199,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-21": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-21": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-21",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-21",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -3418,12 +3418,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-22": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-22": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-22",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-22",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -3637,12 +3637,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-23": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-23": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-23",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-23",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -3856,12 +3856,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-24": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-24": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-24",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-24",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -4075,12 +4075,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-25": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-25": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-25",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-25",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -4294,12 +4294,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-26": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-26": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-26",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-26",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -4513,12 +4513,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-27": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-27": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-27",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-27",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -4732,12 +4732,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-28": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-28": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-28",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-28",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -4951,12 +4951,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-29": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-29": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-29",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-29",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -5170,12 +5170,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-3": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-3": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-3",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-3",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -5389,12 +5389,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-30": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-30": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-30",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-30",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -5608,12 +5608,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-31": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-31": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-31",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-31",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -5827,12 +5827,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-32": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-32": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-32",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-32",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -6046,12 +6046,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-33": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-33": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-33",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-33",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -6265,12 +6265,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-34": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-34": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-34",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-34",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -6484,12 +6484,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-35": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-35": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-35",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-35",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -6703,12 +6703,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-36": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-36": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-36",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-36",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -6922,12 +6922,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-37": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-37": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-37",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-37",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -7141,12 +7141,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-38": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-38": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-38",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-38",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -7360,12 +7360,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-39": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-39": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-39",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-39",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -7579,12 +7579,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-40": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-40": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-40",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-40",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -7798,12 +7798,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-42": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-42": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-42",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-42",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -8019,12 +8019,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-5": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-5": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-5",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-5",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -8238,12 +8238,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-7": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-7": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-7",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-7",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -8457,12 +8457,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-9": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-9": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-16-9",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-16-9",
     "nodes": {
      "breaker": {
       "name": "breaker",
@@ -8676,12 +8676,12 @@
     "switch/relay-requester": "NONE"
    }
   },
-  "xg-7814-15i6h-88eb71b8b6b7dff8-1-21-2": {
+  "xg-7814-15i6h-fd5979dd8a5f7ab2-1-21-2": {
    "description": {
     "children": [],
     "extensions": [],
     "homie": "5.0",
-    "name": "xg-7814-15i6h-88eb71b8b6b7dff8-1-21-2",
+    "name": "xg-7814-15i6h-fd5979dd8a5f7ab2-1-21-2",
     "nodes": {
      "connection": {
       "name": "connection",

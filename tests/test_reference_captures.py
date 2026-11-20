@@ -41,6 +41,7 @@ def test_the_names_are_the_shipped_captures_sorted() -> None:
         "r202639-d",
         "r202639-e",
         "r202639-f",
+        "r202645-a",
         "r202645-c",
         "r202645-e",
         "r202645-g",

@@ -14,7 +14,9 @@ SPAN-vendor-specific surface + conformance-latitude overrides) onto the base, wh
 overlay ``null`` removes a base capability or property. ``variant='span-alpha-test-b2'`` then
 merges ``profiles/span-alpha-test-b2/*.json`` on top: site, busbar and frequency properties and
 the commissioning facts a circuit or lugs can carry. ``variant='reference'`` loads the
-spec-conformant base only.
+spec-conformant base only. A variant's release overlays
+(``ebus_panel_sim.firmware.release_overlays``) merge last, chosen by the panel's SPAN
+release build: from release 202645, ``profiles/span-alpha-test-b2-r202645/*.json``.
 
 A numeric property may carry a ``literal`` entry, ``"integer"``, ``"<n>dp"`` or
 ``"shortest"``: the form its numbers are written in on the wire

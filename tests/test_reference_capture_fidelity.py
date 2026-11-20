@@ -100,11 +100,6 @@ _R202645_SHED_FORECAST = (
     "On spanos3/r202645/02 the panel values the four shed-forecast estimates, as "
     "r202639-f on spanos3/r202639/04 does; the variant keeps them unvalued."
 )
-_R202645_NAMEPLATE = (
-    "The panel writes nameplate-capacity as 27.0 where the MAIN 32 captures write "
-    "an integral capacity without a point (81, 27); the profile's shortest form "
-    "writes 27, and no literal form keeps a trailing .0 on an integral value."
-)
 # Differences a capture may still show, by prefix (the device role, the path and the
 # kind of difference, without values), each with the reason the emitter cannot
 # close it.
@@ -137,7 +132,6 @@ _EXCEPTIONS: dict[str, dict[str, str]] = {
         },
     },
     _R202645_G: {
-        "bess #1: info/nameplate-capacity shape": _R202645_NAMEPLATE,
         **{
             f"distribution-enclosure #1: shed-forecast/{key}: valued only by the capture": (
                 _R202645_SHED_FORECAST
@@ -181,6 +175,7 @@ _COMPARED_BY_VALUE = frozenset(
         "config/max-charge-current",
         "config/user-max-charge-current",
         "connection/backed-up",
+        "connection/connection-point",
         "connection/feeds-role",
         "connection/overcurrent-protection",
         "connection/service-rating",
