@@ -181,7 +181,7 @@ Under a variant whose circuit profile declares both `shared-with-device-ids` lis
 
 Under `span` and `reference`, which publish each circuit's own load, each circuit keeps the reading it published; `ticks_from_samples` takes the definition's `variant` for this, and the command line passes it.
 
-A circuit's `shared-with-device-ids` keeps only the other circuits in the tree, each entry read without the spaces around it, with a note counting any it drops. Under a variant declaring both lists, the circuits on one breaker are each seeded with the largest register any of them publishes, since it only rises, and circuits that do not all name each other are a capture error. Any definition the emitter refuses is a `CaptureError`.
+A circuit's `shared-with-device-ids` keeps only the other circuits in the tree, each entry read without the spaces around it, with a note counting any it drops. Under a variant declaring both lists, the circuits on one breaker are each seeded with the largest register any of them publishes, since it only rises, and circuits that do not all name each other are a capture error. Any other definition the emitter refuses is a `CaptureError`, except one with a circuit role `span-alpha-test-b2` cannot book, which is captured with a note.
 
 `ebus_panel_sim.capture` exposes the same steps as functions (`capture_live`, `tree_from_snapshot`, `tree_from_retained`, `definition_from_tree`, `ticks_from_samples`).
 
