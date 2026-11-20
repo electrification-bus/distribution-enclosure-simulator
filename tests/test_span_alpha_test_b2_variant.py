@@ -21,7 +21,10 @@ from ebus_panel_sim import (
     SetterRegistry,
     TickInputs,
     Variant,
+    load_reference_capture,
 )
+from ebus_panel_sim.capture import CaptureError, Tree, definition_from_tree
+from ebus_panel_sim.firmware import release_overlays
 from ebus_panel_sim.manifest_physics import WIRE_VALUE_PATHS
 from ebus_panel_sim.wire.literal import LiteralForm
 from ebus_panel_sim.wire.profile_loader import load_profiles
@@ -492,8 +495,29 @@ def _with_remote_ct(manifest: DeviceManifest, count: int = 1) -> DeviceManifest:
     return DeviceManifest(instances=manifest.instances + extra)
 
 
+_R202639 = "spanos3/r202639/03"
+_R202645 = "spanos3/r202645/01"
+
+
+def _on_firmware(manifest: DeviceManifest, firmware: str) -> DeviceManifest:
+    """``manifest`` with its panel reporting ``firmware``."""
+    return DeviceManifest(
+        instances=tuple(
+            DeviceInstance(
+                i.entity_class,
+                i.instance_id,
+                i.display_name,
+                {**i.metadata, "firmware-version": firmware}
+                if i.entity_class == "panel"
+                else i.metadata,
+            )
+            for i in manifest.instances
+        )
+    )
+
+
 def test_the_remote_ct_is_a_meter_only_circuit_without_spaces(rec: PahoRecorder) -> None:
-    _started(rec, _with_remote_ct(_variant_manifest()))
+    _started(rec, _on_firmware(_with_remote_ct(_variant_manifest()), _R202639))
     description = json.loads(rec.retained["ebus/5/remote-ct-1/$description"])
     assert description["type"] == "energy.ebus.device.circuit"
     assert set(description["nodes"]) == {"meter"}
@@ -718,3 +742,133 @@ def test_a_circuit_role_with_no_known_booking_is_rejected(role: str) -> None:
     with pytest.raises(ManifestValidationError, match=f"feeds-role.*{role}"):
         Emitter(manifest, SetterRegistry(), variant="span-alpha-test-b2")
     Emitter(manifest, SetterRegistry(), variant="span")
+
+
+def test_from_202645_every_circuit_declares_its_connection_point(rec: PahoRecorder) -> None:
+    """A branch circuit reads BRANCH and the remote CT MONITORED; the remote CT's
+    connection node carries nothing else."""
+    manifest = _on_firmware(_with_remote_ct(_variant_manifest()), _R202645)
+    _started(rec, manifest)
+    for inst in manifest.of_class("circuit"):
+        description = json.loads(rec.retained[f"ebus/5/{inst.instance_id}/$description"])
+        point = description["nodes"]["connection"]["properties"]["connection-point"]
+        assert point["datatype"] == "enum"
+        assert point["format"] == "BRANCH,MONITORED"
+        assert "settable" not in point
+        assert rec.retained[f"ebus/5/{inst.instance_id}/connection/connection-point"] == "BRANCH"
+    description = json.loads(rec.retained["ebus/5/remote-ct-1/$description"])
+    assert set(description["nodes"]) == {"meter", "connection"}
+    assert set(description["nodes"]["connection"]["properties"]) == {"connection-point"}
+    assert rec.retained["ebus/5/remote-ct-1/connection/connection-point"] == "MONITORED"
+
+
+def _on_software(manifest: DeviceManifest, software: str) -> DeviceManifest:
+    """``manifest`` with its panel reporting ``software`` as ``software-version`` and
+    no ``firmware-version``."""
+    return DeviceManifest(
+        instances=tuple(
+            DeviceInstance(
+                i.entity_class,
+                i.instance_id,
+                i.display_name,
+                {
+                    **{k: v for k, v in i.metadata.items() if k != "firmware-version"},
+                    "software-version": software,
+                }
+                if i.entity_class == "panel"
+                else i.metadata,
+            )
+            for i in manifest.instances
+        )
+    )
+
+
+@pytest.mark.parametrize(("software", "declares"), [(_R202639, False), (_R202645, True)])
+def test_the_release_is_read_from_software_version_too(
+    rec: PahoRecorder, software: str, declares: bool
+) -> None:
+    """A panel whose firmware is given as ``software-version`` publishes it as
+    ``info/firmware-version`` and is keyed on its release just the same."""
+    _started(rec, _on_software(_with_remote_ct(_variant_manifest()), software))
+    assert rec.retained["ebus/5/abc-123/info/firmware-version"] == software
+    assert any(t.endswith("/connection/connection-point") for t in rec.retained) is declares
+
+
+@pytest.mark.parametrize(
+    ("variant", "release", "overlays"),
+    [
+        ("span-alpha-test-b2", 202644, ()),
+        ("span-alpha-test-b2", 202645, ("span-alpha-test-b2-r202645",)),
+        ("span-alpha-test-b2", 202646, ("span-alpha-test-b2-r202645",)),
+        ("span-alpha-test-b2", None, ("span-alpha-test-b2-r202645",)),
+        ("span", 202645, ()),
+        ("reference", 202645, ()),
+    ],
+)
+def test_release_overlays_start_at_202645(
+    variant: Variant, release: int | None, overlays: tuple[str, ...]
+) -> None:
+    assert release_overlays(variant, release) == overlays
+
+
+def test_before_202645_no_circuit_declares_a_connection_point(rec: PahoRecorder) -> None:
+    _started(rec, _on_firmware(_with_remote_ct(_variant_manifest()), _R202639))
+    assert not any(t.endswith("/connection/connection-point") for t in rec.retained)
+    for topic, payload in rec.retained.items():
+        if topic.endswith("/$description"):
+            nodes = json.loads(payload).get("nodes", {})
+            assert "connection-point" not in nodes.get("connection", {}).get("properties", {})
+
+
+@pytest.mark.parametrize("variant", ["span", "reference"])
+def test_only_span_alpha_test_b2_declares_a_connection_point(
+    rec: PahoRecorder, variant: Variant
+) -> None:
+    """MAIN 32 publishes no connection-point on any release, and the reference
+    variant publishes only what the specification says."""
+    manifest = DeviceManifest(
+        instances=tuple(
+            i for i in _on_firmware(_manifest(), _R202645).instances if i.entity_class != "pv"
+        )
+    )
+    _started(rec, manifest, variant=variant)
+    assert not any(t.endswith("/connection/connection-point") for t in rec.retained)
+
+
+def test_capture_reads_a_202645_remote_ct_back_as_one(rec: PahoRecorder) -> None:
+    """From release 202645 the remote CT has a connection node too, so capture
+    tells it from a branch circuit by connection-point, not by its nodes."""
+    from ebus_panel_sim.capture import definition_from_tree, tree_from_retained
+
+    _started(rec, _on_firmware(_with_remote_ct(_variant_manifest()), _R202645))
+    definition, _ = definition_from_tree(
+        tree_from_retained(rec.retained), variant="span-alpha-test-b2", mask=False
+    )
+    assert [i.instance_id for i in definition.manifest.of_class("remote-ct")] == ["remote-ct-1"]
+    assert "remote-ct-1" not in {i.instance_id for i in definition.manifest.of_class("circuit")}
+
+
+def _r202645_c_with_point(point: str) -> tuple[Tree, str]:
+    """Capture ``r202645-c`` with its first branch circuit's connection-point
+    replaced by ``point``, and that circuit's ID."""
+    tree = load_reference_capture("r202645-c").tree
+    cid = next(i for i, d in tree.items() if d.type == "circuit")
+    tree[cid].properties["connection/connection-point"] = point
+    return tree, cid
+
+
+def test_capture_refuses_a_connection_point_it_cannot_read() -> None:
+    tree, _ = _r202645_c_with_point("FEEDER")
+    with pytest.raises(CaptureError, match="'FEEDER', which is neither BRANCH nor MONITORED"):
+        definition_from_tree(tree, mask=False)
+
+
+def test_capture_notes_what_a_monitored_circuit_with_a_breaker_drops() -> None:
+    """A MONITORED circuit is captured as a remote-ct, which has only a meter, so the
+    nodes it publishes beyond the meter and connection are noted, not dropped silently."""
+    tree, cid = _r202645_c_with_point("MONITORED")
+    definition, notes = definition_from_tree(tree, mask=False)
+    assert [i.instance_id for i in definition.manifest.of_class("remote-ct")] == [cid]
+    (note,) = [n for n in notes if n.device == cid and n.key == "connection-point"]
+    assert note.note.startswith("MONITORED, so captured as a remote-ct; its ")
+    assert "breaker" in note.note and note.note.endswith("not captured")

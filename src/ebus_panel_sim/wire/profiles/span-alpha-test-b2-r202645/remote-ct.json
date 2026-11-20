@@ -1,0 +1,14 @@
+{
+  "capabilities": {
+    "connection": {
+      "type": "energy.ebus.capability.connection",
+      "properties": {
+        "connection-point": {
+          "name": "Whether the enclosure hosts this circuit or only measures it",
+          "datatype": "enum",
+          "format": "BRANCH,MONITORED"
+        }
+      }
+    }
+  }
+}

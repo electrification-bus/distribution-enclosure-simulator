@@ -310,7 +310,13 @@ class Emitter:
                 "variant 'span-alpha-test-b2' has no commissioned-system circuits; a PV or "
                 "battery breaker is an ordinary circuit with a locked relay at priority NEVER"
             )
-        self._profiles = load_profiles(variant=variant)
+        # ManifestPhysicsView raises ManifestValidationError if the manifest
+        # is missing required physics keys. publish_tick is the only publish
+        # path now, so a malformed manifest is a hard error at construction.
+        # It comes first so the profiles are keyed on the panel's validated
+        # release, from firmware-version or software-version as it publishes.
+        self._physics = ManifestPhysicsView(manifest)
+        self._profiles = load_profiles(variant=variant, release=self._physics.panel.release_build)
         self._mapping = load_mapping_table()
         self._mapping.validate_against(self._profiles)
         self._unvalued = _declared_unvalued(manifest, self._profiles)
@@ -344,10 +350,6 @@ class Emitter:
             if load_shedding_config is not None
             else None
         )
-        # ManifestPhysicsView raises ManifestValidationError if the manifest
-        # is missing required physics keys. publish_tick is the only publish
-        # path now, so a malformed manifest is a hard error at construction.
-        self._physics = ManifestPhysicsView(manifest)
         # The conventions that changed across SPAN releases, fixed once for the
         # emitter's life by the variant and the panel's own firmware-version.
         self._conventions = firmware_conventions(variant, self._physics.panel.release_build)

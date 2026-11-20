@@ -1,0 +1,139 @@
+schema: panel-sim-definition/1
+variant: span-alpha-test-b2
+devices:
+- class: panel
+  id: masked-panel
+  name: SPAN Panel eBus Adapter
+  metadata:
+    vendor-name: SPAN
+    serial-number: MASKED-PANEL
+    firmware-version: spanos3/r202645/02
+    hardware-version: '3.0'
+    panel-model: UNKNOWN
+    panel-size: '16'
+    main-breaker-rating-a: '125'
+    postal-code: '00000'
+    time-zone: America/Los_Angeles
+    wifi-ssid: masked-ssid
+    operator-import-limit-enablement: DISABLED
+    off-grid-import-limit-enablement: UNCONFIGURED
+    line-voltage-v: '121.1'
+    service-voltage-v: '242.2'
+    site-name: Masked Panel
+    address-lines: Masked Address
+    locality: Masked City
+    region: Masked Region
+    latitude: '0.0'
+    longitude: '0.0'
+    utility-meter-serial-number: MASKED-METER
+- class: lugs
+  id: lugs-upstream
+  name: Upstream lugs
+  description_name: lugs-upstream
+  metadata:
+    direction: upstream
+    service-rating-a: '125'
+    overcurrent-protection-a: '125'
+- class: circuit
+  id: circuit-1
+  name: Spare
+  description_name: circuit-1
+  metadata:
+    tab-numbers: 9,11
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    tags: SPARE
+    nominal-voltage: '240.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '34'
+    initial-consumed-wh: '2752.2'
+    initial-produced-wh: '642.0'
+- class: circuit
+  id: circuit-2
+  name: Bedroom / Outlets
+  description_name: circuit-2
+  metadata:
+    tab-numbers: '12'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BEDROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '7150.1'
+    initial-produced-wh: '312.7'
+- class: circuit
+  id: circuit-4
+  name: Bathroom / Outlets
+  description_name: circuit-4
+  metadata:
+    tab-numbers: '14'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: BATHROOM
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '4576.6'
+    initial-produced-wh: '314.2'
+- class: circuit
+  id: circuit-5
+  name: Kitchen / Outlets
+  description_name: circuit-5
+  metadata:
+    tab-numbers: '16'
+    placement: upstream-of-lugs
+    breaker-rating-a: '15'
+    dipole: 'false'
+    default-priority: NEVER
+    relay-behavior: controllable
+    locations: KITCHEN
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '37'
+    initial-consumed-wh: '4655.6'
+    initial-produced-wh: '336.9'
+- class: circuit
+  id: circuit-3
+  name: SPAN Drive
+  description_name: circuit-3
+  metadata:
+    tab-numbers: 13,15
+    placement: upstream-of-lugs
+    breaker-rating-a: '60'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    tags: EVSE
+    dedicated: 'true'
+    nominal-voltage: '240.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '1'
+    initial-consumed-wh: '60491.0'
+    initial-produced-wh: '55.0'
+- class: evse
+  id: evse-1
+  name: evse-1
+  metadata:
+    vendor-name: SPAN
+    part-number: 1-01400-03
+    firmware-version: 001.001.006.76f735f.ecf24fe3.0c03f042.A
+    serial-number: MASKED-EVSE-1
+    model: unknown
+    max-current-a: '48'
+    feed: circuit-3
+    unvalued: info/model
+- class: remote-ct
+  id: remote-ct-1
+  name: Service CT
+  description_name: remote-ct-1
+  metadata: {}

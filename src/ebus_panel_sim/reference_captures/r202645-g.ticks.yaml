@@ -1,0 +1,1202 @@
+schema: panel-sim-ticks/1
+ticks:
+- current_time: 1795135252.402009
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: 0.1
+    circuit-8: -0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135253.407275
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.1
+    circuit-11: 0.1
+    circuit-2: -0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135254.412504
+  grid_online: true
+  circuits:
+    circuit-7: -0.1
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.1
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: 0.1
+    circuit-10: 2.0
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.1
+  evse:
+    evse-1: 2.0
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135255.417749
+  grid_online: true
+  circuits:
+    circuit-7: -0.1
+    circuit-6: 0.1
+    circuit-5: 0.1
+    circuit-9: 0.0
+    circuit-8: -0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: -0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135256.424151
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135257.428566
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: 0.1
+    circuit-8: 0.1
+    circuit-1: -0.1
+    circuit-3: -0.1
+    circuit-10: 1.8
+    circuit-4: 0.1
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135258.433782
+  grid_online: true
+  circuits:
+    circuit-7: -0.1
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 2.0
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.1
+  evse:
+    evse-1: 2.0
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135259.437203
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.1
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: -0.1
+    circuit-1: 0.0
+    circuit-3: -0.1
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.1
+    circuit-2: -0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135260.4424489
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.1
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: -0.1
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.1
+    circuit-2: -0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135261.4433868
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: -0.1
+    circuit-3: 0.1
+    circuit-10: 1.9
+    circuit-4: 0.1
+    circuit-11: 0.1
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135262.4449291
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: -0.1
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.1
+    circuit-3: 0.1
+    circuit-10: 1.9
+    circuit-4: 0.1
+    circuit-11: 0.0
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135263.449024
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: -0.1
+    circuit-3: 0.1
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135264.4527512
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: 0.1
+    circuit-8: -0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135265.457691
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: -0.1
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135266.461736
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.2
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.1
+    circuit-11: 0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135267.467069
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.1
+    circuit-3: 0.0
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135268.472534
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.1
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.1
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: -0.1
+    circuit-11: 0.0
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135269.474875
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.1
+    circuit-3: 0.0
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: -0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135270.477652
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135271.4786
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.1
+    circuit-5: 0.0
+    circuit-9: -0.1
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: -0.1
+    circuit-10: 1.9
+    circuit-4: -0.1
+    circuit-11: 0.1
+    circuit-2: -0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135272.483802
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: -0.1
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: -0.1
+    circuit-1: 0.1
+    circuit-3: 0.0
+    circuit-10: 1.7
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.7
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135273.484305
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.1
+    circuit-5: 0.1
+    circuit-9: -0.1
+    circuit-8: 0.0
+    circuit-1: -0.1
+    circuit-3: 0.1
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135274.489532
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135275.494477
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: -0.1
+    circuit-8: 0.1
+    circuit-1: 0.1
+    circuit-3: 0.0
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: 0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135276.495837
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: -0.1
+    circuit-8: 0.1
+    circuit-1: -0.1
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.1
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135277.499945
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: -0.1
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: 0.1
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135278.500941
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 2.0
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 2.0
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135279.506082
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: -0.1
+    circuit-1: 0.0
+    circuit-3: -0.1
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135280.50809
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135281.512287
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: -0.1
+    circuit-5: -0.1
+    circuit-9: 0.0
+    circuit-8: 0.2
+    circuit-1: 0.0
+    circuit-3: 0.1
+    circuit-10: 2.0
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.1
+  evse:
+    evse-1: 2.0
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135282.513134
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: -0.1
+    circuit-8: 0.1
+    circuit-1: -0.1
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: -0.1
+    circuit-11: 0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135283.5184152
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: -0.1
+    circuit-8: 0.0
+    circuit-1: 0.1
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: -0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135284.523923
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.2
+    circuit-9: -0.1
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.1
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135285.529069
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.1
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: 0.1
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135286.529878
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135287.535232
+  grid_online: true
+  circuits:
+    circuit-7: 0.2
+    circuit-6: 0.1
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.1
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135288.540524
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: 0.1
+    circuit-8: 0.0
+    circuit-1: 0.1
+    circuit-3: 0.0
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135289.545873
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: -0.1
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: -0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135290.5512588
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: -0.1
+    circuit-5: -0.1
+    circuit-9: 0.1
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 2.0
+    circuit-4: -0.1
+    circuit-11: 0.0
+    circuit-2: 0.1
+  evse:
+    evse-1: 2.0
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135291.551887
+  grid_online: true
+  circuits:
+    circuit-7: -0.1
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.1
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: -0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135292.5571918
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: -0.1
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135293.562457
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.2
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135294.563733
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: -0.1
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: 0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135295.566389
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.1
+    circuit-10: 1.9
+    circuit-4: 0.1
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135296.569271
+  grid_online: true
+  circuits:
+    circuit-7: -0.1
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 2.0
+    circuit-4: 0.1
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 2.0
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135297.572596
+  grid_online: true
+  circuits:
+    circuit-7: -0.1
+    circuit-6: 0.1
+    circuit-5: 0.1
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.1
+    circuit-3: 0.0
+    circuit-10: 2.0
+    circuit-4: 0.1
+    circuit-11: 0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 2.0
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135298.577504
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.2
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135299.579217
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: -0.1
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: -0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135300.5844328
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.1
+    circuit-5: -0.1
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 2.0
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 2.0
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135301.588612
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.1
+    circuit-5: 0.1
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: 0.1
+    circuit-10: 1.9
+    circuit-4: 0.1
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135302.594154
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135303.599544
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.1
+    circuit-5: 0.1
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: -0.1
+    circuit-3: 0.0
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: 0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135304.6042829
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: -0.1
+    circuit-9: -0.1
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.8
+    circuit-4: -0.1
+    circuit-11: -0.1
+    circuit-2: -0.1
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135305.604738
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.1
+    circuit-3: 0.1
+    circuit-10: 2.0
+    circuit-4: -0.1
+    circuit-11: 0.0
+    circuit-2: 0.1
+  evse:
+    evse-1: 2.0
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135306.605823
+  grid_online: true
+  circuits:
+    circuit-7: 0.1
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: -0.1
+    circuit-8: -0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.1
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135307.611011
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: -0.1
+    circuit-9: 0.0
+    circuit-8: 0.1
+    circuit-1: -0.1
+    circuit-3: 0.0
+    circuit-10: 1.7
+    circuit-4: 0.0
+    circuit-11: 0.0
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.7
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135308.616251
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: -0.1
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: -0.1
+    circuit-11: 0.0
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135309.616996
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.1
+    circuit-9: 0.1
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: 0.1
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135310.622228
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.1
+    circuit-8: 0.1
+    circuit-1: 0.0
+    circuit-3: 0.0
+    circuit-10: 1.9
+    circuit-4: 0.0
+    circuit-11: -0.1
+    circuit-2: 0.1
+  evse:
+    evse-1: 1.9
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0
+- current_time: 1795135311.6274061
+  grid_online: true
+  circuits:
+    circuit-7: 0.0
+    circuit-6: 0.0
+    circuit-5: 0.0
+    circuit-9: 0.0
+    circuit-8: 0.0
+    circuit-1: 0.0
+    circuit-3: 0.1
+    circuit-10: 1.8
+    circuit-4: 0.0
+    circuit-11: -0.1
+    circuit-2: 0.0
+  evse:
+    evse-1: 1.8
+  bess_communication:
+    bess-1: OK
+  bess_pv:
+    bess-1: 0.0

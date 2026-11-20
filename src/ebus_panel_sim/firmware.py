@@ -16,6 +16,9 @@ build in it, such as the examples' ``example/v0.1.0``, gets the current
 conventions, and so does every other variant: the span-alpha-test-b2 and
 reference variants publish the specification's frame whatever firmware they
 report.
+
+From release 202645 span-alpha-test-b2 also declares a circuit's
+``connection/connection-point``, as a profile overlay ``release_overlays`` names.
 """
 
 from __future__ import annotations
@@ -90,3 +93,23 @@ def firmware_conventions(variant: Variant, release: int | None) -> FirmwareConve
     if keyed and release is not None and release < CURRENT_CONVENTIONS_RELEASE:
         return _EARLIER
     return _CURRENT
+
+
+CONNECTION_POINT_RELEASE: Final = 202645
+"""The first SPAN release build in which a span-alpha-test-b2 panel publishes
+``connection/connection-point`` on its circuits and remote CT."""
+
+# Profile overlay subdirectories a variant adds from a release build on, in order.
+_RELEASE_OVERLAYS: Final[dict[str, tuple[tuple[int, str], ...]]] = {
+    "span-alpha-test-b2": ((CONNECTION_POINT_RELEASE, "span-alpha-test-b2-r202645"),),
+}
+
+
+def release_overlays(variant: Variant, release: int | None) -> tuple[str, ...]:
+    """The profile overlays a panel of ``variant`` reporting ``release`` adds, in
+    order. An unknown release is taken to be current, so it gets every one."""
+    return tuple(
+        subdir
+        for first, subdir in _RELEASE_OVERLAYS.get(variant, ())
+        if release is None or release >= first
+    )

@@ -691,9 +691,20 @@ class _Mapper:
         self.variant: Variant = variant or _infer_variant(self.tree[self.panel_id])
         self.profiles = load_profiles(variant=self.variant)
         self.shares_breakers = declares_shared_breakers(self.profiles)
-        # A circuit device with only a meter is a remote-ct, not a branch circuit.
+        # A circuit device the panel only measures is a remote-ct, not a branch circuit.
         self.remote_cts = {i for i, d in self.tree.items() if _is_remote_ct(d)}
         self.ids = self._id_map()
+        for i in sorted(self.remote_cts):
+            extra = sorted(
+                set(self.tree[i].description.get("nodes", {})) - {"meter", "connection"}
+            )
+            if extra:
+                self.note(
+                    i,
+                    "connection-point",
+                    f"MONITORED, so captured as a remote-ct; its {', '.join(extra)} "
+                    f"{'node is' if len(extra) == 1 else 'nodes are'} not captured",
+                )
         self.circuit_numbers = {
             cid: n
             for n, cid in enumerate(
@@ -1465,7 +1476,21 @@ class _EchoKeys(dict[str, str]):
 
 
 def _is_remote_ct(device: Device) -> bool:
-    return device.type == "circuit" and set(device.description.get("nodes", {})) == {"meter"}
+    """A circuit device the panel only measures: ``connection/connection-point``
+    ``MONITORED`` from release 202645, and before it a circuit with only a meter.
+    A ``connection-point`` other than ``BRANCH`` or ``MONITORED`` is a
+    ``CaptureError``, since it says neither."""
+    if device.type != "circuit":
+        return False
+    point = device.value("connection/connection-point")
+    if point is None:
+        return set(device.description.get("nodes", {})) == {"meter"}
+    if point not in ("BRANCH", "MONITORED"):
+        raise CaptureError(
+            f"a circuit publishes connection/connection-point {point!r}, which is neither "
+            "BRANCH nor MONITORED"
+        )
+    return point == "MONITORED"
 
 
 def _infer_variant(panel: Device) -> Variant:

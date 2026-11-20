@@ -14,7 +14,9 @@ SPAN-vendor-specific surface + conformance-latitude overrides) onto the base, wh
 overlay ``null`` removes a base capability or property. ``variant='span-alpha-test-b2'`` then
 merges ``profiles/span-alpha-test-b2/*.json`` on top: site, busbar and frequency properties and
 the commissioning facts a circuit or lugs can carry. ``variant='reference'`` loads the
-spec-conformant base only.
+spec-conformant base only. A variant's release overlays
+(``ebus_panel_sim.firmware.release_overlays``) merge last, chosen by the panel's SPAN
+release build: from release 202645, ``profiles/span-alpha-test-b2-r202645/*.json``.
 
 A numeric property may carry a ``literal`` entry, ``"integer"``, ``"<n>dp"`` or
 ``"shortest"``: the form its numbers are written in on the wire
@@ -33,6 +35,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from ebus_panel_sim.exceptions import ProfileValidationError
+from ebus_panel_sim.firmware import release_overlays
 from ebus_panel_sim.wire.literal import LiteralForm, parse_literal_form
 
 _DEFAULT_DIR = Path(__file__).parent / "profiles"
@@ -90,15 +93,18 @@ def load_profiles(
     *,
     variant: Variant = "span",
     catalog_dir: Path = _CATALOG_DIR,
+    release: int | None = None,
 ) -> ProfileTable:
     """Hydrate the base selections against the vendored catalogs, merging the
-    variant's overlays in order."""
+    variant's overlays in order, then those it adds by the panel's SPAN release
+    build (``ebus_panel_sim.firmware.release_overlays``)."""
+    overlays = (*_OVERLAYS[variant], *release_overlays(variant, release))
     catalogs = _load_catalogs(catalog_dir)
     table = ProfileTable()
     for path in sorted(directory.glob("*.json")):  # base only; overlay subdirs are not matched
         entity_class = path.stem
         raw = json.loads(path.read_text())
-        for subdir in _OVERLAYS[variant]:
+        for subdir in overlays:
             overlay_path = directory / subdir / f"{entity_class}.json"
             if overlay_path.exists():
                 raw = _merge_overlay(raw, json.loads(overlay_path.read_text()), overlay_path)

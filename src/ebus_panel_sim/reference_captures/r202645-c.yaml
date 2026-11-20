@@ -1,0 +1,644 @@
+schema: panel-sim-definition/1
+variant: span-alpha-test-b2
+devices:
+- class: panel
+  id: masked-panel
+  name: SPAN Panel eBus Adapter
+  metadata:
+    vendor-name: SPAN
+    serial-number: MASKED-PANEL
+    firmware-version: spanos3/r202645/02
+    hardware-version: '3.0'
+    panel-model: MAIN_40
+    panel-size: '40'
+    main-breaker-rating-a: '70'
+    postal-code: '00000'
+    time-zone: America/Los_Angeles
+    wifi-ssid: masked-ssid
+    operator-import-limit-enablement: DISABLED
+    off-grid-import-limit-enablement: UNCONFIGURED
+    line-voltage-v: '122.0'
+    service-voltage-v: '244.0'
+    site-name: Masked Panel
+    address-lines: Masked Address
+    locality: Masked City
+    region: Masked Region
+    latitude: '0.0'
+    longitude: '0.0'
+- class: lugs
+  id: lugs-upstream
+  name: Upstream lugs
+  description_name: lugs-upstream
+  metadata:
+    direction: upstream
+    service-rating-a: '200'
+- class: circuit
+  id: circuit-1
+  name: Load 9
+  description_name: circuit-1
+  metadata:
+    tab-numbers: '9'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '201553.0'
+    initial-produced-wh: '460.1'
+- class: circuit
+  id: circuit-2
+  name: Load 10
+  description_name: circuit-2
+  metadata:
+    tab-numbers: '10'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '59102.8'
+    initial-produced-wh: '408.3'
+- class: circuit
+  id: circuit-3
+  name: Load 11
+  description_name: circuit-3
+  metadata:
+    tab-numbers: '11'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '299890.4'
+    initial-produced-wh: '485.9'
+- class: circuit
+  id: circuit-4
+  name: Load 13
+  description_name: circuit-4
+  metadata:
+    tab-numbers: '13'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '102872.2'
+    initial-produced-wh: '494.1'
+- class: circuit
+  id: circuit-6
+  name: Load 15
+  description_name: circuit-6
+  metadata:
+    tab-numbers: '15'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '646.3'
+    initial-produced-wh: '502.5'
+- class: circuit
+  id: circuit-7
+  name: Load 17
+  description_name: circuit-7
+  metadata:
+    tab-numbers: '17'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '7224.6'
+    initial-produced-wh: '142.5'
+- class: circuit
+  id: circuit-8
+  name: Load 18
+  description_name: circuit-8
+  metadata:
+    tab-numbers: '18'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '284407.1'
+    initial-produced-wh: '104.4'
+- class: circuit
+  id: circuit-9
+  name: Load 19
+  description_name: circuit-9
+  metadata:
+    tab-numbers: '19'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '18814.4'
+    initial-produced-wh: '112.3'
+- class: circuit
+  id: circuit-10
+  name: Load 20
+  description_name: circuit-10
+  metadata:
+    tab-numbers: '20'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '284596.8'
+    initial-produced-wh: '105.8'
+- class: circuit
+  id: circuit-11
+  name: Load 21
+  description_name: circuit-11
+  metadata:
+    tab-numbers: '21'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '25540.8'
+    initial-produced-wh: '124.6'
+- class: circuit
+  id: circuit-12
+  name: Load 22
+  description_name: circuit-12
+  metadata:
+    tab-numbers: '22'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '695.4'
+    initial-produced-wh: '552.8'
+- class: circuit
+  id: circuit-13
+  name: Load 23
+  description_name: circuit-13
+  metadata:
+    tab-numbers: '23'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '699.7'
+    initial-produced-wh: '546.3'
+- class: circuit
+  id: circuit-14
+  name: Load 24
+  description_name: circuit-14
+  metadata:
+    tab-numbers: '24'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '695.4'
+    initial-produced-wh: '540.7'
+- class: circuit
+  id: circuit-15
+  name: Load 25
+  description_name: circuit-15
+  metadata:
+    tab-numbers: '25'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '3948.7'
+    initial-produced-wh: '1.4'
+- class: circuit
+  id: circuit-16
+  name: Load 26
+  description_name: circuit-16
+  metadata:
+    tab-numbers: '26'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '689.7'
+    initial-produced-wh: '544.5'
+- class: circuit
+  id: circuit-17
+  name: Load 27
+  description_name: circuit-17
+  metadata:
+    tab-numbers: '27'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '762.2'
+    initial-produced-wh: '484.5'
+- class: circuit
+  id: circuit-18
+  name: Load 28
+  description_name: circuit-18
+  metadata:
+    tab-numbers: '28'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '707.5'
+    initial-produced-wh: '540.4'
+- class: circuit
+  id: circuit-19
+  name: Load 29
+  description_name: circuit-19
+  metadata:
+    tab-numbers: '29'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '666.3'
+    initial-produced-wh: '508.2'
+- class: circuit
+  id: circuit-20
+  name: Load 30
+  description_name: circuit-20
+  metadata:
+    tab-numbers: '30'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '693.3'
+    initial-produced-wh: '562.4'
+- class: circuit
+  id: circuit-21
+  name: Load 31
+  description_name: circuit-21
+  metadata:
+    tab-numbers: '31'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '688.0'
+    initial-produced-wh: '538.7'
+- class: circuit
+  id: circuit-22
+  name: Load 32
+  description_name: circuit-22
+  metadata:
+    tab-numbers: '32'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '693.0'
+    initial-produced-wh: '547.3'
+- class: circuit
+  id: circuit-23
+  name: Load 33
+  description_name: circuit-23
+  metadata:
+    tab-numbers: '33'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '703.0'
+    initial-produced-wh: '550.7'
+- class: circuit
+  id: circuit-24
+  name: Load 34
+  description_name: circuit-24
+  metadata:
+    tab-numbers: '34'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '693.6'
+    initial-produced-wh: '561.3'
+- class: circuit
+  id: circuit-25
+  name: Load 35
+  description_name: circuit-25
+  metadata:
+    tab-numbers: '35'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '847.1'
+    initial-produced-wh: '542.5'
+- class: circuit
+  id: circuit-26
+  name: Load 36
+  description_name: circuit-26
+  metadata:
+    tab-numbers: '36'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '694.3'
+    initial-produced-wh: '532.6'
+- class: circuit
+  id: circuit-27
+  name: Load 37
+  description_name: circuit-27
+  metadata:
+    tab-numbers: '37'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '689.3'
+    initial-produced-wh: '538.6'
+- class: circuit
+  id: circuit-28
+  name: Load 38
+  description_name: circuit-28
+  metadata:
+    tab-numbers: '38'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '689.2'
+    initial-produced-wh: '540.9'
+- class: circuit
+  id: circuit-29
+  name: Load 39
+  description_name: circuit-29
+  metadata:
+    tab-numbers: '39'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '708.7'
+    initial-produced-wh: '556.3'
+- class: circuit
+  id: circuit-30
+  name: Load 40
+  description_name: circuit-30
+  metadata:
+    tab-numbers: '40'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '725.8'
+    initial-produced-wh: '568.1'
+- class: circuit
+  id: circuit-31
+  name: Load 41
+  description_name: circuit-31
+  metadata:
+    tab-numbers: '41'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '706.6'
+    initial-produced-wh: '563.3'
+- class: circuit
+  id: circuit-32
+  name: Load 42
+  description_name: circuit-32
+  metadata:
+    tab-numbers: '42'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '697.9'
+    initial-produced-wh: '549.7'
+- class: circuit
+  id: circuit-33
+  name: Load 43
+  description_name: circuit-33
+  metadata:
+    tab-numbers: '43'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '93951.0'
+    initial-produced-wh: '66653.0'
+- class: circuit
+  id: circuit-34
+  name: Load 44
+  description_name: circuit-34
+  metadata:
+    tab-numbers: '44'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '691.4'
+    initial-produced-wh: '529.2'
+- class: circuit
+  id: circuit-35
+  name: Load 45
+  description_name: circuit-35
+  metadata:
+    tab-numbers: '45'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '89206.0'
+    initial-produced-wh: '107786.8'
+- class: circuit
+  id: circuit-36
+  name: Load 46
+  description_name: circuit-36
+  metadata:
+    tab-numbers: '46'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '699.3'
+    initial-produced-wh: '535.5'
+- class: circuit
+  id: circuit-37
+  name: Load 47
+  description_name: circuit-37
+  metadata:
+    tab-numbers: '47'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '701.9'
+    initial-produced-wh: '539.9'
+- class: circuit
+  id: circuit-38
+  name: Load 48
+  description_name: circuit-38
+  metadata:
+    tab-numbers: '48'
+    placement: upstream-of-lugs
+    breaker-rating-a: '50'
+    dipole: 'false'
+    default-priority: NICE_TO_HAVE
+    relay-behavior: controllable
+    nominal-voltage: '120.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '232'
+    initial-consumed-wh: '684.6'
+    initial-produced-wh: '546.3'
+- class: circuit
+  id: circuit-5
+  name: Heat strip
+  description_name: circuit-5
+  metadata:
+    tab-numbers: 14,16
+    placement: upstream-of-lugs
+    breaker-rating-a: '40'
+    dipole: 'true'
+    default-priority: OFF_GRID
+    relay-behavior: controllable
+    tags: HEAT_STRIP
+    dedicated: 'true'
+    nominal-voltage: '240.0'
+    protection-functions: OVERCURRENT
+    pcs-priority: '11'
+    initial-consumed-wh: '56391.0'
+    initial-produced-wh: '3424.1'

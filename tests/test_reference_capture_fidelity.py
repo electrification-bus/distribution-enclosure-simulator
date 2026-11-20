@@ -7,7 +7,9 @@ the 60 one-second ticks recorded with it. ``r202639-f``, a panel on
 the tree alone. The three MAIN 32 captures are held to the same bar:
 ``main32_r202639`` and ``main32_r202639-upstream-pv`` (its PV inverters and
 battery upstream of the panel) with their definitions and ticks, and the r202633
-capture ``main32_r202633``, which has neither. A capture that is the tree alone is
+capture ``main32_r202633``, which has neither. So are the ``spanos3/r202645``
+captures, each with its definition and ticks: ``main32_r202645``,
+``main32_r202645-cascade`` and ``r202645-<handle>``. A capture that is the tree alone is
 republished through the definition ``panel-sim-capture`` writes from it and one
 tick sampled from it, as the accessor derives them.
 
@@ -58,6 +60,9 @@ _MAIN32_R202639 = "main32_r202639"
 _MAIN32_R202633 = "main32_r202633"
 _MAIN32_R202639_UPSTREAM_PV = "main32_r202639-upstream-pv"
 _R202639_F = "r202639-f"
+_MAIN32_R202645 = "main32_r202645"
+_MAIN32_R202645_CASCADE = "main32_r202645-cascade"
+_R202645_G = "r202645-g"
 _R202639_04_SHED_FORECAST = (
     "On spanos3/r202639/04 the panel values four shed-forecast estimates (the total "
     "and priority-shed times, from now and from a full charge) that both captures "
@@ -65,11 +70,16 @@ _R202639_04_SHED_FORECAST = (
     "show whether that firmware always values them, or how it estimates them, so the "
     "variant keeps them unvalued."
 )
-_FEEDTHROUGH = (
-    "The panel feeds a sub-panel through its downstream lugs (2700.6 W in the "
-    "capture), which a definition cannot express, so the emitter's site lacks that "
-    "load and its grid and upstream lugs run the other way."
-)
+
+
+def _feedthrough(watts: str) -> str:
+    return (
+        f"The panel feeds a sub-panel through its downstream lugs ({watts} W in the "
+        "capture), which a definition cannot express, so the emitter's site lacks that "
+        "load and its grid and upstream lugs run the other way."
+    )
+
+
 _UPSTREAM_PV_SITE = (
     "With its PV inverters and battery upstream of the panel, the panel writes site "
     "as an integer (4443, the negated sum of the integer grid, pv and battery flows), "
@@ -80,6 +90,15 @@ _UPSTREAM_PV_SITE = (
 _FED_BY_ENCLOSURE = (
     "The upstream lugs are fed by another enclosure, which a definition cannot "
     "express; panel-sim-capture reports it as a note."
+)
+_CASCADE_SITE = (
+    "Fed by another panel, with its battery and PV upstream of it, the panel writes "
+    "site as an integer (2873), as main32_r202639-upstream-pv does with its PV and "
+    "battery upstream; the span profile keeps one decimal."
+)
+_R202645_SHED_FORECAST = (
+    "On spanos3/r202645/02 the panel values the four shed-forecast estimates, as "
+    "r202639-f on spanos3/r202639/04 does; the variant keeps them unvalued."
 )
 # Differences a capture may still show, by prefix (the device role, the path and the
 # kind of difference, without values), each with the reason the emitter cannot
@@ -96,8 +115,34 @@ _EXCEPTIONS: dict[str, dict[str, str]] = {
         ),
     },
     _MAIN32_R202639: {
-        "distribution-enclosure #1: power-flows/grid sign": _FEEDTHROUGH,
-        "lugs UPSTREAM: meter/active-power sign": _FEEDTHROUGH,
+        "distribution-enclosure #1: power-flows/grid sign": _feedthrough("2700.6"),
+        "lugs UPSTREAM: meter/active-power sign": _feedthrough("2700.6"),
+    },
+    _MAIN32_R202645: {
+        "distribution-enclosure #1: power-flows/grid sign": _feedthrough("2744.6"),
+        "lugs UPSTREAM: meter/active-power sign": _feedthrough("2744.6"),
+    },
+    _MAIN32_R202645_CASCADE: {
+        "distribution-enclosure #1: power-flows/site shape": _CASCADE_SITE,
+        **{
+            f"lugs UPSTREAM: connection/fed-by-device-{key}: valued only by the capture": (
+                _FED_BY_ENCLOSURE
+            )
+            for key in ("id", "status", "type")
+        },
+    },
+    _R202645_G: {
+        **{
+            f"distribution-enclosure #1: shed-forecast/{key}: valued only by the capture": (
+                _R202645_SHED_FORECAST
+            )
+            for key in (
+                "full-charge-time-to-priority-shed",
+                "full-charge-total-time-remaining",
+                "time-to-priority-shed",
+                "total-time-remaining",
+            )
+        },
     },
     _MAIN32_R202639_UPSTREAM_PV: {
         "distribution-enclosure #1: power-flows/site shape": _UPSTREAM_PV_SITE,
@@ -130,6 +175,7 @@ _COMPARED_BY_VALUE = frozenset(
         "config/max-charge-current",
         "config/user-max-charge-current",
         "connection/backed-up",
+        "connection/connection-point",
         "connection/feeds-role",
         "connection/overcurrent-protection",
         "connection/service-rating",

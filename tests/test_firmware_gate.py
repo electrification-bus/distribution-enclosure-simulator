@@ -13,6 +13,7 @@ variant always publishes the battery's own frame and declares no user limit."""
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import json
 from collections.abc import Mapping
@@ -315,7 +316,7 @@ def test_span_alpha_test_b2_before_202639_still_publishes_the_current_convention
 ) -> None:
     """The gate is the span variant's alone: the span-alpha-test-b2 example on a firmware
     string from before release 202639 publishes the same tree as the shipped
-    one, the firmware topic aside."""
+    one, the firmware topic and release 202645's ``connection-point`` aside."""
     shipped = _run_example(rec, _B2, None).tree
     run = _run_example(rec, _B2, _PRE)
     pre = run.tree
@@ -333,8 +334,21 @@ def test_span_alpha_test_b2_before_202639_still_publishes_the_current_convention
     # The SPAN Drive's user limit is unpublished until a user sets one.
     assert _B2_USER_MAX not in pre
 
+    # Release 202645 adds connection/connection-point; an unversioned firmware
+    # string is current, so only that addition and the firmware topic differ.
     changed = {t for t in shipped.keys() | pre.keys() if shipped.get(t) != pre.get(t)}
-    assert changed == {_B2_FIRMWARE}
+    added = {t for t in changed if t.endswith("/connection/connection-point")}
+    assert added and all(t not in pre for t in added)
+    described = {t.rsplit("/", 2)[0] + "/$description" for t in added}
+    assert changed - added - described == {_B2_FIRMWARE}
+    for topic in described:
+        now, before = copy.deepcopy(shipped[topic]), pre[topic]
+        assert isinstance(now, dict) and isinstance(before, dict)
+        nodes = now["nodes"]
+        del nodes["connection"]["properties"]["connection-point"]
+        if not nodes["connection"]["properties"] and "connection" not in before["nodes"]:
+            del nodes["connection"]
+        assert now == before, topic
 
     # A user's set publishes, as on any firmware.
     user_set = _run_example(
