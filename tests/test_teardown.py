@@ -116,3 +116,26 @@ def test_ungraceful_stop_publishes_the_root_state_exactly_once(rec: PahoRecorder
     assert payload == "lost", f"payload should be the wire string, got {payload!r}"
     assert retain is True
     assert rec.retained[ROOT_STATE] == "lost"
+
+
+def test_clear_retained_removes_each_device_state_first(rec: PahoRecorder) -> None:
+    """Homie 5 removes a device by clearing its ``$state`` before its other topics.
+    A controller that sees an empty ``$description`` while the device still has a
+    ``$state`` reads it as a malformed description, not a removal."""
+    emitter = _started()
+    devices = list(emitter._graph.devices)
+    assert len(devices) > 1
+    rec.reset()
+    emitter.stop(clear_retained=True)
+    cleared = [t for (t, d, _q, r) in rec.published if d == "" and r]
+    for device_id in devices:
+        state, description = f"ebus/5/{device_id}/$state", f"ebus/5/{device_id}/$description"
+        assert state in cleared and description in cleared, device_id
+        assert cleared.index(state) < cleared.index(description), device_id
+
+
+def test_clear_retained_leaves_nothing_retained(rec: PahoRecorder) -> None:
+    """A trailing ``disconnected`` would re-create the root as a ``$state`` with no
+    ``$description``."""
+    _started().stop(clear_retained=True)
+    assert rec.retained == {}

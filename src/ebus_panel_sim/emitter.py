@@ -754,10 +754,12 @@ class Emitter:
         ``ready``, deterministically. There is nothing to await: letting the loop
         turn once before you close the client is the whole remedy.
 
-        ``clear_retained`` additionally clears every device's retained values +
-        ``$description`` before disconnecting, for a clean-slate re-run. It
-        applies to the graceful path only, since a producer that died clears
-        nothing."""
+        ``clear_retained`` instead removes the whole tree before disconnecting,
+        for a clean-slate re-run: each device's ``$state`` is cleared before its
+        ``$description`` and values (Homie 5 device removal), leaves first, and no
+        ``disconnected`` follows, since that would leave a ``$state`` with no
+        ``$description``. It applies to the graceful path only, since a producer
+        that died clears nothing."""
         if not graceful:
             # Only ever stop a client this emitter had built for it. Stopping an
             # injected one would tear down a connection the caller owns and may
@@ -776,8 +778,9 @@ class Emitter:
                 client.stop()
             return
         if clear_retained:
-            for device in self._graph.devices.values():
-                device.delete_all_from_mqtt()
+            self._root.delete()
+            self._root.stop(announce=False)
+            return
         self._root.stop()
 
     def update_bess_config(self, config: BESSConfig) -> None:

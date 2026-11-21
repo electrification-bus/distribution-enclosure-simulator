@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+`Emitter.stop(clear_retained=True)` removes each device the Homie 5 way, clearing its `$state` before its `$description` and values, and no longer publishes `$state` `disconnected` afterwards ([#88](https://github.com/electrification-bus/distribution-enclosure-simulator/issues/88)). It cleared each `$description` while the device's `$state` was still retained, which a controller logs as a malformed description (electrification-bus/python-sdk#123), and left the root on a `$state` with no `$description`.
+
 ## [0.11.0] - 2026-11-19
 
 **BREAKING (wire).** Under a variant whose circuit profile declares both `meter/shared-with-device-ids` and `switch/shared-with-device-ids`, circuits that name each other in `shared-with-device-ids` each publish their breaker's one reading, where each published its own load: the sum of their loads, the breaker's current and one energy register ([#68](https://github.com/electrification-bus/distribution-enclosure-simulator/issues/68)). The tandem in the shipped example whose variant declares both lists (`circuit-1` and `circuit-2`) now publishes `meter/active-power` `-181.0` on both, where they published `-121.0` and `-60.0`. The span and reference variants, which declare neither, publish as before.
